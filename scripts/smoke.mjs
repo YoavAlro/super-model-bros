@@ -174,6 +174,7 @@ async function checkStar(page, id, tag) {
   };
   await page.evaluate(() => window.__smb.give('rlhf'));
   if (!(await waitFor(page, starred, null, 8000))) throw new Error(`${id}: the star never tinted the character or started its tune`);
+  const materials = await page.evaluate(() => window.__smb.starFx()[0].materials);
   await page.screenshot({ path: `${OUT}/${tag}-star-${id}.png` });
   await page.evaluate(() => window.__smb.starLeft(0.4));
   if (!(await waitFor(page, restored, null, 8000))) throw new Error(`${id}: colours or music not restored when the star ran out`);
@@ -181,8 +182,14 @@ async function checkStar(page, id, tag) {
   if (!(await waitFor(page, starred, null, 8000))) throw new Error(`${id}: the second star never tinted the character`);
   const p = await page.evaluate(() => window.__smb.player());
   await page.evaluate((pl) => window.__smb.teleport(pl.x, -3.5), p);
-  if (!(await waitFor(page, restored, null, 8000))) throw new Error(`${id}: colours or music not restored after dying while starred`);
-  return `star tinted ${await page.evaluate(() => window.__smb.starFx()[0].materials)} materials, restored on timeout and death (${level} → star → ${await page.evaluate(() => window.__smb.tune())})`;
+  // Down: quiet under the die sound (the theme must not restart as you fall), then back on the respawn.
+  const fallen = () => {
+    const f = window.__smb.starFx()[0];
+    return f.left === 0 && !f.tinted && f.restored && window.__smb.tune() === null;
+  };
+  if (!(await waitFor(page, fallen, null, 8000))) throw new Error(`${id}: colours not restored, or music not quiet, after dying while starred`);
+  if (!(await waitFor(page, (tune) => window.__smb.tune() === tune, level, 12000))) throw new Error(`${id}: the respawn did not bring back ${level}`);
+  return `star tinted ${materials} materials, restored on timeout and death (${level} → star → quiet → ${await page.evaluate(() => window.__smb.tune())})`;
 }
 
 /**

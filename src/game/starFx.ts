@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { canvasTexture, labelSprite } from './meshes';
 import { prefs } from './prefs';
-import { comboColor, comboLabel, knockPose, starCycleRate, starHue, starMix, type KnockPose, type StarKind } from './starRules';
+import { comboColor, comboLabel, knockPose, stackPopup, starCycleRate, starHue, starLift, starMix, type KnockPose, type StarKind } from './starRules';
 import { StarTint } from './starTint';
 
 /**
@@ -98,7 +98,8 @@ export class StarFx {
     const breathe = 1 + 0.06 * Math.sin(2 * Math.PI * this.phase);
     a.position.set(body.x + body.w / 2, body.y + body.h * 0.5, -0.4);
     a.scale.setScalar((body.h * 1.7 + 0.8) * breathe);
-    a.material.color.setHSL(starHue(star.kind, this.phase, 0.5), 1, 0.5, THREE.SRGBColorSpace);
+    const hue = starHue(star.kind, this.phase, 0.5);
+    a.material.color.setHSL(hue, 1, starLift(hue, 1, 0.5), THREE.SRGBColorSpace);
     a.material.opacity = (star.kind === 'mega' ? 0.75 : 0.55) * mix;
   }
 }
@@ -281,7 +282,7 @@ class Sparkles {
     this.life[i] = 0.45 + r() * 0.4;
     this.base[i] = (kind === 'mega' ? 1.8 : 1.15) * (0.7 + r() * 0.6);
     const hue = kind === 'viral' ? (phase + r()) % 1 : 0.1 + r() * 0.07;
-    const light = kind === 'viral' ? 0.62 : r() < 0.3 ? 0.9 : 0.62;
+    const light = kind === 'viral' ? starLift(hue, 1, 0.62) : r() < 0.3 ? 0.9 : 0.62;
     vivid.setHSL(hue, 1, light, THREE.SRGBColorSpace);
     this.rgb[i * 3] = vivid.r;
     this.rgb[i * 3 + 1] = vivid.g;
@@ -365,8 +366,11 @@ export class KnockOffs {
     popup.renderOrder = 4;
     const half = popup.scale.y / 2;
     const x = body.x + body.w / 2;
-    const py = Math.max(body.y + body.h + 0.25 + half, clearAbove + 0.1 + half);
     const px = x - dir * 0.8;
+    const box = { x: px, y: Math.max(body.y + body.h + 0.25 + half, clearAbove + 0.1 + half), w: popup.scale.x, h: popup.scale.y };
+    // Only on a hit, so the little list of live popups is not per-frame garbage.
+    const live = this.flying.filter((f) => f.popup.parent).map(({ popup: o }) => ({ x: o.position.x, y: o.position.y, w: o.scale.x, h: o.scale.y }));
+    const py = stackPopup(box, live);
     popup.position.set(px, py, 0);
     this.scene.add(popup);
     this.flying.push({ mesh, x, y: body.y, mid: body.h / 2, dir, age: 0, popup, px, py });

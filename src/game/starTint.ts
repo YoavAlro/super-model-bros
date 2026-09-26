@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { starGlow, starHue, starLightness, starSaturation, starWeight, type StarKind } from './starRules';
+import { starGlow, starHue, starLift, starLightness, starSaturation, starWeight, type StarKind } from './starRules';
 
 /**
- * The star rainbow's material cache: finds every tintable material under a character's mesh, keeps
- * its own colour, emissive and emissive intensity in `material.userData.starOriginal`, tints it for
- * a frame, and puts it back exactly. No textures or DOM, so it is unit tested (`star.test.ts`).
+ * The star rainbow's material cache: finds every tintable material under a character's mesh the
+ * first time, keeps its own colour, emissive and emissive intensity in this object's part list, tints
+ * it for a frame, and puts it back exactly. No textures or DOM, so it is unit tested (`star.test.ts`).
  * Materials are per-instance (see `characterMeshes.ts` and `toonKit.ts`), so tinting one
- * character never tints another.
+ * character never tints another. The originals stay out of `material.userData`, which a material
+ * clone would copy, stale, into another mesh.
  */
 
 type Tintable = THREE.Material & { color: THREE.Color; emissive?: THREE.Color; emissiveIntensity?: number };
@@ -58,11 +59,11 @@ export class StarTint {
     const lum = starGlow(kind);
     for (const p of parts) {
       const hue = starHue(kind, phase, p.offset);
-      vivid.setHSL(hue, sat, p.lightness, SRGB);
+      vivid.setHSL(hue, sat, starLift(hue, sat, p.lightness), SRGB);
       p.mat.color.copy(p.orig.color).lerp(vivid, mix * p.weight);
       if (p.mat.emissive && p.orig.emissive) {
         // Blend from the part's own glow, so parts that glow anyway keep it on the off frames.
-        p.mat.emissive.copy(p.orig.emissive).lerp(glow.setHSL(hue, 1, lum, SRGB), mix);
+        p.mat.emissive.copy(p.orig.emissive).lerp(glow.setHSL(hue, 1, starLift(hue, 1, lum), SRGB), mix);
         p.mat.emissiveIntensity = THREE.MathUtils.lerp(p.orig.intensity, 1, mix);
       }
     }
@@ -131,7 +132,6 @@ export class StarTint {
     const span = Math.max(0.001, Math.max(...ys) - lo);
     return [...found].map(([mat, y]) => {
       const orig: Original = { color: mat.color.clone(), emissive: mat.emissive?.clone() ?? null, intensity: 1 };
-      mat.userData.starOriginal = orig;
       // capture() fills in the originals' values, lightness and weight.
       return { mat, orig, offset: (y - lo) / span, lightness: 0.5, weight: 1 };
     });
