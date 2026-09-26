@@ -3,7 +3,7 @@ import type { CharacterSpec } from '../config/characters';
 import type { FormAbility } from '../config/levelSpec';
 import { disposeObject } from './dispose';
 import { blinkVisible, prefs } from './prefs';
-import { makeCape, makeCharacter } from './characterMeshes';
+import { animateCharacter, makeCape, makeCharacter, type CharacterMotion } from './characterMeshes';
 import { labelSprite } from './meshes';
 import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
 import type { Pad } from './pad';
@@ -23,6 +23,15 @@ const MEGA_H = 3;
 /** The name tag: its centre this far above the head, and its height. */
 const TAG_ABOVE = 0.55;
 const TAG_SCALE = 0.42;
+/**
+ * Emissive strength of the held-power glows: a tint over the body, not a recolour. Think's violet
+ * is weaker because warm bodies (clay, orange) have so little blue that it would turn them pink.
+ */
+const TOOL_GLOW = 0.35;
+const THINK_GLOW = 0.11;
+
+/** A material the star, tool and think glows tint. */
+type GlowMat = THREE.Material & { emissive: THREE.Color; emissiveIntensity: number };
 
 /** A power you keep until you get hit. */
 export type HeldPower = 'tool' | 'cape' | null;
@@ -69,7 +78,12 @@ export class PlayerActor {
   mega = 0;
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
-  private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
+  /** The body's material plus any big second-colour mass (`userData.glow`): the star, tool and think glows. */
+  private readonly glowMats: GlowMat[];
+  /** Seconds left of an air-dash's streaming look. */
+  private dashTime = 0;
+  /** Reused every frame for the mascot's idle life. */
+  private readonly motion: CharacterMotion = { speed: 0, airborne: false, vy: 0 };
   private actionHeldPrev = false;
   private ghosted = false;
   private squash = 0;
@@ -95,11 +109,18 @@ export class PlayerActor {
   ) {
     this.mover = newMover(x, y, 0.8, SMALL_H);
     this.mesh = makeCharacter(spec);
-    this.bodyMat = (this.mesh.getObjectByName('body') as THREE.Mesh | undefined)?.material as THREE.MeshLambertMaterial;
+    const glow = new Set<GlowMat>();
+    this.mesh.traverse((o) => {
+      const m = (o as THREE.Mesh).material as (THREE.Material & { emissive?: THREE.Color }) | undefined;
+      if (m?.emissive && (o.name === 'body' || m.userData.glow)) glow.add(m as GlowMat);
+    });
+    this.glowMats = [...glow];
     this.cape = makeCape(spec.accent);
     this.cape.visible = false;
     this.mesh.add(this.cape);
     if (clone) this.mesh.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.setValues?.({ transparent: true, opacity: 0.55 }));
+    // Ink outlines are back-face hulls: on a see-through clone they read as a muddy shell.
+    if (clone) showOutlines(this.mesh, false);
     this.tag = this.makeTag(clone ? cloneTag : form);
     scene.add(this.mesh, this.tag);
     this.fx = new StarFx(this.mesh, scene);
@@ -306,7 +327,10 @@ export class PlayerActor {
         this.spinDir = -this.mover.facing;
       }
     }
-    if (ev.dashed) sfx.dash();
+    if (ev.dashed) {
+      sfx.dash();
+      this.dashTime = 0.3;
+    }
     if (ev.landed) this.squash = 0.25;
     return ev;
   }
@@ -330,8 +354,12 @@ export class PlayerActor {
       this.ghosted = ghosted;
       this.mesh.traverse((o) => {
         const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (m) m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
+        if (!m) return;
+        m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
+        // Opaque materials compile with alpha forced to 1: recompile, or the hit never shows.
+        m.needsUpdate = true;
       });
+      showOutlines(this.mesh, !ghosted);
     }
     if (this.spin >= 0) {
       this.spin += dt;
@@ -345,29 +373,42 @@ export class PlayerActor {
     star.total = this.starTotal;
     this.fx.update(dt, this.star > 0 && this.starKind ? star : null, b);
     this.cape.visible = this.power === 'cape';
-    (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
-    // A star's rainbow (starFx.ts) owns every colour while it lasts.
-    if (this.bodyMat && this.star <= 0) {
-      if (this.power === 'tool') {
-        this.bodyMat.emissive.setHex(0x0d5c50);
-      } else if (this.thinking) {
-        this.bodyMat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
-      } else {
-        this.bodyMat.emissive.setHex(0x000000);
+    (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(1.1, Math.abs(b.vy) * 0.07);
+    // A star's rainbow (starFx.ts) owns every colour while it lasts. Otherwise held powers (tool,
+    // think) glow as a sheen that keeps the lab's colour.
+    if (this.star <= 0) {
+      const glowStrength = this.power === 'tool' ? TOOL_GLOW : THINK_GLOW;
+      for (const mat of this.glowMats) {
+        mat.emissiveIntensity = glowStrength;
+        if (this.power === 'tool') mat.emissive.setHex(0x0d5c50);
+        else if (this.thinking) mat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
+        else mat.emissive.setHex(0x000000);
       }
     }
     this.tag.position.set(b.x + b.w / 2, b.y + b.h + TAG_ABOVE, 0);
     this.tag.visible = !this.dead;
+    // Tall parts (ears, antennae, spouts) push the tag up when stretched big or giant.
+    this.tag.position.y = Math.max(this.tag.position.y, b.y + ((this.mesh.userData.top as number | undefined) ?? 1) * sy + 0.32);
+    // The mascot's idle life: blinks, swinging limbs, and its own signature motion.
+    this.dashTime = Math.max(0, this.dashTime - dt);
+    const m = this.motion;
+    m.speed = Math.abs(b.vx);
+    m.airborne = !b.onGround;
+    m.vy = b.vy;
+    m.thinking = this.thinking;
+    m.dashing = this.dashTime > 0;
+    m.dead = this.dead;
+    animateCharacter(this.mesh, t, m);
   }
 
   /** The top of the name tag, for popups that must stay clear of it. */
   tagTop(): number {
-    return this.body.y + this.body.h + TAG_ABOVE + TAG_SCALE / 2;
+    return this.tag.position.y + TAG_SCALE / 2;
   }
 
   /** For the debug hooks: the star effects' state. The power glows own the body's emissive outside a star. */
   starDebug() {
-    return { ...this.fx.debug(this.bodyMat), spinning: this.spin >= 0, left: this.star, kind: this.starKind, chain: this.starChain };
+    return { ...this.fx.debug(this.glowMats[0]), spinning: this.spin >= 0, left: this.star, kind: this.starKind, chain: this.starChain };
   }
 
   dispose(): void {
@@ -382,4 +423,11 @@ export class PlayerActor {
     tag.scale.multiplyScalar(TAG_SCALE);
     return tag;
   }
+}
+
+/** Shows or hides a mascot's ink outlines (meshes named 'outline'). */
+function showOutlines(root: THREE.Object3D, on: boolean): void {
+  root.traverse((o) => {
+    if (o.name === 'outline') o.visible = on;
+  });
 }
