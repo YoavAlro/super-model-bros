@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { blocksDoubleTap, DOUBLE_TAP_MS } from './zoomLock';
+import { blocksPinch, isZoomedIn } from './zoomLock';
 
 describe('zoom lock', () => {
-  it('cancels a quick second tap on game controls, never on menu buttons', () => {
-    expect(blocksDoubleTap(120, false)).toBe(true);
-    expect(blocksDoubleTap(120, true)).toBe(false);
-    expect(blocksDoubleTap(DOUBLE_TAP_MS + 1, false)).toBe(false);
+  it('blocks a pinch at normal scale but lets a zoomed page pinch back out', () => {
+    expect(blocksPinch(2, 1)).toBe(true);
+    expect(blocksPinch(2, undefined)).toBe(true);
+    expect(blocksPinch(1, 1)).toBe(false);
+    expect(blocksPinch(2, 1.6)).toBe(false);
+  });
+
+  it('treats only a real zoom as zoomed', () => {
+    expect(isZoomedIn(undefined)).toBe(false);
+    expect(isZoomedIn(1.005)).toBe(false);
+    expect(isZoomedIn(1.3)).toBe(true);
   });
 });
