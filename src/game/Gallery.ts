@@ -27,7 +27,7 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
   scene.add(sun);
 
   const items = which === 'characters' ? characterGallery(ROSTER) : enemyGallery();
-  const perRow = which === 'characters' ? items.length : 7;
+  const perRow = which === 'characters' ? items.length : 8;
   const close = which === 'characters' ? 2 : 1;
   const cell = which === 'characters' ? 2.6 : 4.2;
   const spinners: THREE.Object3D[] = [];
