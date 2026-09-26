@@ -21,10 +21,22 @@ const WEAKEST: MoveStats = {
 /**
  * People are not frame-perfect: on a phone they take off a little early or a little slow. So every
  * level must also be finishable, with no soft-locks, when the weakest character's jump velocity is
- * scaled by this margin. A jump that passes only at full strength needs a pixel-perfect take-off.
- * (At 0.94 the deliberate 4-tall climbs, like the lying bar in 5-4, shrink to a 0.04 s window.)
+ * scaled by this margin. That proves some route has height and distance to spare; it does not prove
+ * the obvious route is safe (a block over a pit can still knock a runner in), so play those spots.
  */
-const HUMAN_MARGIN = 0.95;
+const HUMAN_MARGIN = 0.9;
+
+/**
+ * Deliberate 4-tall running climbs, held to a laxer margin: below 95% of the jump their take-off
+ * window shrinks to ~0.04 s. List a level here only for a climb like that, and say which one it is.
+ * No level is ever laxer than LAXEST_MARGIN.
+ */
+const LAXEST_MARGIN = 0.95;
+const DELIBERATE_CLIMBS: Record<string, number> = {
+  'gpt-2-2': LAXEST_MARGIN, // the climb out of the valley between the staircases; big: the run onto the brick ceiling
+  'claude-3-2': LAXEST_MARGIN, // the sky platform 4 up over the long pit
+  'gpt-5-4': LAXEST_MARGIN, // the 4-tall lying bar in the chart puzzle
+};
 
 describe('paths', () => {
   it('reference levels that exist, in world order', () => {
@@ -36,6 +48,16 @@ describe('paths', () => {
         expect(spec.world).toBeGreaterThanOrEqual(world);
         world = spec.world;
       }
+    }
+  });
+});
+
+describe('human margin', () => {
+  it('lists only real levels as deliberate climbs, none laxer than 95% of the jump', () => {
+    for (const [id, margin] of Object.entries(DELIBERATE_CLIMBS)) {
+      expect(LEVELS[id], id).toBeDefined();
+      expect(margin, id).toBeGreaterThan(HUMAN_MARGIN);
+      expect(margin, id).toBeLessThanOrEqual(LAXEST_MARGIN);
     }
   });
 });
@@ -91,10 +113,11 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     ['big', 1.75],
   ])('can be finished, with no soft-locks, by the weakest %s character', (_size, h) => expectFinishable(h, 1));
 
+  const margin = DELIBERATE_CLIMBS[spec.id] ?? HUMAN_MARGIN;
   it.each([
     ['small', 0.95],
     ['big', 1.75],
-  ])(`leaves a human margin: the weakest %s character finishes it on ${Math.round(HUMAN_MARGIN * 100)}% of its jump`, (_size, h) =>
-    expectFinishable(h, HUMAN_MARGIN),
+  ])(`leaves a human margin: the weakest %s character finishes it on ${Math.round(margin * 100)}% of its jump`, (_size, h) =>
+    expectFinishable(h, margin),
   );
 });

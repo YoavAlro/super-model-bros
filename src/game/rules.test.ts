@@ -8,7 +8,7 @@ import { newMover, stepMover, type MoveStats } from './movement';
 import { emptyPad, type Pad } from './pad';
 import { moveBody } from './physics';
 import { checkUnlocks, emptyProgress, endsWorld, formBefore, isUnlocked, nextStep, recordLevel } from './progress';
-import { analyzeReach } from './reach';
+import { analyzeReach, standingX } from './reach';
 
 const STEP = 1 / 120;
 const GPT: MoveStats = CHARACTERS.gpt;
@@ -256,6 +256,27 @@ describe('reachability checker', () => {
     const r = analyzeReach(grid, { x: 10, y: 2 }, grid.spawnOf('flag')!.x, { stats: { ...GPT, jumpVelocity: 21 }, h: 1.75 });
     expect(r.goalReachable).toBe(true);
     expect(r.deadEnds).toEqual([]);
+  });
+
+  it('stands a body in a gap between a tall wall and a ledge on the ledge, not inside the wall', () => {
+    // Spot (4, 2) is the 1-wide gap between the wall at x=3 and the ledge at x=5. The wall has a
+    // "floor" under the body's feet too, but it is solid at body height, so only the ledge fits.
+    const grid = new LevelGrid([
+      '          ',
+      '   X      ',
+      '   X      ',
+      '   X X    ',
+      '##########',
+    ]);
+    for (const h of [0.95, 1.75]) expect(standingX(grid, 4, 2, h)).toBeCloseTo(4.55);
+    const mirrored = new LevelGrid([
+      '          ',
+      '      X   ',
+      '      X   ',
+      '    X X   ',
+      '##########',
+    ]);
+    for (const h of [0.95, 1.75]) expect(standingX(mirrored, 5, 2, h)).toBeCloseTo(4.65);
   });
 });
 
