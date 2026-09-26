@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import type { CapStyle, DecorStyle, HardStyle, ShelfStyle, SoilStyle, Theme } from '../config/themes';
+import type { BrickStyle, CapStyle, DecorStyle, HardStyle, PipeStyle, ShelfStyle, SoilStyle, Theme } from '../config/themes';
 import { css, evictThemeTextures, softTexture, type Paint } from './art';
-import { hash01, shade } from './palette';
+import { hash01, mixHex, shade } from './palette';
 import { mulberry32 } from './rng';
 
 /**
@@ -123,7 +123,11 @@ function glyph(c: Ctx, text: string, x: number, y: number, px: number): void {
 const atlas = (key: string, paint: Paint, scope: 'global' | 'theme' = 'global') => softTexture(key, 128, 128, paint, scope);
 
 // --------------------------------------------------------------- fixed kinds
-/** The prompt ("?") block, frame k of 4: dot k of the typing indicator is raised (frame 3: none). */
+/**
+ * The prompt block, frame k of 4: a cream chat bubble on the amber face holding a '?' and the typing
+ * indicator, whose dot k is raised (frame 3: none). The bubble is what makes it a prompt rather than a
+ * plain '?' block, so it is sized to read at phone size.
+ */
 export function promptFrames(): THREE.Texture[] {
   return [0, 1, 2, 3].map((k) =>
     atlas(`prompt:${k}`, (c) => {
@@ -131,25 +135,35 @@ export function promptFrames(): THREE.Texture[] {
         fillAll(c, 0xffc23a);
         bevel(c, 3, 2, 0xffe08a, 0xc46a0a);
         border(c, 3, 0x6a2e00, 0.85);
-        c.font = 'bold 38px system-ui, sans-serif';
+        // The bubble, its tail notched out of the lower left, with a soft drop shadow.
+        const bubble = (dx: number, dy: number) => {
+          c.beginPath();
+          c.roundRect(8 + dx, 8 + dy, 48, 40, 9);
+          c.moveTo(15 + dx, 47 + dy);
+          c.lineTo(11 + dx, 57 + dy);
+          c.lineTo(26 + dx, 47 + dy);
+          c.closePath();
+        };
+        bubble(2, 2);
+        c.fillStyle = rgba(0xc46a0a, 0.8);
+        c.fill();
+        bubble(0, 0);
+        c.fillStyle = css(0xfff3d0);
+        c.fill();
+        c.strokeStyle = rgba(0x6a2e00, 0.9);
+        c.lineWidth = 2.5;
+        c.lineJoin = 'round';
+        c.stroke();
+        c.font = 'bold 27px system-ui, sans-serif';
         c.textAlign = 'center';
         c.textBaseline = 'middle';
-        c.fillStyle = css(0xc46a0a);
-        c.fillText('?', 34, 29);
-        c.strokeStyle = css(0x6a2e00);
-        c.lineWidth = 5;
-        c.lineJoin = 'round';
-        c.strokeText('?', 32, 27);
-        c.fillStyle = css(0xfff3d0);
-        c.fillText('?', 32, 27);
-        [22, 32, 42].forEach((x, i) => {
+        c.fillStyle = css(0xb8560a);
+        c.fillText('?', 32, 22);
+        [20, 32, 44].forEach((x, i) => {
           c.beginPath();
-          c.arc(x, i === k ? 47 : 51, 3.2, 0, TAU);
-          c.fillStyle = css(0xfff3d0);
+          c.arc(x, i === k ? 36 : 39, 4.6, 0, TAU);
+          c.fillStyle = css(0x6a2e00);
           c.fill();
-          c.lineWidth = 1.5;
-          c.strokeStyle = css(0x6a2e00);
-          c.stroke();
         });
       });
       for (const [cell, hex] of [[Tc, 0xffd25a], [S, 0xe0a020], [U, 0xc48a18]] as const) {
@@ -181,24 +195,170 @@ export function usedAtlas(): THREE.Texture {
   });
 }
 
-/** Clay pill bricks in the theme's brick colour. */
-export function brickAtlas(C: number): THREE.Texture {
+/**
+ * Breakable bricks (C = theme.brick), in the era's craft: clay pills, wooden building blocks, folded
+ * paper, moulded plastic, tufted velvet, printed tin or cast resin. Every style keeps a bond of
+ * smaller pieces inside the tile, so a brick never reads as the solid, framed hard block.
+ */
+export function brickAtlas(style: BrickStyle, C: number): THREE.Texture {
   return atlas(
-    `brick:${C}`,
+    `brick:${style}:${C}`,
     (c) => {
+      const tone = (x: number, row: number, spread = 0.16) => shade(C, 1 - spread / 2 + spread * hash01(x + 64, row));
       const face = (c: Ctx) => {
-        fillAll(c, dd(C));
-        [0, 16, 0].forEach((off, row) => {
-          const y = row * 21;
-          for (let x = off - 32; x < 64; x += 32) {
-            c.fillStyle = css(shade(C, 0.92 + 0.16 * hash01(x + 64, row)));
-            c.beginPath();
-            c.roundRect(x + 1.5, y + 1.5, 29, 18, 6);
-            c.fill();
-            rect(c, x + 5.5, y + 3.5, 21, 2, up(C));
-            rect(c, x + 5.5, y + 15, 21, 2, dn(C));
+        switch (style) {
+          case 'pill':
+            fillAll(c, dd(C));
+            [0, 16, 0].forEach((off, row) => {
+              const y = row * 21;
+              for (let x = off - 32; x < 64; x += 32) {
+                c.fillStyle = css(tone(x, row));
+                c.beginPath();
+                c.roundRect(x + 1.5, y + 1.5, 29, 18, 6);
+                c.fill();
+                rect(c, x + 5.5, y + 3.5, 21, 2, up(C));
+                rect(c, x + 5.5, y + 15, 21, 2, dn(C));
+              }
+            });
+            break;
+          case 'woodblock':
+            // Two courses of wooden blocks: grain, a lit chamfer along the top, a dark one below.
+            fillAll(c, dd(C));
+            [0, 22].forEach((off, row) => {
+              const y = row * 32;
+              for (let x = off - 44; x < 64; x += 44) {
+                const t = tone(x, row, 0.14);
+                rect(c, x + 1.5, y + 1.5, 41, 29, t);
+                for (const gy of [9, 17, 24]) {
+                  c.strokeStyle = rgba(dd(t), 0.55);
+                  c.lineWidth = 1.2;
+                  c.beginPath();
+                  c.moveTo(x + 4, y + gy);
+                  c.bezierCurveTo(x + 14, y + gy - 2.5, x + 28, y + gy + 2.5, x + 40, y + gy - 1);
+                  c.stroke();
+                }
+                rect(c, x + 1.5, y + 1.5, 41, 3, up(t));
+                rect(c, x + 1.5, y + 1.5, 3, 29, up(t));
+                rect(c, x + 1.5, y + 27.5, 41, 3, dn(t));
+              }
+            });
+            break;
+          case 'folded':
+            // Paper bricks, each folded along a diagonal crease, with a strip of tape across a joint.
+            fillAll(c, dd(C));
+            [0, 16].forEach((off, row) => {
+              const y = row * 32;
+              for (let x = off - 32; x < 64; x += 32) {
+                const t = tone(x, row, 0.1);
+                rect(c, x + 1.5, y + 1.5, 29, 29, t);
+                c.fillStyle = css(shade(t, 0.88));
+                c.beginPath();
+                c.moveTo(x + 30.5, y + 1.5);
+                c.lineTo(x + 30.5, y + 30.5);
+                c.lineTo(x + 1.5, y + 30.5);
+                c.closePath();
+                c.fill();
+                line(c, [x + 2, y + 30, x + 30, y + 2], 1.5, up(t));
+              }
+            });
+            c.fillStyle = rgba(0xfff4d6, 0.55);
+            c.save();
+            c.translate(32, 32);
+            c.rotate(-0.12);
+            c.fillRect(-9, -20, 18, 40);
+            c.restore();
+            break;
+          case 'moulded':
+            // Glossy plastic bricks: rounded, with a white gloss dash at the upper left of each.
+            fillAll(c, dd(C));
+            [0, 16].forEach((off, row) => {
+              const y = row * 32;
+              for (let x = off - 32; x < 64; x += 32) {
+                c.fillStyle = css(tone(x, row, 0.08));
+                c.beginPath();
+                c.roundRect(x + 2, y + 2, 28, 28, 7);
+                c.fill();
+                c.strokeStyle = rgba(dn(C), 0.9);
+                c.lineWidth = 2;
+                c.stroke();
+                line(c, [x + 7, y + 9, x + 15, y + 6.5], 3, 0xffffff, 0.75);
+                disc(c, x + 6.5, y + 14, 1.5, 0xffffff, 0.6);
+              }
+            });
+            break;
+          case 'tufted': {
+            // Chesterfield velvet: buttons on a staggered grid, creases running between them.
+            fillAll(c, C);
+            const buttons: [number, number][] = [];
+            for (const [y, off] of [[0, 0], [32, 16], [64, 0]]) for (let x = off - 32; x <= 96; x += 32) buttons.push([x, y]);
+            for (const [x, y] of buttons) {
+              const g = c.createRadialGradient(x + 11, y + 13, 2, x + 16, y + 16, 20);
+              g.addColorStop(0, css(shade(C, 1.22)));
+              g.addColorStop(1, css(C));
+              c.fillStyle = g;
+              c.beginPath();
+              c.moveTo(x, y);
+              c.lineTo(x + 16, y + 16);
+              c.lineTo(x, y + 32);
+              c.lineTo(x - 16, y + 16);
+              c.closePath();
+              c.fill();
+            }
+            for (const [x, y] of buttons) {
+              line(c, [x - 16, y - 16, x + 16, y + 16], 1.5, dd(C), 0.8);
+              line(c, [x + 16, y - 16, x - 16, y + 16], 1.5, dd(C), 0.8);
+            }
+            for (const [x, y] of buttons) {
+              disc(c, x, y, 3, dd(C));
+              disc(c, x - 0.8, y - 0.8, 1.1, up(C));
+            }
+            break;
           }
-        });
+          case 'litho':
+            // Printed tin: a rolled rim, a cream printed band with little stars, rivets in the corners.
+            fillAll(c, C);
+            rect(c, 0, 0, 64, 6, shade(C, 1.3));
+            rect(c, 0, 58, 64, 6, dn(C));
+            rect(c, 0, 6, 64, 1.5, dd(C));
+            rect(c, 0, 24, 64, 16, 0xf0e0b0);
+            rect(c, 0, 24, 64, 1.5, dd(C));
+            rect(c, 0, 38.5, 64, 1.5, dd(C));
+            for (const x of [10.7, 32, 53.3]) star5(c, x, 32, 5, 2.2, C);
+            for (const [x, y] of [[7, 15], [57, 15], [7, 49], [57, 49]]) {
+              disc(c, x, y + 0.8, 2.2, dd(C));
+              disc(c, x, y, 2.2, up(C));
+            }
+            break;
+          case 'cast':
+            // Cast resin: two courses of glassy blocks with gold flecks set in them.
+            fillAll(c, dd(C));
+            [0, 20].forEach((off, row) => {
+              const y = row * 32;
+              for (let x = off - 40; x < 64; x += 40) {
+                const t = tone(x, row, 0.1);
+                const g = c.createLinearGradient(x, y, x + 38, y + 30);
+                g.addColorStop(0, css(up(t)));
+                g.addColorStop(1, css(t));
+                c.fillStyle = g;
+                c.beginPath();
+                c.roundRect(x + 1.5, y + 1.5, 37, 29, 4);
+                c.fill();
+                line(c, [x + 6, y + 6, x + 18, y + 5], 2, 0xffffff, 0.45);
+              }
+            });
+            for (let i = 0; i < 12; i++) {
+              const [x, y] = [4 + 56 * hash01(i, 3), 4 + 56 * hash01(i, 9)];
+              c.fillStyle = css(0xd8b458);
+              c.beginPath();
+              c.moveTo(x, y - 1.8);
+              c.lineTo(x + 1.4, y);
+              c.lineTo(x, y + 1.8);
+              c.lineTo(x - 1.4, y);
+              c.closePath();
+              c.fill();
+            }
+            break;
+        }
         border(c, 2, INK, 0.45);
       };
       F(c, face);
@@ -209,7 +369,7 @@ export function brickAtlas(C: number): THREE.Texture {
           for (let x = off - 32; x < 64; x += 32) {
             c.fillStyle = css(shade(up(C), 0.94 + 0.12 * hash01(x + 64, row + 7)));
             c.beginPath();
-            c.roundRect(x + 1.5, row * 32 + 2, 29, 28, 12);
+            c.roundRect(x + 1.5, row * 32 + 2, 29, 28, style === 'pill' ? 12 : style === 'moulded' ? 7 : 3);
             c.fill();
           }
         });
@@ -219,6 +379,19 @@ export function brickAtlas(C: number): THREE.Texture {
     },
     'theme',
   );
+}
+
+function star5(c: Ctx, x: number, y: number, outer: number, inner: number, hex: number): void {
+  c.fillStyle = css(hex);
+  c.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const r = k % 2 ? inner : outer;
+    const a = (k / 10) * TAU - Math.PI / 2;
+    if (k === 0) c.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+    else c.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
+  }
+  c.closePath();
+  c.fill();
 }
 
 /** Toggle blocks: '[' (A, blue) and ']' (B, orange), the map characters, so colour is never the only cue. */
@@ -334,67 +507,178 @@ export function lavaTexture(): THREE.Texture {
   return tex;
 }
 
-/** Construction-toy tube bodies (theme.pipe) with rib pairs. */
-export function pipeBody(C: number): THREE.Texture {
+/**
+ * Tube bodies (C = theme.pipe) in the era's material. u runs round the tube (u 0.2 and 0.8 face the
+ * camera on every variant), v up one tile, so patterns repeat seamlessly up a column.
+ */
+export function pipeBody(style: PipeStyle, C: number): THREE.Texture {
   return softTexture(
-    `pipeBody:${C}`,
+    `pipeBody:${style}:${C}`,
     64,
     64,
     (c) => {
       fillAll(c, C);
-      for (const y of [14, 46]) {
-        rect(c, 0, y, 64, 3, up(C));
-        rect(c, 0, y + 3, 64, 3, dn(C));
+      switch (style) {
+        case 'tincan':
+          // Rolled tin ribs.
+          for (const y of [14, 46]) {
+            rect(c, 0, y, 64, 3, up(C));
+            rect(c, 0, y + 3, 64, 3, dn(C));
+          }
+          break;
+        case 'cardboard':
+          // A kraft tube: fibre flecks and one 45° spiral seam that wraps round from tile to tile.
+          for (let i = 0; i < 26; i++) rect(c, 64 * hash01(i, 1), 64 * hash01(i, 2), 3, 1, i % 2 ? up(C) : dn(C), 0.7);
+          wrap((dx, dy) => {
+            line(c, [dx - 2, dy + 64, dx + 62, dy], 3.5, dd(C), 0.9);
+            line(c, [dx + 1.5, dy + 64, dx + 65.5, dy], 1.5, up(C));
+          });
+          break;
+        case 'paper':
+          // A rolled newspaper: faint columns of print and the overlapping edge of the sheet.
+          for (let col = 0; col < 3; col++) for (let y = 6; y < 62; y += 6) rect(c, 4 + col * 20, y, 8 + 8 * hash01(col, y), 2, shade(C, 0.82));
+          rect(c, 44, 0, 3, 64, dd(C), 0.8);
+          rect(c, 47, 0, 2, 64, up(C));
+          break;
+        case 'toy':
+          // Glossy moulded plastic: a bright gloss stripe (upper left, where the sun is) and a shaded edge.
+          rect(c, 13, 0, 7, 64, 0xffffff, 0.55);
+          rect(c, 23, 0, 2, 64, 0xffffff, 0.35);
+          rect(c, 52, 0, 12, 64, dn(C), 0.7);
+          break;
+        case 'velvet':
+          // A soft sheen down the middle and a gold piping ring at each end.
+          for (let x = 0; x < 64; x++) rect(c, x, 0, 1, 64, 0xffffff, 0.16 * Math.max(0, Math.cos(((x - 18) / 64) * TAU)) ** 3);
+          for (const y of [4, 58]) rect(c, 0, y, 64, 3, 0xd8b048);
+          break;
+        case 'glass':
+          // A glass tube: lighter body, two white highlights, a darker far edge and a bubble or two.
+          fillAll(c, shade(C, 1.25));
+          rect(c, 12, 0, 5, 64, 0xffffff, 0.7);
+          rect(c, 21, 0, 2, 64, 0xffffff, 0.45);
+          rect(c, 50, 0, 14, 64, dd(C), 0.45);
+          for (const [x, y, r] of [[36, 18, 2.5], [40, 44, 1.6], [31, 52, 1.2]]) {
+            c.strokeStyle = rgba(0xffffff, 0.6);
+            c.lineWidth = 1;
+            c.beginPath();
+            c.arc(x, y, r, 0, TAU);
+            c.stroke();
+          }
+          break;
       }
     },
     'theme',
   );
 }
 
-/** The bolted collar on a tube's top tile. Bolts at u 0.2 and 0.8, so one faces the camera. */
-export function pipeCollar(C: number): THREE.Texture {
+/** The collar on a tube's top tile, in the tube's material. Its fixings sit at u 0.2 and 0.8, so one faces the camera. */
+export function pipeCollar(style: PipeStyle, C: number): THREE.Texture {
   return softTexture(
-    `pipeCollar:${C}`,
+    `pipeCollar:${style}:${C}`,
     64,
     64,
     (c) => {
-      fillAll(c, up(C));
-      rect(c, 0, 0, 64, 8, shade(C, 1.3));
+      const band = style === 'glass' ? 0xc9a44a : C;
+      fillAll(c, up(band));
+      rect(c, 0, 0, 64, 8, shade(band, 1.3));
       rect(c, 0, 9, 64, 2, INK, 0.55);
       rect(c, 0, 59, 64, 2, INK, 0.55);
-      for (const x of [13, 51]) {
-        disc(c, x, 36, 5, dd(C));
-        disc(c, x - 1.5, 34.5, 1.6, up(C));
+      switch (style) {
+        case 'toy':
+          // Six peg holes round the collar instead of bolts.
+          for (let i = 0; i < 6; i++) {
+            const x = 5.33 + i * 10.67;
+            disc(c, x, 37, 3.6, up(C));
+            disc(c, x, 36, 3.2, dd(C));
+          }
+          rect(c, 10, 12, 5, 46, 0xffffff, 0.45);
+          break;
+        case 'cardboard':
+        case 'paper':
+          // Taped on: a strip of pale tape over each fixing point.
+          for (const x of [13, 51]) {
+            rect(c, x - 6, 14, 12, 42, 0xfff4d6, 0.55);
+            rect(c, x - 6, 14, 12, 1.5, 0xffffff, 0.5);
+          }
+          break;
+        case 'velvet':
+          // A gold fringe hanging from the rim.
+          rect(c, 0, 12, 64, 3, 0xd8b048);
+          for (let x = 1; x < 64; x += 4) rect(c, x, 15, 2, 20, 0xd8b048);
+          break;
+        default:
+          // Bolts (tin) or rivets (the glass tubes' brass collars).
+          for (const x of [13, 51]) {
+            disc(c, x, 36, 5, dd(band));
+            disc(c, x - 1.5, 34.5, 1.6, up(band));
+          }
       }
     },
     'theme',
   );
 }
 
-/** Alpha map: a soft rounded square (3 px falloff), for the paper drop shadows. */
+/**
+ * Alpha map: a rounded square with a hard 2 px edge, for the cut-paper drop shadows. Alpha maps are
+ * linear data (see paintTexture), or the greys would be crushed.
+ */
 export function shadowAlpha(): THREE.Texture {
-  return softTexture('alpha:shadow', 32, 32, (c) => {
-    c.fillStyle = '#000';
-    c.fillRect(0, 0, 32, 32);
-    for (let i = 0; i < 4; i++) {
-      const v = Math.round(((i + 1) / 4) * 255);
-      c.fillStyle = `rgb(${v},${v},${v})`;
+  return softTexture(
+    'alpha:shadow',
+    32,
+    32,
+    (c) => {
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, 32, 32);
+      c.fillStyle = 'rgb(128,128,128)';
       c.beginPath();
-      c.roundRect(1 + i, 1 + i, 30 - 2 * i, 30 - 2 * i, Math.max(1, 6 - i));
+      c.roundRect(1, 1, 30, 30, 5);
       c.fill();
-    }
-  });
+      c.fillStyle = '#fff';
+      c.beginPath();
+      c.roundRect(2, 2, 28, 28, 4);
+      c.fill();
+    },
+    'global',
+    true,
+  );
 }
 
-/** Alpha map: opaque at the bottom, clear at the top (lava glow, pit shade). */
+/** Alpha map: opaque at the bottom, clear at the top (lava glow). */
 export function gradientAlpha(): THREE.Texture {
-  return softTexture('alpha:gradient', 32, 32, (c) => {
-    const g = c.createLinearGradient(0, 32, 0, 0);
-    g.addColorStop(0, '#fff');
-    g.addColorStop(1, '#000');
-    c.fillStyle = g;
-    c.fillRect(0, 0, 32, 32);
-  });
+  return softTexture(
+    'alpha:gradient',
+    32,
+    32,
+    (c) => {
+      const g = c.createLinearGradient(0, 32, 0, 0);
+      g.addColorStop(0, '#fff');
+      g.addColorStop(1, '#000');
+      c.fillStyle = g;
+      c.fillRect(0, 0, 32, 32);
+    },
+    'global',
+    true,
+  );
+}
+
+/** Alpha map for a pit's shade: clear at the lip, fully dark from 35% of the way down. */
+export function pitAlpha(): THREE.Texture {
+  return softTexture(
+    'alpha:pit',
+    8,
+    64,
+    (c) => {
+      const g = c.createLinearGradient(0, 0, 0, 64);
+      g.addColorStop(0, '#000');
+      g.addColorStop(0.35, '#fff');
+      g.addColorStop(1, '#fff');
+      c.fillStyle = g;
+      c.fillRect(0, 0, 8, 64);
+    },
+    'global',
+    true,
+  );
 }
 
 /** The 3-stop sky behind everything (2×128). */
@@ -422,7 +706,7 @@ export function skyTexture(theme: Theme): THREE.Texture {
  * transparent under the edge (alphaTest cuts it).
  */
 export function capAtlas(style: CapStyle, C: number, ground: number): THREE.Texture {
-  return atlas(
+  const tex = atlas(
     `cap:${style}:${C}:${ground}`,
     (c) => {
       const rnd = mulberry32(style.length * 977 + 13);
@@ -431,20 +715,49 @@ export function capAtlas(style: CapStyle, C: number, ground: number): THREE.Text
         const body = (bottom: number) => rect(c, 0, 0, 64, bottom, C);
         switch (style) {
           case 'felt': {
+            // A felt blanket laid over the edge: fibres, a cream running stitch, and five big
+            // pinking-shear teeth, each shaded on its lower right so the felt reads as hanging over.
             body(40);
-            c.fillStyle = css(C);
-            c.beginPath();
-            c.moveTo(0, 39);
-            for (let i = 0; i < 8; i++) {
-              c.lineTo(i * 8 + 4, 58);
-              c.lineTo((i + 1) * 8, 40);
+            for (let i = 0; i < 5; i++) {
+              const x0 = i * 12.8;
+              const tip = x0 + 6.4;
+              c.fillStyle = css(C);
+              c.beginPath();
+              c.moveTo(x0, 39);
+              c.lineTo(tip, 62);
+              c.lineTo(x0 + 12.8, 39);
+              c.closePath();
+              c.fill();
+              c.fillStyle = css(dd(C));
+              c.beginPath();
+              c.moveTo(tip + 1.5, 44);
+              c.lineTo(tip, 62);
+              c.lineTo(x0 + 12.8, 39);
+              c.lineTo(x0 + 10.5, 39);
+              c.closePath();
+              c.fill();
             }
-            c.lineTo(64, 39);
-            c.closePath();
-            c.fill();
-            for (let i = 0; i < 30; i++) rect(c, rnd() * 63, 3 + rnd() * 32, 1, 3, up(C));
+            for (let i = 0; i < 70; i++) rect(c, rnd() * 63, 2 + rnd() * 36, 1, 4 + 3 * rnd(), i % 2 ? up(C) : dn(C), 0.8);
+            for (let x = 1; x < 64; x += 9) rect(c, x, 22, 5, 7, 0xfff4d6, 0.95);
             break;
           }
+          case 'fold':
+            // A folded paper strip: pleats catch the light at 45° (painted steep: the face is squashed
+            // 4×), over a straight edge with a dark underside fold.
+            body(46);
+            for (let k = -2; k < 5; k++) {
+              c.fillStyle = css(k % 2 ? shade(C, 0.93) : up(C));
+              c.beginPath();
+              c.moveTo(k * 16, 40);
+              c.lineTo(k * 16 + 10, 0);
+              c.lineTo(k * 16 + 18, 0);
+              c.lineTo(k * 16 + 8, 40);
+              c.closePath();
+              c.fill();
+            }
+            rect(c, 0, 40, 64, 6, dd(C));
+            rect(c, 0, 0, 64, 4, 0xffffff, 0.7);
+            break;
           case 'moss':
             body(46);
             for (let i = 0; i < 6; i++) disc(c, 5.3 + i * 10.67, 46, 6, C);
@@ -516,8 +829,16 @@ export function capAtlas(style: CapStyle, C: number, ground: number): THREE.Text
           return;
         }
         fillAll(c, up(C));
-        if (style === 'felt') for (let i = 0; i < 40; i++) disc(c, rnd() * 64, rnd() * 64, 1, i % 2 ? shade(C, 1.35) : dn(C));
-        else if (style === 'moss') for (let i = 0; i < 12; i++) disc(c, rnd() * 64, rnd() * 64, 2.5, 0x8ff4ff);
+        if (style === 'felt') {
+          // Felt fibres: short strokes every which way.
+          for (let i = 0; i < 80; i++) {
+            const [x, y, a] = [rnd() * 64, rnd() * 64, rnd() * TAU];
+            line(c, [x, y, x + 3.5 * Math.cos(a), y + 3.5 * Math.sin(a)], 1, i % 2 ? shade(C, 1.35) : dn(C), 0.8);
+          }
+        } else if (style === 'fold') {
+          line(c, [0, 30, 64, 30], 1.5, dn(C), 0.6);
+          rect(c, 0, 58, 64, 3, 0xffffff, 0.8);
+        } else if (style === 'moss') for (let i = 0; i < 12; i++) disc(c, rnd() * 64, rnd() * 64, 2.5, 0x8ff4ff);
         else if (style === 'rubber') for (let y = 4; y < 64; y += 8) for (let x = 4; x < 64; x += 8) disc(c, x, y, 1.5, C);
         else if (style === 'carpet') rect(c, 0, 58, 64, 3, 0xd8b048);
         else if (style === 'walkway') rect(c, 0, 58, 64, 3, 0xffffff);
@@ -525,11 +846,25 @@ export function capAtlas(style: CapStyle, C: number, ground: number): THREE.Text
       // The cap stands 0.03 proud of the ground, so its sides and underside would show through the
       // cut-out below the edge as a tick at every seam: sides stop at the edge line, the underside is
       // clear.
-      S(c, (c) => rect(c, 0, 0, 64, 40, dn(C)));
+      S(c, (c) => rect(c, 0, 0, 64, CAP_BODY[style], dn(C)));
       U(c, (c) => c.clearRect(0, 0, 64, 64));
     },
     'theme',
   );
+  return squashed(tex);
+}
+
+/** Where each cap's solid body ends in its front cell (its end faces are cut there too). */
+const CAP_BODY: Record<CapStyle, number> = { felt: 40, moss: 46, stone: 44, cotton: 40, slate: 40, rubber: 44, carpet: 40, walkway: 44, trim: 44, fold: 46 };
+
+/**
+ * Cap and shelf fronts are squashed 3-4× on screen, so a plain mip lookup blurs their detail across
+ * (the phone's cut-out edges and shelf spines smeared into a band). Those atlases always get 4×
+ * anisotropic filtering, touch included; it only costs on these few thin faces.
+ */
+function squashed(tex: THREE.Texture): THREE.Texture {
+  tex.anisotropy = 4;
+  return tex;
 }
 
 // ------------------------------------------------------------ themed: soil
@@ -565,6 +900,91 @@ export function soilAtlas(style: SoilStyle, C: number, glow = false): THREE.Text
             line(c, [8, 25, 15, 24, 21, 27, 28, 26, 33, 29], 1.2, shade(C, 0.6));
             line(c, [21, 27, 24, 31], 1.2, shade(C, 0.6));
             break;
+          case 'plywood':
+            // Face grain: long wavy lines that wrap both ways, with no per-tile landmark to give the
+            // grid away.
+            if (glow) break;
+            for (let k = 0; k < 8; k++) {
+              const y0 = k * 8 + 3 * hash01(k, 5);
+              const ph = TAU * hash01(k, 11);
+              const amp = 1.5 + 1.5 * hash01(k, 13);
+              for (const dy of [-64, 0, 64]) {
+                c.strokeStyle = rgba(dn(C), 0.7);
+                c.lineWidth = 1.5;
+                c.beginPath();
+                for (let x = 0; x <= 64; x += 2) {
+                  const y = y0 + dy + amp * Math.sin((TAU * x) / 64 + ph) + 0.8 * Math.sin((TAU * 3 * x) / 64 + 2 * ph);
+                  if (x === 0) c.moveTo(x, y);
+                  else c.lineTo(x, y);
+                }
+                c.stroke();
+                if (k % 3 === 0) {
+                  c.strokeStyle = rgba(up(C), 0.5);
+                  c.lineWidth = 1;
+                  c.stroke();
+                }
+              }
+            }
+            break;
+          case 'quilt': {
+            // Patchwork quilt blocks: each 32 px square is two half-square triangles in different
+            // fabrics, turned to make pinwheels (never a brick bond or a tile grid), sewn with cream
+            // running stitches just inside each square.
+            if (glow) break;
+            const tones = [shade(C, 0.92), shade(C, 1.08), mixHex(C, 0xc8a070, 0.16), mixHex(C, 0x9a4a3a, 0.16)];
+            [0, 32].forEach((px, i) => {
+              [0, 32].forEach((py, j) => {
+                const a = tones[(i + 2 * j) % 4];
+                const b = tones[(i + 2 * j + 1 + Math.floor(hash01(i, j + 5) * 2)) % 4];
+                const flip = (i + j) % 2 === 1;
+                rect(c, px, py, 32, 32, a);
+                c.fillStyle = css(b);
+                c.beginPath();
+                if (flip) {
+                  c.moveTo(px, py);
+                  c.lineTo(px + 32, py + 32);
+                  c.lineTo(px, py + 32);
+                } else {
+                  c.moveTo(px + 32, py);
+                  c.lineTo(px + 32, py + 32);
+                  c.lineTo(px, py + 32);
+                }
+                c.closePath();
+                c.fill();
+                c.setLineDash([3, 2.5]);
+                c.strokeStyle = rgba(0xfff4d6, 0.65);
+                c.lineWidth = 1.3;
+                c.strokeRect(px + 3.5, py + 3.5, 25, 25);
+                c.setLineDash([]);
+              });
+            });
+            for (const k of [0, 32]) {
+              rect(c, k, 0, 1.2, 64, dd(C), 0.6);
+              rect(c, 0, k, 64, 1.2, dd(C), 0.6);
+            }
+            break;
+          }
+          case 'origami': {
+            // A folded square: four triangles meeting at the centre, with faint white creases.
+            for (const [pts, hex] of [
+              [[0, 0, 64, 0], up(C)],
+              [[64, 0, 64, 64], C],
+              [[64, 64, 0, 64], dn(C)],
+              [[0, 64, 0, 0], shade(C, 0.9)],
+            ] as const) {
+              c.fillStyle = css(glow ? 0 : hex);
+              c.beginPath();
+              c.moveTo(pts[0], pts[1]);
+              c.lineTo(pts[2], pts[3]);
+              c.lineTo(32, 32);
+              c.closePath();
+              c.fill();
+            }
+            if (glow) break;
+            line(c, [0, 0, 64, 64], 1, 0xffffff, 0.4);
+            line(c, [64, 0, 0, 64], 1, 0xffffff, 0.4);
+            break;
+          }
           case 'rock':
             if (!glow) {
               for (let i = 0; i < 5; i++) {
@@ -709,8 +1129,22 @@ export function soilAtlas(style: SoilStyle, C: number, glow = false): THREE.Text
       }, 'xy');
       if (glow) return;
       Tc(c, (c) => fillAll(c, shade(C, 1.08)));
+      // S is only drawn on exposed walls (pit edges, steps), so it can carry the material's edge.
       S(c, (c) => {
         fillAll(c, shade(C, 0.8));
+        if (style === 'plywood') {
+          // The plies of the sheet, glued in alternating grain.
+          for (let y = 0; y < 64; y += 8) {
+            rect(c, 0, y, 64, 8, y % 16 ? shade(C, 0.84) : shade(C, 1.02));
+            rect(c, 0, y, 64, 1.5, shade(C, 0.58));
+          }
+        } else if (style === 'quilt') {
+          c.setLineDash([3, 3]);
+          for (const x of [7, 57]) line(c, [x, 0, x, 64], 1.5, up(C), 0.8);
+          c.setLineDash([]);
+        } else if (style === 'origami') {
+          line(c, [32, 0, 32, 64], 1, 0xffffff, 0.4);
+        }
         rect(c, 0, 0, 3, 64, INK, 0.5);
         rect(c, 61, 0, 3, 64, INK, 0.5);
       }, 'y');
@@ -746,8 +1180,10 @@ export function hardAtlas(style: HardStyle, C: number, glow = false): THREE.Text
         });
         return;
       }
+      // Geodes: pale ice facets inside a dark rind, so the cave's unbreakable block is literal.
+      const base = style === 'facets' ? 0x4a4458 : C;
       F(c, (c) => {
-        frame(c, C);
+        frame(c, base);
         c.save();
         c.beginPath();
         c.rect(9, 9, 46, 46);
@@ -765,10 +1201,10 @@ export function hardAtlas(style: HardStyle, C: number, glow = false): THREE.Text
             break;
           case 'facets':
             for (const [pts, hex] of [
-              [[8, 8, 56, 8], up(C)],
-              [[56, 8, 56, 56], C],
-              [[56, 56, 8, 56], dn(C)],
-              [[8, 56, 8, 8], shade(C, 0.9)],
+              [[8, 8, 56, 8], 0xe4f6ff],
+              [[56, 8, 56, 56], 0xbfe8ff],
+              [[56, 56, 8, 56], 0x7ad8ff],
+              [[8, 56, 8, 8], 0x9ad0f0],
             ] as const) {
               c.fillStyle = css(hex);
               c.beginPath();
@@ -778,6 +1214,9 @@ export function hardAtlas(style: HardStyle, C: number, glow = false): THREE.Text
               c.closePath();
               c.fill();
             }
+            line(c, [8, 8, 56, 56], 1, 0xffffff, 0.6);
+            line(c, [56, 8, 8, 56], 1, 0x3a7ab0, 0.5);
+            star4(c, 22, 20, 5, 1.5, 0xffffff);
             break;
           case 'bands':
             for (const y of [16, 40]) {
@@ -859,9 +1298,9 @@ export function hardAtlas(style: HardStyle, C: number, glow = false): THREE.Text
         }
         c.restore();
       });
-      Tc(c, (c) => frame(c, shade(C, 1.12)));
-      S(c, (c) => frame(c, shade(C, 0.9)));
-      U(c, (c) => frame(c, shade(C, 0.7)));
+      Tc(c, (c) => frame(c, shade(base, 1.12)));
+      S(c, (c) => frame(c, shade(base, 0.9)));
+      U(c, (c) => frame(c, shade(base, 0.7)));
     },
     'theme',
   );
@@ -886,7 +1325,7 @@ function star4(c: Ctx, x: number, y: number, outer: number, inner: number, hex: 
  * 1×0.16, so round features are painted tall. U is transparent unless the style hangs a fringe.
  */
 export function shelfAtlas(style: ShelfStyle, C: number): THREE.Texture {
-  return atlas(
+  const tex = atlas(
     `shelf:${style}:${C}`,
     (c) => {
       const SQ = 3.3; // the front's vertical squash
@@ -918,13 +1357,16 @@ export function shelfAtlas(style: ShelfStyle, C: number): THREE.Texture {
             }
             break;
           case 'books': {
-            const cols = [0x6a3a5a, 0x2a6a6a, 0xb88a3a, C];
+            // Light spines only (half toward parchment), so the shelf stands off the plum wallpaper
+            // even when a phone's mip blurs it; gold bands thick enough to survive the squash.
+            const cols = [0x6a3a5a, 0x2a6a6a, 0xb88a3a, C].map((k) => mixHex(k, 0xf0d8a0, 0.5));
             let x = 0;
             for (let i = 0; x < 64; i++) {
               const w = 6 + ((i * 5) % 6);
               rect(c, x, 0, w - 1, 64, cols[i % 4]);
-              rect(c, x, 12, w - 1, 2, 0xd8b048);
-              rect(c, x, 50, w - 1, 2, 0xd8b048);
+              rect(c, x + w - 1, 0, 1, 64, dd(C));
+              rect(c, x, 14, w - 1, 5, 0xd8b048);
+              rect(c, x, 46, w - 1, 5, 0xd8b048);
               x += w;
             }
             break;
@@ -938,8 +1380,9 @@ export function shelfAtlas(style: ShelfStyle, C: number): THREE.Texture {
           case 'scallops':
             break;
         }
-        rect(c, 0, 0, 64, 3, style === 'glow' ? 0xffffff : up(C));
-        rect(c, 0, 62, 64, 2, INK, 0.5);
+        // The lit top lip and the ink line under it, painted tall: this face is squashed 3.3×.
+        rect(c, 0, 0, 64, style === 'books' ? 9 : 3, style === 'glow' ? 0xffffff : style === 'books' ? 0xfff0c8 : up(C));
+        rect(c, 0, style === 'books' ? 58 : 62, 64, style === 'books' ? 6 : 2, INK, style === 'books' ? 0.7 : 0.5);
       }, 'x');
       Tc(c, (c) => {
         fillAll(c, up(C));
@@ -1000,6 +1443,7 @@ export function shelfAtlas(style: ShelfStyle, C: number): THREE.Texture {
     },
     'theme',
   );
+  return squashed(tex);
 }
 
 // --------------------------------------------------------------------- decor

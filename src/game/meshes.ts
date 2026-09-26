@@ -238,9 +238,11 @@ function pennantShape(w: number): THREE.Shape {
 /**
  * The goal: a release pennant on a thread spool, with a bell on top. The origin is at the ground
  * tile's bottom (the ground top is local y 1). The banner is the group named 'flag' (Stage slides its
- * position.y down at the clear) and carries the hidden 'stamp' sprite.
+ * position.y down at the clear) and carries the hidden 'stamp' sprite. It flies right of the pole, or
+ * left with `side` −1 (where the level ends too soon after the goal); userData.reach is how far it
+ * flies from the pole.
  */
-export function makeFlag(label: string, height = 9): THREE.Group {
+export function makeFlag(label: string, height = 9, side: 1 | -1 = 1): THREE.Group {
   const g = new THREE.Group();
   const barber = cachedMat(`flag:pole:${height}`, () => {
     const tex = softTexture('flag:barber', 16, 16, (c) => {
@@ -273,28 +275,38 @@ export function makeFlag(label: string, height = 9): THREE.Group {
 
   const banner = new THREE.Group();
   banner.name = 'flag';
-  banner.position.set(0.1, height - 0.6, 0.45);
+  banner.position.set(0.1 * side, height - 0.6, 0.45);
   const text = labelSprite(label, '#ffffff', 'rgba(0,0,0,0)');
-  text.scale.multiplyScalar(0.8);
-  text.center.set(0, 0.5);
-  text.position.set(0.25, 0, 0.1);
-  const w = text.scale.x + 0.5;
-  const geo = new THREE.ShapeGeometry(pennantShape(w));
+  text.scale.multiplyScalar(0.72);
+  text.center.set(side > 0 ? 0 : 1, 0.5);
+  text.position.set(0.25 * side, 0, 0.1);
+  // The tail beyond the label carries a blank cream release tag, which the RELEASED stamp lands on:
+  // red ink on paper, never over the label or on the teal.
+  const tagX = text.scale.x + 0.25 + 1.2;
+  const w = text.scale.x + 2.9;
+  const geo = new THREE.ShapeGeometry(pennantShape(w)).scale(side, 1, 1);
   const pennant = new THREE.Mesh(geo, cachedMat('flag:pennant', () => new THREE.MeshToonMaterial({ color: 0x10a37f, gradientMap: RAMP, side: THREE.DoubleSide })));
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-  const baseX = Float32Array.from({ length: pos.count }, (_, i) => pos.getX(i));
+  const baseX = Float32Array.from({ length: pos.count }, (_, i) => Math.abs(pos.getX(i)));
   onDraw(pennant, (t) => {
     if (prefs.reduceMotion) return;
     for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.08 * Math.sin(4 * t - 1.4 * baseX[i]) * (baseX[i] / w));
     pos.needsUpdate = true;
   });
+  const tag = new THREE.Mesh(
+    cachedGeo('flag:tag', () => new THREE.PlaneGeometry(2.1, 0.8)),
+    cachedMat('flag:tag', () => new THREE.MeshToonMaterial({ color: 0xfff4d6, gradientMap: RAMP, side: THREE.DoubleSide })),
+  );
+  tag.position.set((tagX - 0.05) * side, 0, 0.1);
+  tag.rotation.z = 0.05 * side;
   const stamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stampTexture(), rotation: -0.21, transparent: true, depthWrite: false }));
   stamp.name = 'stamp';
   stamp.visible = false;
-  stamp.position.set(Math.max(1.2, w * 0.6), 0.05, 0.16);
-  stamp.scale.set(2.2, 1.1, 1);
-  banner.add(pennant, text, stamp);
+  stamp.position.set(tagX * side, 0, 0.16);
+  stamp.scale.set(2, 1, 1);
+  banner.add(pennant, text, tag, stamp);
   g.add(pole, spool, bell, banner);
+  g.userData.reach = 0.1 + w;
   return g;
 }
 
@@ -402,7 +414,7 @@ function cottonTexture(): THREE.Texture {
   });
 }
 
-/** Opaque on the left, fading out from u 0.75 with a scalloped (sine-shifted) leading edge. */
+/** Opaque on the left, fading out from u 0.75 with a scalloped (sine-shifted) leading edge. Linear data. */
 function fogEdgeAlpha(): THREE.Texture {
   return softTexture('fog:edge', 64, 64, (c) => {
     const img = c.createImageData(64, 64);
@@ -417,7 +429,7 @@ function fogEdgeAlpha(): THREE.Texture {
       }
     }
     c.putImageData(img, 0, 0);
-  });
+  }, 'global', true);
 }
 
 /** "Cotton-wool front": three drifting layers of fog, origin at the leading edge. */

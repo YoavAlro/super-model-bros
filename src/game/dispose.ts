@@ -10,6 +10,8 @@ export function disposeObject(root: THREE.Object3D): void {
   };
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
+    // An instanced mesh owns its per-instance buffers (its geometry and material may be shared).
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     if (mesh.geometry) free(mesh.geometry);
     const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
     for (const m of mats) {

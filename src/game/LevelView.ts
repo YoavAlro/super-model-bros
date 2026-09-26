@@ -6,7 +6,7 @@ import { Fx } from './fx';
 import { Backdrop } from './backdrop';
 import { LevelGrid, T, type TileId } from './level';
 import { arrowTexture } from './meshes';
-import { hash01, mixHex } from './palette';
+import { hash01, mixHex, shade } from './palette';
 import { prefs } from './prefs';
 import { mulberry32 } from './rng';
 import * as art from './tileArt';
@@ -18,6 +18,7 @@ import { cachedGeo, RAMP } from './toonKit';
  */
 const KINDS = [
   'ground',
+  'wall',
   'lava',
   'lavaGlow',
   'pitShade',
@@ -38,13 +39,14 @@ const KINDS = [
   'spikes',
   'gate',
   'cap',
+  'capEnd',
   'decor',
   'shadow',
 ] as const;
 export type TileKind = (typeof KINDS)[number];
 
 /** Kinds that decorate a tile rather than being it: never bumped. */
-const DRESSING = new Set<TileKind>(['cap', 'decor', 'shadow']);
+const DRESSING = new Set<TileKind>(['wall', 'cap', 'capEnd', 'decor', 'shadow']);
 /** Kinds whose instances move (bumps, swaps, removal). */
 const DYNAMIC = new Set<TileKind>(['brick', 'question', 'used', 'hard', 'gate']);
 /** Kinds a bump ripples into from a neighbour. */
@@ -109,7 +111,7 @@ const DEPTH_TINT = [0.92, 0.85, 0.8, 0.76];
 const SCORCH = mixHex(0xffffff, 0xff8a3a, 0.35);
 /**
  * Ground and caps butt against their neighbours, but each instance has its own matrix, so pixels on
- * a shared edge can fall through to the inked side faces behind. A hair of overlap closes the seams.
+ * a shared edge can fall through to whatever is behind. A hair of overlap closes the seams.
  */
 const SEAL = 1.003;
 /** Resting self-glow of prompt blocks (their emissiveMap is their own face). */
@@ -589,10 +591,19 @@ export class LevelView {
     const decorRng = mulberry32(grid.width * 7);
     const decorEvery = this.opts.touch ? 1 / 6 : 1 / 3;
     const busy = (tx: number, ty: number) => [at(tx - 1, ty + 1), at(tx + 1, ty + 1), at(tx, ty + 1)].some((t) => t === T.PIPE || t === T.GATE);
+    // A cut-paper shadow on an invisible board behind a floating block, thrown down and right (the
+    // sun is upper left), so it shows as a crisp band beside and under the block.
     const shadowFor = (key: number, tx: number, ty: number, oneway = false) => {
       if (ty > 0 && at(tx, ty - 1) === T.EMPTY) {
-        add('shadow', key, tx + 0.57, oneway ? ty + 0.71 : ty + 0.36, { z: -0.66, sy: oneway ? 0.3 : 1 });
+        add('shadow', key, tx + 0.7, oneway ? ty + 0.61 : ty + 0.26, { z: -0.66, sy: oneway ? 0.3 : 1 });
       }
+    };
+    // Ground boxes have no side faces (hidden ones glinted through every seam); a wall stands only
+    // where a side is exposed. Below row 0 the deco rows are ground wherever row 0 is.
+    const solid = (tx: number, ty: number) => (ty < 0 ? at(tx, 0) : at(tx, ty)) === T.GROUND;
+    const walls = (key: number | null, tx: number, ty: number, cy: number) => {
+      if (inside(tx + 1) && !solid(tx + 1, ty)) add('wall', key, tx + 1, cy, { sy: SEAL });
+      if (inside(tx - 1) && !solid(tx - 1, ty)) add('wall', key, tx, cy, { sy: SEAL, ry: Math.PI });
     };
 
     for (let ty = 0; ty < grid.height; ty++) {
@@ -604,15 +615,19 @@ export class LevelView {
         const cy = ty + 0.5;
         if (tile === T.GROUND) {
           add('ground', key, cx, cy, { s: SEAL, tint: jitter(tx, ty) });
+          walls(key, tx, ty, cy);
           if (capped(tx, ty)) {
             const lipL = lipAt(tx - 1, ty);
             const lipR = lipAt(tx + 1, ty);
             const scorched = (lipL && intoLava(tx - 1, ty)) || (lipR && intoLava(tx + 1, ty));
-            add('cap', key, cx + 0.04 * (+lipR - +lipL), ty + 0.9, {
-              s: SEAL,
-              sx: 1 + 0.08 * (+lipL + +lipR),
-              tint: scorched ? new THREE.Color(SCORCH) : null,
-            });
+            const tint = scorched ? new THREE.Color(SCORCH) : null;
+            const capX = cx + 0.04 * (+lipR - +lipL);
+            const capW = 1 + 0.08 * (+lipL + +lipR);
+            add('cap', key, capX, ty + 0.9, { s: SEAL, sx: capW, tint });
+            // Caps have no side faces either: an end face closes each run.
+            const half = 0.5 * capW * SEAL;
+            if (!capped(tx + 1, ty)) add('capEnd', key, capX + half, ty + 0.9, { tint });
+            if (!capped(tx - 1, ty)) add('capEnd', key, capX - half, ty + 0.9, { tint, ry: Math.PI });
             if (theme.tiles.decor && decorRng() < decorEvery && !busy(tx, ty)) {
               const flip = decorRng() < 0.5 ? -1 : 1;
               add('decor', key, cx + (decorRng() - 0.5) * 0.4, ty + 1.18, { z: -0.35, sx: flip * (0.8 + 0.4 * decorRng()) });
@@ -648,14 +663,17 @@ export class LevelView {
     for (let tx = 0; tx < grid.width; tx++) {
       const tile = at(tx, 0);
       if (tile === T.GROUND) {
-        for (let d = 0; d < 4; d++) add('ground', null, tx + 0.5, -d - 0.5, { s: SEAL, tint: jitter(tx, -d - 1, DEPTH_TINT[d]) });
+        for (let d = 0; d < 4; d++) {
+          add('ground', null, tx + 0.5, -d - 0.5, { s: SEAL, tint: jitter(tx, -d - 1, DEPTH_TINT[d]) });
+          walls(null, tx, -d - 1, -d - 0.5);
+        }
       } else if (theme.lavaPits && tile === T.EMPTY) {
         add('lava', null, tx + 0.5, -0.6, { sy: 0.8 });
         add('lavaGlow', null, tx + 0.5, 0.6, { z: -0.3 });
         this.lavaTops.push(tx + 0.5, -0.2);
       } else if (!theme.lavaPits && tile === T.EMPTY) {
-        // Pits read as holes into darkness.
-        add('pitShade', null, tx + 0.5, -2.6, { z: -0.62 });
+        // Pits read as holes into darkness: dark from about a tile under the lip.
+        add('pitShade', null, tx + 0.5, -1.2, { z: -0.62 });
       }
     }
     return cells;
@@ -677,18 +695,27 @@ export class LevelView {
         }
         let end = tx;
         while (grid.get(end + 1, ty) === T.PIPE) end++;
-        for (let x = tx; x <= end; x += 2) {
-          const top = (col: number) => grid.get(col, ty + 1) !== T.PIPE;
-          if (x + 1 <= end) {
+        const top = (col: number) => grid.get(col, ty + 1) !== T.PIPE;
+        // The row the column's tube ends on: two columns only pair when they end level, so a collar
+        // never sits partway up a taller neighbour.
+        const topRow = (col: number) => {
+          let y = ty;
+          while (grid.get(col, y + 1) === T.PIPE) y++;
+          return y;
+        };
+        for (let x = tx; x <= end; ) {
+          if (x + 1 <= end && topRow(x) === topRow(x + 1)) {
             const cx = x + 1;
             // Both halves share one mesh: the right half is the left one turned about y.
             add('pipeHalf', grid.index(x, ty), cx, ty + 0.5, { sz: 0.6 });
             add('pipeHalf', grid.index(x + 1, ty), cx, ty + 0.5, { sz: 0.6, ry: Math.PI });
             if (top(x)) add('collarHalf', grid.index(x, ty), cx, ty + 0.5, { sz: 0.6 });
             if (top(x + 1)) add('collarHalf', grid.index(x + 1, ty), cx, ty + 0.5, { sz: 0.6, ry: Math.PI });
+            x += 2;
           } else {
             add('pipe1', grid.index(x, ty), x + 0.5, ty + 0.5);
             if (top(x)) add('collar1', grid.index(x, ty), x + 0.5, ty + 0.5);
+            x++;
           }
         }
         tx = end + 1;
@@ -699,9 +726,13 @@ export class LevelView {
   private geometry(kind: TileKind): THREE.BufferGeometry {
     switch (kind) {
       case 'ground':
-        return cachedGeo('tile:box', () => insetSides(atlasUV(new THREE.BoxGeometry(1, 1, DEPTH))));
+        return cachedGeo('tile:ground', () => insetTops(withoutSides(atlasUV(new THREE.BoxGeometry(1, 1, DEPTH)))));
+      case 'wall':
+        return cachedGeo('tile:wall', () => sideFace(1, DEPTH));
       case 'cap':
-        return cachedGeo('tile:cap', () => insetSides(atlasUV(new THREE.BoxGeometry(1, 0.26, 1.26)), false));
+        return cachedGeo('tile:capBody', () => withoutSides(atlasUV(new THREE.BoxGeometry(1, 0.26, 1.26))));
+      case 'capEnd':
+        return cachedGeo('tile:capEnd', () => sideFace(0.26, 1.26));
       case 'lava':
         return cachedGeo('tile:lava', () =>
           atlasUV(new THREE.BoxGeometry(1, 1, DEPTH), { front: CELL.FULL, top: [0, 0.85, 1, 1] as Rect, side: CELL.FULL, bottom: CELL.FULL }),
@@ -709,7 +740,7 @@ export class LevelView {
       case 'lavaGlow':
         return cachedGeo('tile:plane:1x1.6', () => new THREE.PlaneGeometry(1, 1.6));
       case 'pitShade':
-        return cachedGeo('tile:plane:1x6.8', () => new THREE.PlaneGeometry(1, 6.8));
+        return cachedGeo('tile:plane:1x4', () => new THREE.PlaneGeometry(1, 4));
       case 'shadow':
         return cachedGeo('tile:plane:1x1', () => new THREE.PlaneGeometry(1, 1));
       case 'brick':
@@ -753,10 +784,14 @@ export class LevelView {
           ...(glow ? { emissive: 0xffffff, emissiveMap: art.soilAtlas(style.soil, theme.ground, true), emissiveIntensity: 0.8 } : {}),
         });
       }
+      case 'wall':
+        return this.materials.get('ground')!;
       case 'cap':
         return toonMat({ map: art.capAtlas(style.cap, theme.grass, theme.ground), alphaTest: 0.5 });
+      case 'capEnd':
+        return this.materials.get('cap')!;
       case 'brick':
-        return toonMat({ map: art.brickAtlas(theme.brick) });
+        return toonMat({ map: art.brickAtlas(style.brick, theme.brick) });
       case 'question':
         // The prompt glows a little in its own colour, so it stays the same amber under every
         // theme's lights (cool cave or storm light would turn it olive).
@@ -793,10 +828,10 @@ export class LevelView {
         return toonMat({ map: art.gateAtlas(), emissive: 0x400010, emissiveIntensity: 1 });
       case 'pipeHalf':
       case 'pipe1':
-        return toonMat({ map: art.pipeBody(theme.pipe) });
+        return toonMat({ map: art.pipeBody(style.pipe, theme.pipe) });
       case 'collarHalf':
       case 'collar1':
-        return toonMat({ map: art.pipeCollar(theme.pipe), vertexColors: true });
+        return toonMat({ map: art.pipeCollar(style.pipe, theme.pipe), vertexColors: true });
       case 'lava':
         return (this.lavaMat = new THREE.MeshBasicMaterial({ map: art.lavaTexture() }));
       case 'lavaGlow':
@@ -809,9 +844,10 @@ export class LevelView {
           depthWrite: false,
         }));
       case 'pitShade':
-        return new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: art.gradientAlpha(), transparent: true, opacity: 0.6, depthWrite: false });
+        // Darkness in the theme's own night colour (a black hole looked harsh in the bright skies).
+        return new THREE.MeshBasicMaterial({ color: shade(parseInt(theme.skyTop.slice(1), 16), 0.3), alphaMap: art.pitAlpha(), transparent: true, opacity: 0.85, depthWrite: false });
       case 'shadow':
-        return new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: art.shadowAlpha(), transparent: true, opacity: 0.24, depthWrite: false });
+        return new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: art.shadowAlpha(), transparent: true, opacity: 0.3, depthWrite: false });
       case 'decor':
         return toonMat({ map: art.decorTexture(style.decor ?? 'daisies'), alphaTest: 0.5, side: THREE.DoubleSide });
     }
@@ -819,24 +855,38 @@ export class LevelView {
 }
 
 /**
- * Sets a box's side (and, with `tops`, top and bottom) faces back from its front by a hair. Each of
- * those faces' front edge lies in the front plane, and that depth tie let the inked side cell win
- * pixels along every seam; set back 1.5% in depth (and pulled in 0.6%), the front always wins, while
- * an exposed pit wall still shows its ink. Caps keep their top flush, so the lip edge stays crisp.
+ * Drops a BoxGeometry's ±x faces (its first two groups). Side by side, a box's hidden side faces lie
+ * edge-on behind its neighbour's front, and at that grazing angle they won pixels along every seam
+ * (a dark line down each tile join); exposed sides get their own 'wall' and 'capEnd' faces instead.
  */
-function insetSides(geo: THREE.BufferGeometry, tops = true, f = 0.994, fz = 0.985): THREE.BufferGeometry {
+function withoutSides(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const index = geo.getIndex()!;
+  const sides = geo.groups[0].count + geo.groups[1].count;
+  geo.setIndex(Array.from(index.array).slice(sides));
+  geo.clearGroups();
+  return geo;
+}
+
+/** Sets a box's top and bottom faces back a hair from its front, so the front always wins the edge. */
+function insetTops(geo: THREE.BufferGeometry, f = 0.994, fz = 0.985): THREE.BufferGeometry {
   const pos = geo.getAttribute('position');
   const nrm = geo.getAttribute('normal');
   for (let i = 0; i < pos.count; i++) {
-    const side = Math.abs(nrm.getX(i)) > 0.5;
-    const top = !side && Math.abs(nrm.getY(i)) > 0.5;
-    if (side) pos.setX(i, pos.getX(i) * f);
-    else if (top && tops) pos.setY(i, pos.getY(i) * f);
-    if (side || (top && tops)) pos.setZ(i, pos.getZ(i) * fz);
+    if (Math.abs(nrm.getY(i)) < 0.5) continue;
+    pos.setY(i, pos.getY(i) * f);
+    pos.setZ(i, pos.getZ(i) * fz);
   }
   pos.needsUpdate = true;
   geo.computeBoundingBox();
   return geo;
+}
+
+/**
+ * One exposed side of a box: an h-tall, d-deep face at local x 0 facing +x (turn it π about y for a
+ * −x side), mapped to the atlas's S cell like a box side.
+ */
+function sideFace(h: number, d: number): THREE.BufferGeometry {
+  return atlasUV(new THREE.PlaneGeometry(d, h).rotateY(Math.PI / 2), CELL.S);
 }
 
 /** Paints a whole geometry one colour (as a vertex colour attribute), or per vertex via fn(y). */

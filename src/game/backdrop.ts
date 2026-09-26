@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Celestial, ExtraId, Life, Scenery, Strip, Theme } from '../config/themes';
 import { softTexture } from './art';
+import { shared } from './shared';
 import { edgeY } from './edges';
 import { fxTexture } from './fx';
 import { css, hash01, hazeHex, mixHex, shade } from './palette';
@@ -33,6 +34,33 @@ const lifeSpan = (z: number) => 18 + 0.9 * Math.abs(z);
 type ColorOf = number | ((x: number, y: number) => number);
 
 /**
+ * The current level's built backdrop geometry (merged cardboard, wall, printed strips), kept across a
+ * respawn: every retry rebuilds the scene, and the backdrop is deterministic for a theme and width, so
+ * a retry reuses these instead of re-merging and re-uploading them. A different level frees them.
+ */
+let levelKey: { theme: Theme; W: number; touch: boolean } | null = null;
+const levelGeo = new Map<string, THREE.BufferGeometry>();
+
+/** Starts building a level's backdrop; true when it is the same level as last time (a retry). */
+function useLevel(theme: Theme, W: number, touch: boolean): boolean {
+  if (levelKey && levelKey.theme === theme && levelKey.W === W && levelKey.touch === touch) return true;
+  for (const g of levelGeo.values()) g.dispose();
+  levelGeo.clear();
+  levelKey = { theme, W, touch };
+  return false;
+}
+
+/** This level's geometry `name`, built once (and marked shared, so teardown keeps it for the retry). */
+function levelGeometry(name: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
+  let g = levelGeo.get(name);
+  if (!g) {
+    g = shared(make());
+    levelGeo.set(name, g);
+  }
+  return g;
+}
+
+/**
  * Collects cardboard pieces into one mesh: every face gets its (hazed) colour, banded by the way it
  * faces, like painted card lit from above. No normals, no UVs: the cheapest draw there is.
  */
@@ -43,10 +71,18 @@ class Cardboard {
   private readonly b = new THREE.Vector3();
   private readonly n = new THREE.Vector3();
 
-  constructor(private readonly sky: string) {}
+  /** `built`: the merged result already exists (a retry), so pieces are only consumed, not baked. */
+  constructor(
+    private readonly sky: string,
+    private readonly built: THREE.BufferGeometry | null = null,
+  ) {}
 
   /** `color` is one colour or a function of the local vertex; `m` places the piece. Consumes `geo`. */
   add(geo: THREE.BufferGeometry, color: ColorOf, haze: number, m?: THREE.Matrix4): void {
+    if (this.built) {
+      geo.dispose();
+      return;
+    }
     const g = geo.index ? geo.toNonIndexed() : geo;
     if (g !== geo) geo.dispose();
     for (const name of Object.keys(g.attributes)) if (name !== 'position') g.deleteAttribute(name);
@@ -71,10 +107,17 @@ class Cardboard {
     this.parts.push(g);
   }
 
-  build(): THREE.Mesh | null {
+  /** The merged geometry of every piece added (null when there were none). */
+  merge(): THREE.BufferGeometry | null {
+    if (this.built) return this.built;
     if (!this.parts.length) return null;
     const geo = mergeGeometries(this.parts)!;
     for (const g of this.parts) g.dispose();
+    return geo;
+  }
+
+  build(geo = this.merge()): THREE.Mesh | null {
+    if (!geo) return null;
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
     mesh.name = 'backdrop:static';
     mesh.matrixAutoUpdate = false;
@@ -188,17 +231,35 @@ function wallTexture(pattern: 'stone' | 'damask' | 'pegboard', c0: number, c1: n
   const tex = softTexture(`wall:${pattern}:${c0}:${c1}`, 64, 64, (c) => {
     const h = (i: number, j: number) => hash01(i + 11, j + 5);
     if (pattern === 'stone') {
+      // A toy fort's painted plywood: a few big irregular flagstones (never small bricks, which
+      // echoed the brick tiles), with a faint wood grain showing through the paint.
       c.fillStyle = css(shade(c0, 0.7));
       c.fillRect(0, 0, 64, 64);
-      for (let row = 0; row < 4; row++) {
-        const off = row % 2 ? 16 : 0;
-        for (let k = -1; k < 3; k++) {
-          const x = k * 32 + off;
-          c.fillStyle = css(mixHex(c0, c1, 0.25 + 0.6 * h(k + 4, row)));
-          c.fillRect(x + 1, row * 16 + 1, 30, 14);
-          c.fillStyle = css(shade(c1, 1.12));
-          c.fillRect(x + 1, row * 16 + 1, 30, 1.5);
-        }
+      const stones: [number, number, number, number][] = [
+        [0, 0, 26, 22],
+        [26, 0, 38, 18],
+        [0, 22, 18, 24],
+        [18, 18, 28, 30],
+        [46, 18, 18, 24],
+        [0, 46, 30, 18],
+        [30, 48, 34, 16],
+        [46, 42, 18, 6],
+      ];
+      stones.forEach(([x, y, w, hh], i) => {
+        c.fillStyle = css(mixHex(c0, c1, 0.2 + 0.6 * h(i, 3)));
+        c.beginPath();
+        c.roundRect(x + 1, y + 1, w - 2, hh - 2, 3);
+        c.fill();
+        c.fillStyle = css(shade(c1, 1.12));
+        c.fillRect(x + 3, y + 1, w - 6, 1.2);
+      });
+      c.strokeStyle = css(shade(c0, 0.82));
+      c.lineWidth = 0.8;
+      for (let y = 4; y < 64; y += 7) {
+        c.beginPath();
+        c.moveTo(0, y);
+        c.bezierCurveTo(20, y - 2, 40, y + 2, 64, y);
+        c.stroke();
       }
     } else if (pattern === 'damask') {
       c.fillStyle = css(c0);
@@ -240,7 +301,9 @@ function wallTexture(pattern: 'stone' | 'damask' | 'pegboard', c0: number, c1: n
     }
   }, 'theme');
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(0.5, 0.5);
+  // The flagstones are big: one 64 px tile of them spans 5 world units.
+  const k = pattern === 'stone' ? 0.2 : 0.5;
+  tex.repeat.set(k, k);
   return tex;
 }
 
@@ -407,16 +470,20 @@ export class Backdrop {
   ) {
     this.touch = touch;
     this.rng = mulberry32(W * 31);
-    const card = new Cardboard(theme.skyBottom);
+    // A retry builds the same backdrop again (the rng is seeded by the width): reuse its geometry.
+    const retry = useLevel(theme, W, touch);
+    const card = new Cardboard(theme.skyBottom, retry ? (levelGeo.get('static') ?? null) : null);
     for (const s of theme.strips) {
       const { body, rim } = stripGeos(s, W);
       if (s.texture) this.addPrinted(body, s);
       else card.add(body, s.color, s.haze);
       card.add(rim, s.rim ?? shade(s.color, 1.18), s.haze);
+      if (s.edge === 'roofs' && !s.hang) this.addHouses(s, card);
     }
     for (const sc of theme.scenery) this.buildScenery(sc, card);
     for (const id of theme.extras ?? []) this.buildExtra(id, card);
-    const staticMesh = card.build();
+    const merged = card.merge();
+    const staticMesh = merged ? card.build(levelGeometry('static', () => merged)) : null;
     if (staticMesh) scene.add(staticMesh);
     if (theme.celestial) this.celestial = this.buildCelestial(theme.celestial);
     this.cloudRange = layerX(-24, W);
@@ -425,14 +492,19 @@ export class Backdrop {
   }
 
   /** A strip printed with a pattern (its own textured draw; UVs in world units, one tile per 8). */
-  private addPrinted(body: THREE.BufferGeometry, s: Strip): void {
-    const pos = body.getAttribute('position');
-    const uv = new Float32Array(pos.count * 2);
-    for (let i = 0; i < pos.count; i++) {
-      uv[i * 2] = pos.getX(i) / 8;
-      uv[i * 2 + 1] = pos.getY(i) / 8;
-    }
-    body.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  private addPrinted(fresh: THREE.BufferGeometry, s: Strip): void {
+    const body = levelGeometry(`printed:${s.z}`, () => {
+      const pos = fresh.getAttribute('position');
+      const uv = new Float32Array(pos.count * 2);
+      // A book's spread spans 40 units, gutter crease in the middle.
+      const span = s.texture === 'pages' ? 40 : 8;
+      for (let i = 0; i < pos.count; i++) {
+        uv[i * 2] = pos.getX(i) / span;
+        uv[i * 2 + 1] = pos.getY(i) / span;
+      }
+      return fresh.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    });
+    if (body !== fresh) fresh.dispose();
     const c = hazeHex(s.color, this.theme.skyBottom, s.haze);
     const tex = softTexture(`strip:${s.texture}:${c}`, 64, 64, (g) => {
       if (s.texture === 'patchwork') {
@@ -455,6 +527,28 @@ export class Backdrop {
           g.lineTo(64, k * 16 + 1.5);
           g.stroke();
         }
+      } else if (s.texture === 'pages') {
+        // An open book's spread: two cream pages of abstract text bars (never readable text) either
+        // side of a shaded gutter crease.
+        g.fillStyle = css(c);
+        g.fillRect(0, 0, 64, 64);
+        g.fillStyle = css(shade(c, 0.9));
+        for (const x0 of [4, 36]) {
+          for (let y = 6; y < 62; y += 5) {
+            let x = x0;
+            while (x < x0 + 24) {
+              const w = 3 + Math.floor(hash01(x, y) * 7);
+              g.fillRect(x, y, Math.min(w, x0 + 24 - x), 1.5);
+              x += w + 1.5;
+            }
+          }
+        }
+        const gutter = g.createLinearGradient(29, 0, 35, 0);
+        gutter.addColorStop(0, css(c));
+        gutter.addColorStop(0.5, css(shade(c, 0.86)));
+        gutter.addColorStop(1, css(c));
+        g.fillStyle = gutter;
+        g.fillRect(29, 0, 6, 64);
       } else {
         // Newsprint: columns of grey text bars and a headline, printed faintly on the storm cloud.
         g.fillStyle = css(c);
@@ -474,6 +568,32 @@ export class Backdrop {
     mesh.name = `backdrop:${s.texture}`;
     mesh.matrixAutoUpdate = false;
     this.scene.add(mesh);
+  }
+
+  /**
+   * A 'roofs' strip is a folded-paper town, not a mountain range: a chimney on about every third
+   * roof, and one or two windows per house, most of them lit.
+   */
+  private addHouses(s: Strip, card: Cardboard): void {
+    const [x0, x1] = layerX(s.z, this.W);
+    const seed = Math.abs(s.z) * 7.13;
+    const P = s.period;
+    for (let i = Math.floor(x0 / P); i * P < x1; i++) {
+      const eave = s.top + edgeY('roofs', i * P + 0.001, s.amp, P, seed);
+      const peak = s.top + edgeY('roofs', (i + 0.5) * P, s.amp, P, seed);
+      const cx = (i + 0.5) * P;
+      if (hash01(i, seed + 31) < 0.34) {
+        // On the right slope, a quarter of the way along: the roof there is halfway up.
+        const xc = cx + 0.22 * P;
+        card.add(new THREE.PlaneGeometry(0.1 * P, 0.22 * s.amp + 0.5), s.color, s.haze, place(xc, eave + 0.56 * (peak - eave) + 0.1 * s.amp, s.z - 0.01));
+      }
+      const two = hash01(i, seed + 37) < 0.5;
+      for (let k = 0; k < (two ? 2 : 1); k++) {
+        const wx = two ? cx + (k ? 0.2 : -0.2) * P : cx;
+        const lit = hash01(i + 3 * k, seed + 41) < 0.7;
+        card.add(new THREE.PlaneGeometry(0.07 * P, 0.1 * P), lit ? 0xffd27a : shade(s.color, 0.6), lit ? Math.max(0.5, s.haze) : s.haze, place(wx, eave - 0.14 * P, s.z + 0.02));
+      }
+    }
   }
 
   // ---------------------------------------------------------------- scenery
@@ -499,7 +619,9 @@ export class Backdrop {
           const h = 2.5 + 1.5 * r();
           const cr = 1.6 + 0.8 * r();
           card.add(new THREE.BoxGeometry(0.35, h, 0.2), c1, hz, place(x, y0 + h / 2, z));
-          card.add(new THREE.CircleGeometry(cr, 16), c0, hz, place(x, y0 + h, z + 0.12));
+          // A folded card: the canopy's left half is creased back into shade.
+          card.add(new THREE.CircleGeometry(cr, 16, Math.PI / 2, Math.PI), shade(c0, 0.88), hz, place(x, y0 + h, z + 0.12));
+          card.add(new THREE.CircleGeometry(cr, 16, -Math.PI / 2, Math.PI), c0, hz, place(x, y0 + h, z + 0.12));
           card.add(new THREE.CircleGeometry(cr + 0.15, 16), mixHex(c0, 0xffffff, 0.5), hz, place(x, y0 + h, z + 0.09));
           card.add(new THREE.BoxGeometry(0.8, 0.12, 0.2), shade(c1, 0.8), hz, place(x, y0 + 0.06, z + 0.05));
         });
@@ -544,6 +666,8 @@ export class Backdrop {
           const R = 1.2 + 0.4 * r();
           const H = 8 + 8 * r();
           card.add(new THREE.CylinderGeometry(R, 1.1 * R, H, 10), c0, hz, place(x, y0 + H / 2, z));
+          // A scored fold down the front, so the tower reads as rolled paper.
+          card.add(new THREE.PlaneGeometry(0.22 * R, H), shade(c0, 1.15), hz, place(x - 0.2 * R, y0 + H / 2, z + 1.06 * R));
           card.add(new THREE.ConeGeometry(1.35 * R, 2.2 * R, 10), c1, hz, place(x, y0 + H + 1.1 * R, z));
           for (const f of [0.55, 0.8]) {
             const lit = r() > 1 / 3;
@@ -564,51 +688,62 @@ export class Backdrop {
           const H = 4 + 2 * r();
           const top = y0 + 2 * r();
           card.add(new THREE.ConeGeometry(R, H, 8).rotateX(Math.PI), c0, hz, place(x, top - H / 2, z));
-          card.add(new THREE.SphereGeometry(R, 12, 4, 0, TAU, 0, Math.PI / 2).scale(1, 0.35, 1), c1, hz, place(x, top, z));
+          card.add(new THREE.SphereGeometry(R, 12, 4, 0, TAU, 0, Math.PI / 2).scale(1, 0.35, 1), shade(c1, 0.85), hz, place(x, top, z));
         });
         break;
       case 'spires':
         // Faceted glass spires with a lit edge line.
         this.copies(sc, (x) => {
-          const R = 1 + 0.6 * r();
-          const H = 8 + 6 * r();
+          // Rooted below the ground line (sc.y), so no spire floats over a band of sky.
+          const R = 1 + 0.6 * r() + 0.06 * (-1 - y0);
+          const H = 8 + 6 * r() + (-1 - y0);
           card.add(new THREE.ConeGeometry(R, H, 4).rotateY(Math.PI / 4), c0, hz, place(x, y0 + H / 2, z));
-          // The lit line runs up the middle of the front face, from its foot to the tip.
+          // A dotted LED trim near the tip of the front face only, over the top 30% of what shows
+          // above the ground (a full-height line read as a laser gate across the jump band).
           const face = R * Math.SQRT1_2;
-          const edge = new THREE.BoxGeometry(0.08, 0.9 * H, 0.08).rotateX(-Math.atan(face / H));
-          card.add(edge, c1, Math.min(hz, 0.1), place(x, y0 + 0.45 * H, z + face * 0.55 + 0.05));
+          const shown = H - (-1 - y0);
+          const tilt = -Math.atan(face / H);
+          for (let k = 0; k < 4; k++) {
+            const from = 0.04 * shown + k * 0.075 * shown;
+            const len = 0.045 * shown;
+            const mid = from + len / 2;
+            card.add(new THREE.BoxGeometry(0.1, len, 0.08).rotateX(tilt), c1, Math.max(hz, 0.35), place(x, y0 + H - mid, z + face * (mid / H) + 0.05));
+          }
         });
         break;
       case 'stacks':
         // Smokestacks; each registers a smoke emitter at its top.
         this.copies(sc, (x) => {
-          const H = 10 + 6 * r();
+          // Rooted below the ground line (sc.y) with their tops where they were.
+          const H = 10 + 6 * r() + (-1 - y0);
           card.add(new THREE.CylinderGeometry(0.7, 0.9, H, 10), c0, hz, place(x, y0 + H / 2, z));
           for (const f of [0.7, 0.9]) card.add(new THREE.CylinderGeometry(0.76, 0.76, 0.4, 10), c1, hz, place(x, y0 + f * H, z));
           this.emitters.push({ x, y: y0 + H, z });
         });
         break;
-      case 'tubes':
-        // A marble run: curved tubes, never vertical, never with mouths (they are not gameplay pipes).
-        this.copies(sc, (x) => {
-          for (let n = 0; n < 2; n++) {
-            const pts: THREE.Vector3[] = [];
-            let y = 3 + r() * 8;
-            for (let i = 0; i < 5; i++) {
-              pts.push(new THREE.Vector3(x - 8 + i * 4, y, 0));
-              y = Math.min(11, Math.max(3, y + (r() * 2 - 1) * 0.6 * 4));
-            }
-            const dz = n ? -0.8 : 0;
-            const curve = new THREE.CatmullRomCurve3(pts);
-            this.tubes.push({ curve, z: z + dz });
-            card.add(new THREE.TubeGeometry(curve, 24, 0.35, 6), c0, hz, place(0, 0, z + dz));
-            pts.forEach((p, i) => {
-              if (i % 2) return;
-              card.add(new THREE.TorusGeometry(0.42, 0.08, 4, 12).rotateY(Math.PI / 2), c1, hz, place(p.x, p.y, z + dz));
-            });
+      case 'tubes': {
+        // A marble run: two smoked-plastic tubes, each one continuous spline across the whole layer,
+        // so there is no open end or mouth anywhere to mistake for a gameplay pipe. Never vertical.
+        const [x0, x1] = layerX(z, this.W);
+        for (let n = 0; n < 2; n++) {
+          const pts: THREE.Vector3[] = [];
+          let y = 4 + r() * 6;
+          for (let x = x0; x < x1 + 4; x += 4) {
+            pts.push(new THREE.Vector3(x, y, 0));
+            y = Math.min(11, Math.max(3, y + (r() * 2 - 1) * 0.6 * 4));
           }
-        });
+          const dz = n ? -0.8 : 0;
+          const curve = new THREE.CatmullRomCurve3(pts);
+          curve.arcLengthDivisions = pts.length * 12;
+          this.tubes.push({ curve, z: z + dz });
+          const segs = Math.round(((x1 - x0) / sc.every) * 12);
+          card.add(new THREE.TubeGeometry(curve, segs, 0.35, 6), c0, hz, place(0, 0, z + dz));
+          // The gloss line along the top of the tube (the sun is upper left).
+          const gloss = curve.getSpacedPoints(segs).map((p) => [p.x - 0.06, p.y + 0.2] as [number, number]);
+          card.add(polyline(gloss, 0.035, 0.36), c1, 0.5, place(0, 0, z + dz));
+        }
         break;
+      }
       case 'wall':
         this.buildWall(sc, card);
         break;
@@ -632,9 +767,10 @@ export class Backdrop {
       for (let k = Math.ceil((x0 + hole.w - 6) / sc.every); 6 + k * sc.every < x1 - hole.w; k++) {
         const x = 6 + k * sc.every;
         shape.holes.push(capsule(hole.w, hole.h, x, hole.y));
+        // A torchlit plywood edge round each window, so it reads as a window, not a dark blob.
         const frame = capsule(hole.w + 0.3, hole.h + 0.3, x, hole.y);
         frame.holes.push(capsule(hole.w, hole.h, x, hole.y));
-        card.add(shapeGeo(frame, 0, 10), c1, sc.haze, place(0, 0, sc.z + 0.01));
+        card.add(shapeGeo(frame, 0, 10), mixHex(c1, 0xffc890, 0.35), sc.haze, place(0, 0, sc.z + 0.01));
       }
     }
     if (sc.pattern === 'pegboard') {
@@ -647,15 +783,20 @@ export class Backdrop {
           wrench
             ? [capsule(0.35 - 2 * inset, 4 - 2 * inset, x, 5.2), wrenchHead(0.9 - inset, x, 7.6)]
             : [capsule(0.35 - 2 * inset, 3.6 - 2 * inset, x, 5.4), rectShape(x - 1.1 + inset, 7 + inset, x + 1.1 - inset, 7.8 - inset)];
-        if (home) card.add(shapeGeo(parts(0), 0), c2, sc.haze, place(0, 0, sc.z + 0.02));
+        // Teal marks only the tools (hazed well back), never the board.
+        const toolHaze = Math.max(sc.haze, 0.45);
+        if (home) card.add(shapeGeo(parts(0), 0), c2, toolHaze, place(0, 0, sc.z + 0.02));
         else {
-          card.add(shapeGeo(parts(0), 0), c1, sc.haze, place(0, 0, sc.z + 0.02));
+          card.add(shapeGeo(parts(0), 0), c2, toolHaze, place(0, 0, sc.z + 0.02));
           card.add(shapeGeo(parts(0.12), 0), c0, sc.haze, place(0, 0, sc.z + 0.03));
         }
       }
     }
     const tex = wallTexture(sc.pattern ?? 'stone', hazeHex(c0, sky, sc.haze), hazeHex(c1, sky, sc.haze));
-    const wall = new THREE.Mesh(new THREE.ShapeGeometry(shape, 10).translate(0, 0, sc.z), new THREE.MeshBasicMaterial({ map: tex }));
+    const wall = new THREE.Mesh(
+      levelGeometry(`wall:${sc.z}`, () => new THREE.ShapeGeometry(shape, 10).translate(0, 0, sc.z)),
+      new THREE.MeshBasicMaterial({ map: tex }),
+    );
     wall.name = 'backdrop:wall';
     wall.matrixAutoUpdate = false;
     this.scene.add(wall);
@@ -699,15 +840,18 @@ export class Backdrop {
       for (let i = 0; i < 3; i++) {
         const rad = 1.5 + 2 * r();
         if (i) gx += 0.9 * (prev + rad);
-        const y = up ? 7 + r() * 3 : 3 + r() * 3;
+        // High, above the blocks and tokens on screen: the play band sits over plain wall.
+        const y = up ? 15 + r() * 2 : 13 + r() * 2;
         up = !up;
         list.push({ x: gx, y, z: sc.z + (i % 2) * 0.05, r: rad, dir: i % 2 ? -1 : 1 });
         prev = rad;
       }
       x = gx + prev + sc.every * (0.6 + 0.8 * r());
     }
-    const geo = cachedGeo('bd:gear', gearGeo);
-    const mat = new THREE.MeshBasicMaterial({ color: hazeHex(sc.colors[0], this.theme.skyBottom, sc.haze), vertexColors: true });
+    const sky = this.theme.skyBottom;
+    const [face, rim, hub] = [sc.colors[0], shade(sc.colors[0], 1.35), 0xb8964a].map((c) => hazeHex(c, sky, sc.haze));
+    const geo = cachedGeo(`bd:gear:${face}:${rim}:${hub}`, () => gearGeo(face, rim, hub));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
     const mesh = new THREE.InstancedMesh(geo, mat, list.length);
     mesh.name = 'gear';
     mesh.frustumCulled = false;
@@ -738,6 +882,11 @@ export class Backdrop {
     const disc = () => new THREE.CircleGeometry(r, 32);
     if (c.kind === 'sun') {
       card.add(disc(), c.color, 0);
+      // A felt sun: a cream running stitch just inside its edge.
+      for (let i = 0; i < 28; i++) {
+        const a0 = (i / 28) * TAU;
+        card.add(new THREE.RingGeometry(r - 0.5, r - 0.32, 4, 1, a0, (TAU / 28) * 0.55), 0xfff8e8, 0, place(0, 0, 0.02));
+      }
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * TAU;
         const tri = new THREE.BufferGeometry().setAttribute(
@@ -786,13 +935,16 @@ export class Backdrop {
   private buildClouds(): void {
     const color = this.theme.cloudColor ?? 0xffffff;
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
-    const variants = [0, 1, 2].map((v) => cloudGeo(v, color, this.theme.skyBottom));
+    // Threads a couple of render pixels wide on phones (thinner ones broke into crawling dashes).
+    const thread = this.touch ? 0.1 : 0.05;
+    const variants = [0, 1, 2].map((v) => cachedGeo(`bd:cloud:${v}:${color}:${this.theme.skyBottom}:${thread}`, () => cloudGeo(v, color, this.theme.skyBottom, thread)));
     const [x0, x1] = this.cloudRange;
     let x = x0 + this.rng() * 10;
     let i = 0;
     while (x < x1) {
       const mesh = new THREE.Mesh(variants[i % 3], mat);
-      const y = 11 + 3 * this.rng();
+      // High enough that no cloud reads as a ledge behind a row of tokens or blocks.
+      const y = 16 + 3 * this.rng();
       mesh.position.set(x, y + 26, -24 - (i % 2) * 0.3);
       mesh.name = 'backdrop:cloud';
       this.scene.add(mesh);
@@ -851,19 +1003,36 @@ export class Backdrop {
         break;
       }
       case 'lanterns': {
+        // Paper sky lanterns (a tapered four-sided shade with a dark rim), hazed, drifting up high
+        // above the play band, so none reads as a pickup.
         const rise = (i: number, t: number, clock: number, o: { x: number; y: number; rz: number }) => {
-          o.y = wrap(o.y + 0.6 * clock, -2, 18);
+          o.y = wrap(o.y + 0.6 * clock, 7, 22);
           o.x += 0.3 * Math.sin(0.8 * t + i);
           o.rz = 0.08 * Math.sin(1.1 * t + i);
         };
-        const box = new Movers(cachedGeo('bd:lantern', () => new THREE.BoxGeometry(0.35, 0.45, 0.35)), new THREE.MeshBasicMaterial({ color: l.color }), n, l.z, mulberry32(this.W + 7), [-2, 18], rise);
+        const body = hazeHex(l.color, sky, 0.3);
+        const geo = cachedGeo(`bd:lantern:${body}`, () => {
+          const shadeGeo = new THREE.CylinderGeometry(0.2, 0.26, 0.55, 4, 1).rotateY(Math.PI / 4).toNonIndexed();
+          const rim = new THREE.CylinderGeometry(0.205, 0.215, 0.1, 4, 1).rotateY(Math.PI / 4).translate(0, 0.25, 0).toNonIndexed();
+          const paint = (g: THREE.BufferGeometry, hex: number) => {
+            const cc = new THREE.Color(hex);
+            const col = new Float32Array(g.getAttribute('position').count * 3);
+            for (let k = 0; k < col.length; k += 3) cc.toArray(col, k);
+            g.deleteAttribute('uv');
+            g.deleteAttribute('normal');
+            g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+            return g;
+          };
+          return mergeGeometries([paint(shadeGeo, body), paint(rim, hazeHex(0x5a2a1a, sky, 0.3))])!;
+        });
+        const box = new Movers(geo, new THREE.MeshBasicMaterial({ vertexColors: true }), n, l.z, mulberry32(this.W + 7), [7, 22], rise);
         const glow = new Movers(
           cachedGeo('bd:plane:0.9', () => new THREE.PlaneGeometry(0.9, 0.9)),
-          new THREE.MeshBasicMaterial({ map: glowTexture(), color: l.color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }),
+          new THREE.MeshBasicMaterial({ map: glowTexture(), color: l.color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }),
           n,
           l.z - 0.2,
           mulberry32(this.W + 7),
-          [-2, 18],
+          [7, 22],
           rise,
         );
         add(glow.mesh);
@@ -1049,33 +1218,32 @@ export class Backdrop {
     }
   }
 
-  /** Storm lightning: now and then one of three jagged bolts far away, with a flash of the sky. */
+  /**
+   * Storm lightning: now and then one of three cut-paper bolts, with a flash of the sky. Each is a
+   * filled zigzag (a flat paper shape, not a thin crack across the screen) flashing across the storm
+   * clouds, just in front of them, so on screen it stays above the play band.
+   */
   private buildLightning(): void {
     const rng = mulberry32(this.W + 11);
-    const z = -50;
-    const mat = new THREE.MeshBasicMaterial({ color: 0xeef2ff });
+    const z = -38;
+    const mat = new THREE.MeshBasicMaterial({ color: 0xfff4c0 });
     const bolts = [0, 1, 2].map(() => {
-      const quads: number[] = [];
-      const seg = (x0: number, y0: number, x1: number, y1: number, w: number) => {
-        const dx = x1 - x0;
-        const dy = y1 - y0;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = (-dy / len) * w;
-        const ny = (dx / len) * w;
-        quads.push(x0 - nx, y0 - ny, z, x1 - nx, y1 - ny, z, x1 + nx, y1 + ny, z, x0 - nx, y0 - ny, z, x1 + nx, y1 + ny, z, x0 + nx, y0 + ny, z);
-      };
-      const strike = (x: number, y: number, yEnd: number, w: number, branch: boolean) => {
-        while (y > yEnd) {
-          const nx = x + (rng() - 0.5) * 3;
-          const ny = y - 1.5 - 2 * rng();
-          seg(x, y, nx, ny, w);
-          if (branch && rng() < 0.3) strike(nx, ny, ny - 6 - 4 * rng(), w * 0.55, false);
-          x = nx;
-          y = ny;
-        }
-      };
-      strike(0, 34, 2, 0.22, true);
-      const mesh = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(quads, 3)), mat);
+      // Walk down in zigzags, then offset the path either side into a tapering band.
+      const path: [number, number][] = [[0, 32]];
+      let [x, y] = [0, 32];
+      let dir = rng() < 0.5 ? -1 : 1;
+      while (y > 16) {
+        x += dir * (1.2 + 1.4 * rng());
+        y -= 2.2 + 2 * rng();
+        path.push([x, Math.max(16, y)]);
+        dir = -dir;
+      }
+      const shape = new THREE.Shape();
+      const w = (k: number) => 0.9 * (1 - k / path.length) + 0.15;
+      path.forEach(([px, py], k) => (k ? shape.lineTo(px - w(k), py) : shape.moveTo(px - w(k), py)));
+      for (let k = path.length - 1; k >= 0; k--) shape.lineTo(path[k][0] + w(k) + (k % 2 ? 0.6 : -0.2), path[k][1] - (k % 2 ? 0.5 : 0));
+      shape.closePath();
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape).translate(0, 0, z), mat);
       mesh.visible = false;
       mesh.frustumCulled = false;
       mesh.name = 'backdrop:lightning';
@@ -1122,12 +1290,14 @@ export class Backdrop {
     const [x0, x1] = layerX(z, this.W);
     const rng = mulberry32(this.W + 13);
     const pts: [number, number][] = [];
+    // High under the ceiling with a shallow drape, so the lowest bulb stays well above the top row
+    // of blocks and tokens on screen.
     let ax = x0;
-    let ay = 14 + rng() - 0.5;
+    let ay = 15.5 + rng() - 0.5;
     while (ax < x1) {
       const bx = ax + 7 + 2 * rng();
-      const by = 14 + rng() - 0.5;
-      const sag = 1.2 + 0.8 * rng();
+      const by = 15.5 + rng() - 0.5;
+      const sag = 0.5 + 0.3 * rng();
       const n = Math.max(2, Math.round((bx - ax) / 0.5));
       let px = ax;
       let py = ay;
@@ -1143,16 +1313,21 @@ export class Backdrop {
       ax = bx;
       ay = by;
     }
-    const palette = [0xffe08a, 0x7ad8ff, 0xff9ad5].map((c) => new THREE.Color(c));
-    const bulbs = new THREE.InstancedMesh(cachedGeo('bd:bulb', () => new THREE.SphereGeometry(0.11, 6, 4)), new THREE.MeshBasicMaterial({ color: 0xffffff }), pts.length);
+    const palette = [0xfff0c0, 0x7ad8ff, 0xff9ad5].map((c) => new THREE.Color(c));
+    // Bulbs hazed a little toward the cave's sky (and never a round gold: that is the fake reward orb).
+    const bulbs = new THREE.InstancedMesh(
+      cachedGeo('bd:bulb', () => new THREE.SphereGeometry(0.11, 6, 4)),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(hazeHex(0xffffff, this.theme.skyBottom, 0.3)) }),
+      pts.length,
+    );
     const glows = new THREE.InstancedMesh(
       cachedGeo('bd:plane:1', () => new THREE.PlaneGeometry(1, 1)),
-      new THREE.MeshBasicMaterial({ map: fxTexture('spark'), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ map: fxTexture('spark'), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }),
       pts.length,
     );
     pts.forEach(([x, y], i) => {
       bulbs.setMatrixAt(i, this.m.makeTranslation(x, y - 0.12, z + 0.05));
-      glows.setMatrixAt(i, this.m.makeScale(0.8, 0.8, 1).setPosition(x, y - 0.12, z + 0.02));
+      glows.setMatrixAt(i, this.m.makeScale(0.5, 0.5, 1).setPosition(x, y - 0.12, z + 0.02));
       const c = palette[i % 3];
       bulbs.setColorAt(i, c);
       glows.setColorAt(i, c);
@@ -1185,7 +1360,9 @@ export class Backdrop {
   private buildKites(): void {
     const z = -26;
     const sky = this.theme.skyBottom;
-    const geo = cachedGeo('bd:kite', kiteGeo);
+    // Strings and tails a couple of render pixels wide on phones, where thinner ones broke up.
+    const thin = this.touch ? 0.05 : 0.018;
+    const geo = cachedGeo(`bd:kite:${thin}`, () => kiteGeo(thin));
     const mv = new Movers(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), 3, z, mulberry32(this.W + 17), [9, 13], (i, t, clock, o) => {
       o.x += 0.4 * clock;
       o.y += 0.7 * Math.sin(0.7 * t + 2 * i);
@@ -1278,24 +1455,33 @@ export class Backdrop {
     }
   }
 
-  /** Finale: brass orreries, a sun with five arms whose planets turn on their own slow periods. */
+  /**
+   * Finale: brass orreries standing on the planetoid horizon, far out, a sun with five arms whose
+   * planets turn on their own slow periods. At 1.5× they rise well above the play band, and their
+   * pedestals sink behind the horizon, so no base disc reads as a platform.
+   */
   private buildOrrery(card: Cardboard): void {
-    const z = -34;
+    const z = -52;
+    const S = 1.5;
     const hz = 0.5;
     const brass = 0xd9a53a;
     const planetsC = [0xb8c0ff, 0xffd166, 0x7ad8ff, 0xff9ad5, 0x9be04a];
     const centres: [number, number][] = [];
+    // The planetoid strip's surface at x (the orrery stands on it).
+    const ground = this.theme.strips.find((st) => st.z >= z - 2 && st.z <= z + 6 && !st.hang);
+    const surface = (x: number) => (ground ? ground.top + edgeY(ground.edge, x, ground.amp, ground.period, Math.abs(ground.z) * 7.13) : -1);
     // Never in the first or last screen: the camera parks there (the boss arena), and an orrery
     // would sit on the ringed planet for the whole fight.
-    for (let x = 40; x < this.W - 50; x += 70) centres.push([x, 15]);
+    for (let x = 50; x < this.W - 60; x += 80) centres.push([x, 21]);
     for (const [cx, cy] of centres) {
-      card.add(new THREE.CylinderGeometry(0.12, 0.12, cy + 1, 8), brass, hz, place(cx, (cy - 1) / 2, z - 0.2));
-      card.add(new THREE.CylinderGeometry(1.1, 1.6, 0.7, 16), shade(brass, 0.8), hz, place(cx, -0.6, z - 0.2));
-      card.add(new THREE.CircleGeometry(1.5, 32), 0xffd166, 0.35, place(cx, cy, z));
-      card.add(new THREE.CircleGeometry(1.7, 32), brass, hz, place(cx, cy, z - 0.05));
+      const base = surface(cx) - 0.4;
+      card.add(new THREE.CylinderGeometry(0.12 * S, 0.12 * S, cy - base, 8), brass, hz, place(cx, (cy + base) / 2, z - 0.2));
+      card.add(new THREE.CylinderGeometry(1.1 * S, 1.6 * S, 0.7 * S, 16), shade(brass, 0.8), hz, place(cx, base, z - 0.4));
+      card.add(new THREE.CircleGeometry(1.5 * S, 32), 0xffd166, 0.35, place(cx, cy, z));
+      card.add(new THREE.CircleGeometry(1.7 * S, 32), brass, hz, place(cx, cy, z - 0.05));
       for (let i = 0; i < 5; i++) {
-        const L = ORRERY_ARM(i);
-        card.add(new THREE.RingGeometry(L - 0.03, L + 0.03, 64), shade(brass, 0.7), 0.7, place(cx, cy, z - 0.3));
+        const L = ORRERY_ARM(i) * S;
+        card.add(new THREE.RingGeometry(L - 0.05, L + 0.05, 64), shade(brass, 0.7), 0.7, place(cx, cy, z - 0.3));
       }
     }
     const n = centres.length * 5;
@@ -1319,11 +1505,11 @@ export class Backdrop {
           const [cx, cy] = centres[o];
           for (let i = 0; i < 5; i++) {
             const k = o * 5 + i;
-            const L = ORRERY_ARM(i);
+            const L = ORRERY_ARM(i) * S;
             const a = (0.5 / (1 + i)) * c + i * 1.3 + o;
             this.q.setFromEuler(this.e.set(0, 0, a));
-            arms.setMatrixAt(k, this.m.compose(this.p.set(cx, cy, z - 0.1), this.q, this.s.set(L, 1, 1)));
-            const pr = 0.25 + 0.06 * ((i * 3) % 5);
+            arms.setMatrixAt(k, this.m.compose(this.p.set(cx, cy, z - 0.1), this.q, this.s.set(L, S, 1)));
+            const pr = (0.25 + 0.06 * ((i * 3) % 5)) * S;
             planets.setMatrixAt(k, this.m.makeScale(pr, pr, 1).setPosition(cx + Math.cos(a) * L, cy + Math.sin(a) * L, z + 0.05));
           }
         }
@@ -1333,35 +1519,36 @@ export class Backdrop {
     });
   }
 
-  /** Pipes: teal marbles (function calls) rolling through the tube run. */
+  /**
+   * Pipes: marbles rolling along the tube run, in warm toy colours hazed well back (teal is for the
+   * tools and the chips) and with no glint (glints are for toy pieces you can touch).
+   */
   private buildMarbles(): void {
     if (!this.tubes.length) return;
     const tubes = this.tubes;
-    const mesh = new THREE.InstancedMesh(
-      cachedGeo('bd:marble', () => new THREE.SphereGeometry(0.24, 10, 6)),
-      new THREE.MeshBasicMaterial({ color: hazeHex(0x1fd1b0, this.theme.skyBottom, 0.15) }),
-      tubes.length,
-    );
-    const shine = new THREE.InstancedMesh(cachedGeo('bd:marble:shine', () => new THREE.CircleGeometry(0.07, 8)), new THREE.MeshBasicMaterial({ color: 0xe8fff8 }), tubes.length);
+    const sky = this.theme.skyBottom;
     const lengths = tubes.map((tb) => tb.curve.getLength());
+    // About one marble every 9 units of tube, all in one instanced draw.
+    const per = lengths.map((len) => Math.max(1, Math.ceil(len / 9)));
+    const n = per.reduce((a, b) => a + b, 0);
+    const mesh = new THREE.InstancedMesh(cachedGeo('bd:marble', () => new THREE.SphereGeometry(0.25, 10, 6)), new THREE.MeshBasicMaterial(), n);
+    const warm = [0xffc933, 0xff7a46, 0x46a0ff];
+    for (let i = 0; i < n; i++) mesh.setColorAt(i, new THREE.Color(hazeHex(warm[i % 3], sky, 0.45)));
     const p = new THREE.Vector3();
-    for (const m of [mesh, shine]) {
-      m.frustumCulled = false;
-      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      m.name = 'backdrop:marbles';
-      this.scene.add(m);
-    }
+    mesh.frustumCulled = false;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.name = 'backdrop:marbles';
+    this.scene.add(mesh);
     this.life.push({
       update: () => {
-        for (let i = 0; i < tubes.length; i++) {
-          const tb = tubes[i];
-          const u = fract((this.clock * 2) / lengths[i] + i * 0.37);
-          tb.curve.getPointAt(u, p);
-          mesh.setMatrixAt(i, this.m.makeTranslation(p.x, p.y, tb.z + 0.4));
-          shine.setMatrixAt(i, this.m.makeTranslation(p.x - 0.08, p.y + 0.09, tb.z + 0.65));
-        }
+        let i = 0;
+        tubes.forEach((tb, j) => {
+          for (let k = 0; k < per[j]; k++, i++) {
+            tb.curve.getPointAt(fract((this.clock * 2) / lengths[j] + k / per[j] + 0.37 * j), p);
+            mesh.setMatrixAt(i, this.m.makeTranslation(p.x, p.y, tb.z + 0.4));
+          }
+        });
         mesh.instanceMatrix.needsUpdate = true;
-        shine.instanceMatrix.needsUpdate = true;
       },
     });
   }
@@ -1392,7 +1579,7 @@ export class Backdrop {
     }
   }
 
-  /** Ghost house: faint moonbeams through the windows, empty gilt frames and a chalkboard of ∴. */
+  /** Ghost house: faint moonbeams through the windows, crooked cameo portraits and a chalkboard. */
   private buildMoonbeams(card: Cardboard): void {
     const wall = this.theme.scenery.find((s) => s.piece === 'wall');
     const torches = this.theme.scenery.find((s) => s.piece === 'torches');
@@ -1427,31 +1614,60 @@ export class Backdrop {
     mesh.frustumCulled = false;
     this.scene.add(mesh);
     if (!torches) return;
-    // Above every other torch: an empty gilt frame, and every third of those a chalkboard.
-    const gilt = 0xc9a44a;
+    // Above every other torch, high over the shelves: a crooked portrait hung by a string from a nail
+    // (a cameo silhouette in a hazed, dulled gilt frame), and every third a chalkboard of scribbles
+    // and a bar chart. Tall and tilted, so none reads as a tile or a hidden block's outline.
+    const gilt = mixHex(0xc9a44a, 0x8a8078, 0.4);
+    const hz = 0.55;
     let n = 0;
     for (let x = Math.ceil(x0 / torches.every) * torches.every; x < x1; x += 2 * torches.every, n++) {
-      const fy = (torches.y ?? 6.5) + 3.3;
+      const fy = (torches.y ?? 6.5) + 5.5;
       const fz = wall.z + 0.03;
-      if (n % 3 === 2) {
-        card.add(new THREE.PlaneGeometry(2.4, 1.6), 0x6a4a2a, 0.3, place(x, fy, fz));
-        card.add(new THREE.PlaneGeometry(2.1, 1.3), 0x1e3a2e, 0.3, place(x, fy, fz + 0.01));
-        for (let g = 0; g < 4; g++) {
-          const gx = x - 0.7 + (g % 2) * 1.1 + (g > 1 ? 0.3 : 0);
-          const gy = fy + (g > 1 ? -0.3 : 0.3);
-          for (const [dx, dy] of [[0, 0.1], [-0.12, -0.08], [0.12, -0.08]]) card.add(new THREE.CircleGeometry(0.05, 6), 0xe8e8e0, 0.3, place(gx + dx, gy + dy, fz + 0.02));
-        }
-        card.add(ribbon(x - 0.9, fy - 0.55, x + 0.5, fy - 0.45, 0.02, fz + 0.02), 0xe8e8e0, 0.4);
+      const tilt = (hash01(x, 7) < 0.5 ? -1 : 1) * (0.1 + 0.07 * hash01(x, 9));
+      const board = n % 3 === 2;
+      const [w, h] = board ? [2.4, 1.6] : [1.4, 2.0];
+      const m = place(x, fy, fz, tilt);
+      const at = (dx: number, dy: number): [number, number] => [x + Math.cos(tilt) * dx - Math.sin(tilt) * dy, fy + Math.sin(tilt) * dx + Math.cos(tilt) * dy];
+      // The nail, and the string from it to the frame's top corners.
+      const nail: [number, number] = [x, fy + h / 2 + 0.7];
+      card.add(new THREE.CircleGeometry(0.07, 6), 0x8a8078, hz, place(nail[0], nail[1], fz + 0.02));
+      for (const side of [-1, 1]) {
+        const [cx, cy] = at(side * 0.35 * w, h / 2 - 0.05);
+        card.add(ribbon(nail[0], nail[1], cx, cy, 0.025, fz + 0.01), 0x8a8078, hz);
+      }
+      const frame = rectShape(-w / 2, -h / 2, w / 2, h / 2);
+      const inner = new THREE.Path();
+      inner.moveTo(-w / 2 + 0.16, -h / 2 + 0.16);
+      inner.lineTo(-w / 2 + 0.16, h / 2 - 0.16);
+      inner.lineTo(w / 2 - 0.16, h / 2 - 0.16);
+      inner.lineTo(w / 2 - 0.16, -h / 2 + 0.16);
+      inner.closePath();
+      frame.holes.push(inner);
+      if (board) {
+        card.add(new THREE.ShapeGeometry(frame), 0x6a4a2a, hz, m);
+        card.add(new THREE.PlaneGeometry(w - 0.3, h - 0.3), 0x1e3a2e, hz, m.clone().multiply(place(0, 0, -0.01)));
+        const chalk = 0xe8e8e0;
+        // A chalk scribble, and a little bar chart with its axis.
+        const squiggle: [number, number][] = [];
+        for (let k = 0; k <= 16; k++) squiggle.push([-0.95 + (k / 16) * 0.9, 0.35 + 0.12 * Math.sin(k * 1.9)]);
+        card.add(polyline(squiggle, 0.03, 0.02), chalk, hz, m);
+        card.add(polyline([[-0.95, -0.05], [-0.4, -0.05]], 0.025, 0.02), chalk, hz, m);
+        card.add(polyline([[0.1, -0.55], [0.1, 0.5], [0.1, -0.55], [1, -0.55]], 0.025, 0.02), chalk, hz, m);
+        [0.3, 0.55, 0.4, 0.8].forEach((bh, k) => card.add(new THREE.PlaneGeometry(0.14, bh).translate(0.28 + k * 0.2, -0.55 + bh / 2, 0.02), chalk, hz, m));
       } else {
-        const frame = rectShape(x - 0.8, fy - 0.6, x + 0.8, fy + 0.6);
-        const inner = new THREE.Path();
-        inner.moveTo(x - 0.6, fy - 0.4);
-        inner.lineTo(x - 0.6, fy + 0.4);
-        inner.lineTo(x + 0.6, fy + 0.4);
-        inner.lineTo(x + 0.6, fy - 0.4);
-        inner.closePath();
-        frame.holes.push(inner);
-        card.add(new THREE.ShapeGeometry(frame), gilt, 0.3, place(0, 0, fz));
+        card.add(new THREE.ShapeGeometry(frame), gilt, hz, m);
+        card.add(new THREE.PlaneGeometry(w - 0.3, h - 0.3), 0x3a1a3a, hz, m.clone().multiply(place(0, 0, -0.01)));
+        const oval = new THREE.Shape().absellipse(0, 0, 0.42, 0.62, 0, TAU, false, 0);
+        card.add(new THREE.ShapeGeometry(oval, 20).translate(0, 0, 0.01), 0xf0e2c0, hz, m);
+        // A cut-paper profile, facing right.
+        const head = new THREE.Shape();
+        const pts: [number, number][] = [
+          [-0.13, -0.5], [0.1, -0.5], [0.08, -0.28], [0.17, -0.2], [0.19, -0.11], [0.22, -0.05], [0.29, 0.03],
+          [0.21, 0.09], [0.22, 0.2], [0.16, 0.33], [0.0, 0.41], [-0.19, 0.33], [-0.26, 0.12], [-0.22, -0.1], [-0.13, -0.28],
+        ];
+        pts.forEach(([px, py], k) => (k ? head.lineTo(px, py) : head.moveTo(px, py)));
+        head.closePath();
+        card.add(new THREE.ShapeGeometry(head).translate(0, 0, 0.02), 0x1a0e1a, hz, m);
       }
     }
   }
@@ -1527,6 +1743,16 @@ export class Backdrop {
   }
 }
 
+/** A thin ribbon along a path of points (one geometry), `w` either side of the line, facing +z. */
+function polyline(pts: [number, number][], w: number, z: number): THREE.BufferGeometry {
+  const out: number[] = [];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const g = ribbon(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], w, z).getAttribute('position').array;
+    for (let k = 0; k < g.length; k++) out.push(g[k]);
+  }
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
+}
+
 /** A thin cardboard ribbon from (x0, y0) to (x1, y1), `w` either side of the line, facing +z. */
 function ribbon(x0: number, y0: number, x1: number, y1: number, w: number, z: number): THREE.BufferGeometry {
   const len = Math.hypot(x1 - x0, y1 - y0) || 1;
@@ -1539,7 +1765,7 @@ function ribbon(x0: number, y0: number, x1: number, y1: number, w: number, z: nu
 }
 
 /** A diamond kite with a cross spar, a bow tail and a long string down, vertex-coloured light and dark. */
-function kiteGeo(): THREE.BufferGeometry {
+function kiteGeo(thin: number): THREE.BufferGeometry {
   const pos: number[] = [];
   const col: number[] = [];
   const tri = (a: number[], b: number[], c: number[], v: number) => {
@@ -1566,13 +1792,13 @@ function kiteGeo(): THREE.BufferGeometry {
   for (let i = 1; i <= 5; i++) {
     const x = 0.25 * Math.sin(i * 1.3);
     const y = -0.9 - i * 0.45;
-    quad(px, py, x, y, 0.015, 0.45);
+    quad(px, py, x, y, thin, 0.45);
     tri([x - 0.14, y + 0.07], [x, y], [x - 0.14, y - 0.07], 1.15);
     tri([x + 0.14, y + 0.07], [x + 0.14, y - 0.07], [x, y], 1.15);
     px = x;
     py = y;
   }
-  quad(0, -0.9, 3, -26, 0.012, 0.35);
+  quad(0, -0.9, 3, -26, thin * 0.8, 0.35);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -1596,8 +1822,11 @@ function balloonGeo(): THREE.BufferGeometry {
   return mergeGeometries([env.toNonIndexed(), basket.toNonIndexed(), ...ropes.map((r) => r.toNonIndexed())])!;
 }
 
-/** A 12-tooth gear with a hub ring round its axle hole, outer radius 1 (scaled per instance). */
-function gearGeo(): THREE.BufferGeometry {
+/**
+ * A brass 12-tooth gear, outer radius 1 (scaled per instance): a face, a bright rim ring inside the
+ * teeth, and a gold hub with spokes round its axle hole, all baked as vertex colours.
+ */
+function gearGeo(face: number, rimHex: number, hubHex: number): THREE.BufferGeometry {
   const s = new THREE.Shape();
   const step = TAU / 12;
   const root = 0.82;
@@ -1620,22 +1849,26 @@ function gearGeo(): THREE.BufferGeometry {
   hole.absarc(0, 0, 0.28, 0, TAU, true);
   s.holes.push(hole);
   const body = new THREE.ExtrudeGeometry(s, { depth: 0.25, bevelEnabled: false, curveSegments: 12 }).toNonIndexed();
+  const rim = new THREE.RingGeometry(0.66, 0.78, 36).translate(0, 0, 0.26).toNonIndexed();
   const hub = new THREE.RingGeometry(0.28, 0.44, 16).translate(0, 0, 0.26).toNonIndexed();
   const spokes = mergeGeometries(
     [0, 1, 2].map((k) => new THREE.PlaneGeometry(0.12, 1.1).rotateZ((k * Math.PI) / 3).translate(0, 0, 0.255).toNonIndexed()),
   )!;
-  const parts = [body, hub, spokes].map((g, i) => {
+  const c = new THREE.Color();
+  const parts = ([[body, face], [rim, rimHex], [hub, hubHex], [spokes, hubHex]] as const).map(([g, hex]) => {
     for (const name of Object.keys(g.attributes)) if (name !== 'position') g.deleteAttribute(name);
     g.clearGroups();
-    const v = i === 0 ? 1 : 1.3;
-    g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 3).fill(v), 3));
+    c.setHex(hex);
+    const col = new Float32Array(g.getAttribute('position').count * 3);
+    for (let k = 0; k < col.length; k += 3) c.toArray(col, k);
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return g;
   });
   return mergeGeometries(parts)!;
 }
 
 /** A scalloped cardboard cloud on a thread: flat bottom, bumps on top, origin at the thread's top. */
-function cloudGeo(variant: number, color: number, sky: string): THREE.BufferGeometry {
+function cloudGeo(variant: number, color: number, sky: string, thread: number): THREE.BufferGeometry {
   const bumps = [5, 6, 7][variant];
   const w = [4, 5.5, 7][variant];
   const h = [1.6, 2, 2.4][variant];
@@ -1668,7 +1901,7 @@ function cloudGeo(variant: number, color: number, sky: string): THREE.BufferGeom
   const card = new Cardboard(sky);
   const belly = 0x9ab0d8;
   card.add(new THREE.ShapeGeometry(s).translate(0, -26 - h / 2, 0), (_x, y) => (y + 26 + h / 2 < 0.3 * h ? mixHex(color, belly, 0.25) : color), 0.35);
-  card.add(new THREE.BoxGeometry(0.04, 26, 0.01).translate(0, -13, -0.02), shade(color, 0.7), 0.5);
+  card.add(new THREE.BoxGeometry(thread, 26, 0.01).translate(0, -13, -0.02), shade(color, 0.7), 0.5);
   const mesh = card.build()!;
   const geo = mesh.geometry;
   (mesh.material as THREE.Material).dispose();

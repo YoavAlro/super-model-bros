@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DATA_TYPES, type ChipShape, type DataTypeId } from '../config/dataTypes';
 import { atlasUV, cachedMat, CELL, easeOutBack, glint, softTexture } from './art';
 import { fxTexture } from './fx';
-import { css, hash01, shade } from './palette';
+import { css, hash01, mixHex, shade } from './palette';
 import { prefs } from './prefs';
 import { basic, cachedGeo, INK, inkOutline, RAMP, roundedBox, toon } from './toonKit';
 
@@ -280,11 +280,15 @@ interface FaceOpts {
   extra?: (c: CanvasRenderingContext2D, pts: THREE.Vector2[]) => void;
 }
 
-/** A chip's 64 px face: rim colour everywhere, the silhouette, a lighter sticker inset, the glyph, a glint. */
+/**
+ * A chip's 64 px face: rim colour everywhere, the silhouette, a lighter sticker inset, the glyph, a
+ * glint. The rim (the chip's bevel and sides) is its colour pushed well toward ink, so every chip is
+ * outlined like the other toy pieces and stands off a backdrop of its own hue.
+ */
 function chipFace(key: string, id: ChipId, color: number, o: FaceOpts): THREE.Texture {
   return softTexture(`chip:${key}`, 64, 64, (c) => {
     const pts = chipShape(id).getPoints(8);
-    c.fillStyle = css(shade(color, 0.62));
+    c.fillStyle = css(mixHex(shade(color, 0.55), INK, 0.45));
     c.fillRect(0, 0, 64, 64);
     tracePath(c, pts);
     c.fillStyle = css(color);
@@ -560,10 +564,12 @@ function goldStar(kind: 'rlhf' | 'viral'): THREE.Group {
   const g = new THREE.Group();
   const rlhf = kind === 'rlhf';
   // Viral's emissive hue is cycled each frame: one shared material, so every copy shimmers in sync.
-  const star = mesh(pillowStar(), rlhf ? toonC(0xffc933, 0xffa000, 0.35) : toonC(0xffffff, 0x66ccff, 0.45), 0, 0.45);
+  // Viral is tinted off pure white (white is for glints, and in the skies white means solid cloud).
+  const star = mesh(pillowStar(), rlhf ? toonC(0xffc933, 0xffa000, 0.35) : toonC(0xeef6ff, 0x66ccff, 0.45), 0, 0.45);
   const parts: Record<string, THREE.Object3D> = { star };
+  // Both stars are inked, so the pale share star still reads against pale skies.
+  outline(star, 0.025);
   if (rlhf) {
-    outline(star, 0.025);
     // The foil face of the sticker.
     const foil = mesh(cachedGeo('star:foil', () => new THREE.ShapeGeometry(starShape(0.42 * 0.55, 0.2 * 0.55))), basicC(0xfff2a0), 0, 0, 0.14);
     star.add(foil);

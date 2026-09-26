@@ -13,7 +13,78 @@ const TOKEN_OUTRO = 0.25;
 /** A 0.09 s half-sine bump starting at `start` (0 outside it): one heartbeat. */
 const pulse = (p: number, start: number) => (p >= start && p < start + 0.09 ? Math.sin((Math.PI * (p - start)) / 0.09) : 0);
 
-/** A floating data token. `pop` tokens burst out of blocks and collect themselves. */
+/**
+ * A level's chips of one data type, drawn as one InstancedMesh: a screen full of tokens costs a draw
+ * per type, not one per chip. Each Token owns a slot and writes its matrix there every frame (a zero
+ * matrix once it has gone). The batch lives with its scene, so a rebuilt level starts afresh.
+ */
+class ChipBatch {
+  private mesh: THREE.InstancedMesh;
+  private used = 0;
+  /** Slots still showing a chip (the batch skips its draw once every chip has gone). */
+  private live = 0;
+
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly chip: THREE.Mesh,
+  ) {
+    this.mesh = this.make(16);
+  }
+
+  private make(capacity: number): THREE.InstancedMesh {
+    const m = new THREE.InstancedMesh(this.chip.geometry, this.chip.material, capacity);
+    m.name = 'tokens';
+    // Chips spread over the whole level, so a bounding sphere would be wrong.
+    m.frustumCulled = false;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.count = this.used;
+    m.visible = this.live > 0;
+    this.scene.add(m);
+    return m;
+  }
+
+  alloc(): number {
+    const capacity = this.mesh.instanceMatrix.count;
+    if (this.used === capacity) {
+      const old = this.mesh;
+      this.mesh = this.make(capacity * 2);
+      (this.mesh.instanceMatrix.array as Float32Array).set(old.instanceMatrix.array);
+      this.scene.remove(old);
+      old.dispose();
+    }
+    this.live++;
+    this.mesh.visible = true;
+    this.mesh.count = ++this.used;
+    return this.used - 1;
+  }
+
+  write(slot: number, m: THREE.Matrix4): void {
+    this.mesh.setMatrixAt(slot, m);
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** The slot's chip has gone for good. */
+  hide(slot: number): void {
+    this.write(slot, ZERO);
+    this.mesh.visible = --this.live > 0;
+  }
+}
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+const chipMatrix = new THREE.Matrix4();
+const batches = new WeakMap<THREE.Scene, Map<DataTypeId, ChipBatch>>();
+
+function chipBatch(scene: THREE.Scene, type: DataTypeId, chip: THREE.Mesh): ChipBatch {
+  let byType = batches.get(scene);
+  if (!byType) batches.set(scene, (byType = new Map()));
+  let batch = byType.get(type);
+  if (!batch) byType.set(type, (batch = new ChipBatch(scene, chip)));
+  return batch;
+}
+
+/**
+ * A floating data token. `pop` tokens burst out of blocks and collect themselves. Its mesh is never
+ * in the scene: updateMesh poses it, then copies the chip's matrix into its type's ChipBatch.
+ */
 export class Token {
   readonly body: Body;
   readonly mesh: THREE.Group;
@@ -21,18 +92,33 @@ export class Token {
   private popTime = 0;
   /** When the outro started (the first frame drawn after the token was taken), or −1. */
   private outroAt = -1;
+  private readonly batch: ChipBatch;
+  private readonly slot: number;
+  /** The chip's place in the token group (it sits at y 0.5). */
+  private readonly chipLocal: THREE.Matrix4;
 
   constructor(
     readonly type: DataTypeId,
     x: number,
     y: number,
-    private readonly scene: THREE.Scene,
+    scene: THREE.Scene,
     readonly pop = false,
   ) {
     this.body = { x: x + 0.2, y: y + 0.2, w: 0.6, h: 0.6, vx: 0, vy: pop ? 14 : 0, onGround: false };
     this.mesh = makeToken(type);
     this.mesh.position.set(x + 0.5, y, 0);
-    scene.add(this.mesh);
+    const chip = this.mesh.children[0] as THREE.Mesh;
+    chip.updateMatrix();
+    this.chipLocal = chip.matrix;
+    this.batch = chipBatch(scene, type, chip);
+    this.slot = this.batch.alloc();
+    this.draw();
+  }
+
+  /** Copies the posed chip into its batch slot. */
+  private draw(): void {
+    this.mesh.updateMatrix();
+    this.batch.write(this.slot, chipMatrix.multiplyMatrices(this.mesh.matrix, this.chipLocal));
   }
 
   /** Returns true once a popped token has finished its arc (it is then collected). */
@@ -58,7 +144,10 @@ export class Token {
       m.position.set(this.body.x + 0.3, this.body.y - 0.2 + 0.9 * (1 - (1 - k) * (1 - k)), 0);
       m.rotation.y = 2 * TAU * k;
       m.scale.setScalar(k < 0.35 ? 1 + k : 1.35 * (1 - (k - 0.35) / 0.65));
-      if (k >= 1) m.visible = false;
+      if (k >= 1) {
+        m.visible = false;
+        this.batch.hide(this.slot);
+      } else this.draw();
       return;
     }
     const x = this.body.x;
@@ -71,10 +160,12 @@ export class Token {
     const ph = fract(0.42 * t - 0.06 * x);
     if (ph < 0.16 && !prefs.reduceMotion) m.rotation.y = TAU * easeOutBack(ph / 0.16);
     else m.rotation.y = 0.25 * (prefs.reduceMotion ? 0.3 : 1) * Math.min(1, Math.max(0, (ph - 0.16) / 0.1)) * Math.sin(2 * t + x);
+    this.draw();
   }
 
   dispose(): void {
-    this.scene.remove(this.mesh);
+    if (this.mesh.visible) this.batch.hide(this.slot);
+    this.mesh.visible = false;
   }
 }
 

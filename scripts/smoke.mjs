@@ -56,15 +56,25 @@ async function playLevel(page, id, tag) {
   await waitFor(page, () => window.__smb.state() === 'playing');
   await sleep(600);
   await page.screenshot({ path: `${OUT}/${tag}-${id}-play.png` });
-  // Draw budget (whole frame, cast included): the phone must stay under 120 calls and 250k triangles.
-  const draws = await page.evaluate(() => window.__smb.draws());
-  if (draws) {
-    console.log(`${tag} ${id}: ${draws.calls} draw calls, ${draws.triangles} triangles`);
-    if (tag === 'phone' && (draws.calls > 120 || draws.triangles > 250000)) throw new Error(`${id}: over the phone draw budget (${draws.calls} calls, ${draws.triangles} triangles)`);
-  }
   await page.evaluate(() => window.__smb.invincible());
 
+  // Draw budget (whole frame, cast included): the phone must stay under 120 calls and 250k triangles
+  // on the level's busiest screen, not just its first. Sweep the camera across the whole level in
+  // 6-tile steps; Stage keeps the most calls and triangles of any frame since the level was built.
   const flag = await page.evaluate(() => window.__smb.flag());
+  const end = flag ? flag.x - 6 : ((await page.evaluate(() => window.__smb.width?.())) ?? 0) - 10;
+  for (let x = 4; x < end; x += 6) {
+    await page.evaluate((x) => window.__smb.teleport(x, 10), x);
+    await sleep(350);
+  }
+  const draws = await page.evaluate(() => window.__smb.draws());
+  if (draws) {
+    console.log(`${tag} ${id}: ${draws.calls} draw calls at the flag run, ${draws.maxCalls} at most (${draws.maxTriangles} triangles)`);
+    if (tag === 'phone' && (draws.maxCalls > 120 || draws.maxTriangles > 250000)) {
+      throw new Error(`${id}: over the phone draw budget (${draws.maxCalls} calls, ${draws.maxTriangles} triangles at the busiest screen)`);
+    }
+  }
+
   if (flag) {
     await page.evaluate((f) => window.__smb.teleport(f.x - 6, f.y + 3), flag);
     await page.keyboard.down('ArrowRight');

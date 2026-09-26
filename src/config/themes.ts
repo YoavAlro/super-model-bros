@@ -1,11 +1,28 @@
 export type ThemeId = 'plains' | 'caves' | 'castle' | 'hills' | 'skies' | 'skycastle' | 'storm' | 'pipes' | 'ghost' | 'factory' | 'frontier' | 'finale';
 
 /** Tile families (painted in src/game/tileArt.ts). Each style is a craft that suits its world. */
-export type CapStyle = 'felt' | 'moss' | 'stone' | 'cotton' | 'slate' | 'rubber' | 'carpet' | 'walkway' | 'trim';
-export type SoilStyle = 'soil' | 'rock' | 'ashlar' | 'cardboard' | 'papier' | 'hexmould' | 'wainscot' | 'plates' | 'resin' | 'starfield';
+export type CapStyle = 'felt' | 'moss' | 'stone' | 'cotton' | 'slate' | 'rubber' | 'carpet' | 'walkway' | 'trim' | 'fold';
+export type SoilStyle =
+  | 'soil'
+  | 'plywood'
+  | 'quilt'
+  | 'rock'
+  | 'ashlar'
+  | 'cardboard'
+  | 'origami'
+  | 'papier'
+  | 'hexmould'
+  | 'wainscot'
+  | 'plates'
+  | 'resin'
+  | 'starfield';
 export type HardStyle = 'rings' | 'facets' | 'bands' | 'creases' | 'veins' | 'strap' | 'screws' | 'corners' | 'crate' | 'star';
 export type ShelfStyle = 'rope' | 'gills' | 'brackets' | 'scallops' | 'news' | 'holes' | 'books' | 'slots' | 'rivets' | 'glow';
 export type DecorStyle = 'daisies' | 'shrooms' | 'tufts' | 'papers' | 'screws' | 'candles' | 'bolts' | 'shards' | 'twinkles';
+/** Breakable bricks: the craft ages with the era, like everything else (wood, paper, plastic, velvet, tin, resin). */
+export type BrickStyle = 'pill' | 'woodblock' | 'folded' | 'moulded' | 'tufted' | 'litho' | 'cast';
+/** Tube tiles: construction-toy tubes in the era's material, never plumbing. */
+export type PipeStyle = 'cardboard' | 'paper' | 'toy' | 'velvet' | 'tincan' | 'glass';
 export interface TileStyle {
   /** Top of walkable ground. */
   cap: CapStyle;
@@ -16,6 +33,8 @@ export interface TileStyle {
   shelf: ShelfStyle;
   /** Little cut-outs standing on some caps (null: none). */
   decor: DecorStyle | null;
+  brick: BrickStyle;
+  pipe: PipeStyle;
 }
 
 /** A flat cardboard layer behind the play plane: a long strip with a shaped top edge. */
@@ -34,8 +53,8 @@ export interface Strip {
   hang?: boolean;
   /** Colour of the thin rim ribbon along the edge (default: the colour lightened). */
   rim?: number;
-  /** A printed surface instead of flat card: sewn patches or newsprint. */
-  texture?: 'patchwork' | 'newsprint';
+  /** A printed surface instead of flat card: sewn patches, newsprint or the ruled pages of an open book. */
+  texture?: 'patchwork' | 'newsprint' | 'pages';
 }
 export type PieceId = 'trees' | 'books' | 'prisms' | 'towers' | 'islands' | 'spires' | 'stacks' | 'wall' | 'torches' | 'gears' | 'tubes';
 export type WallPattern = 'stone' | 'damask' | 'pegboard';
@@ -73,7 +92,7 @@ export interface Celestial {
 /**
  * Signature set pieces beyond the standard kit, one or two per world (built in src/game/backdrop.ts):
  * fairy-light strands, kites, hot-air balloons, marbles in the tube run, felt pennants, moonbeams
- * with gilt frames and a chalkboard, lightning, an aurora and a brass orrery.
+ * with cameo portraits and a chalkboard, lightning, an aurora and a brass orrery.
  */
 export type ExtraId = 'fairyLights' | 'kites' | 'balloons' | 'marbles' | 'pennants' | 'moonbeams' | 'lightning' | 'aurora' | 'orrery';
 /** Light colours only; intensities are the same in every theme. Keep every sun channel ≥ 0xa0. */
@@ -119,19 +138,20 @@ export const THEMES: Record<ThemeId, Theme> = {
     skyMid: '#7fb4ff',
     skyBottom: '#d4f0ff',
     ground: 0xa0612e,
-    grass: 0x46c04a,
+    grass: 0x5aa84a,
     brick: 0xc8602a,
     hard: 0xb8864a,
     pipe: 0x2a9d8f,
     platform: 0xc98a4b,
     lights: { sun: 0xfff4e0, sky: 0xffffff, ground: 0x6a5a3a },
-    tiles: { cap: 'felt', soil: 'soil', hard: 'rings', shelf: 'rope', decor: 'daisies' },
+    tiles: { cap: 'felt', soil: 'plywood', hard: 'rings', shelf: 'rope', decor: 'daisies', brick: 'woodblock', pipe: 'cardboard' },
     strips: [
-      { edge: 'rolling', z: -70, top: 8, amp: 3, period: 44, color: 0x9cc8e6, haze: 0.6 },
+      // The far hills are the open book's pages (BookCorpus): ruled, printed, creased at the gutter.
+      { edge: 'rolling', z: -70, top: 8, amp: 3, period: 44, color: 0xf2e8d0, haze: 0.45, texture: 'pages' },
       { edge: 'rolling', z: -34, top: 5, amp: 2.5, period: 26, color: 0xa8dca0, haze: 0.45 },
     ],
     scenery: [
-      { piece: 'trees', z: -18, every: 9, colors: [0x8fcf8a, 0xd8c0a0], haze: 0.5 },
+      { piece: 'trees', z: -18, every: 9, colors: [0x8fcf8a, 0xd8c0a0], haze: 0.25 },
       { piece: 'books', z: -20, every: 23, colors: [0xf0b8a8, 0xa8c8f0, 0xf0e0a0], haze: 0.5 },
     ],
     life: [{ kind: 'birds', count: 6, color: 0x5a6a8a, z: -26 }],
@@ -147,11 +167,12 @@ export const THEMES: Record<ThemeId, Theme> = {
     ground: 0x35598c,
     grass: 0x6fb8e8,
     brick: 0x3f86d0,
-    hard: 0x8a6ad8,
+    // Ice geodes in a dark rind (violet stays reserved for reasoning and hidden blocks).
+    hard: 0xbfe8ff,
     pipe: 0x2a8fa8,
     platform: 0x3fc1b0,
     lights: { sun: 0xa8c0ff, sky: 0x8aa0ff, ground: 0x201040 },
-    tiles: { cap: 'moss', soil: 'rock', hard: 'facets', shelf: 'gills', decor: 'shrooms' },
+    tiles: { cap: 'moss', soil: 'rock', hard: 'facets', shelf: 'gills', decor: 'shrooms', brick: 'pill', pipe: 'glass' },
     strips: [
       { edge: 'drip', z: -30, top: 14, amp: 3, period: 5, color: 0x0a1430, haze: 0.25, hang: true },
       { edge: 'jagged', z: -40, top: 2, amp: 5, period: 9, color: 0x0f1f46, haze: 0.5 },
@@ -173,8 +194,12 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x5a6a78,
     platform: 0xb08a5a,
     lights: { sun: 0xffc9a0, sky: 0xffd0c0, ground: 0x6a2010 },
-    tiles: { cap: 'stone', soil: 'ashlar', hard: 'bands', shelf: 'brackets', decor: null },
-    strips: [{ edge: 'crenel', z: -60, top: 9, amp: 1.5, period: 3, color: 0x3a1a16, haze: 0.3 }],
+    tiles: { cap: 'stone', soil: 'ashlar', hard: 'bands', shelf: 'brackets', decor: null, brick: 'woodblock', pipe: 'cardboard' },
+    strips: [
+      // A warm dusk card behind the far battlements: only seen through the windows, which glow faintly.
+      { edge: 'rolling', z: -66, top: 40, amp: 0.3, period: 50, color: 0x7a3420, haze: 0.3 },
+      { edge: 'crenel', z: -60, top: 9, amp: 1.5, period: 3, color: 0x3a1a16, haze: 0.3 },
+    ],
     scenery: [
       { piece: 'wall', z: -10, every: 12, colors: [0x2a1210, 0x3a1a16], haze: 0.25, pattern: 'stone', hole: { w: 2, h: 4.5, y: 6.5 } },
       { piece: 'torches', z: -9.5, every: 12, y: 7, colors: [0xffb040, 0xff6a1a], haze: 0 },
@@ -196,7 +221,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x3a9e8a,
     platform: 0xb87a48,
     lights: { sun: 0xffcaa0, sky: 0xffe0c0, ground: 0x6a4030 },
-    tiles: { cap: 'felt', soil: 'soil', hard: 'rings', shelf: 'rope', decor: 'tufts' },
+    tiles: { cap: 'felt', soil: 'quilt', hard: 'rings', shelf: 'rope', decor: 'tufts', brick: 'woodblock', pipe: 'cardboard' },
     strips: [
       { edge: 'rolling', z: -70, top: 7, amp: 3, period: 40, color: 0xe8a0a8, haze: 0.6 },
       { edge: 'rolling', z: -34, top: 4, amp: 2.5, period: 24, color: 0xf0c8a0, haze: 0.45, texture: 'patchwork' },
@@ -221,7 +246,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x3aa0e8,
     platform: 0xffffff,
     lights: { sun: 0xfffaf0, sky: 0xffffff, ground: 0x8aa0e0 },
-    tiles: { cap: 'cotton', soil: 'cardboard', hard: 'creases', shelf: 'scallops', decor: null },
+    tiles: { cap: 'cotton', soil: 'cardboard', hard: 'creases', shelf: 'scallops', decor: null, brick: 'folded', pipe: 'paper' },
     strips: [
       { edge: 'scallop', z: -60, top: 2, amp: 3, period: 9, color: 0x90bdf0, haze: 0.3 },
       { edge: 'scallop', z: -26, top: 0.5, amp: 2.5, period: 6, color: 0x9cc6f2, haze: 0.35 },
@@ -245,10 +270,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x6a8ae0,
     platform: 0xffffff,
     lights: { sun: 0xffc7a0, sky: 0xe0d0ff, ground: 0x8a5a6a },
-    tiles: { cap: 'stone', soil: 'ashlar', hard: 'veins', shelf: 'scallops', decor: null },
+    tiles: { cap: 'fold', soil: 'origami', hard: 'veins', shelf: 'scallops', decor: null, brick: 'folded', pipe: 'paper' },
     strips: [{ edge: 'scallop', z: -60, top: 0, amp: 2.5, period: 8, color: 0x5a3a78, haze: 0.45 }],
     scenery: [
-      { piece: 'islands', z: -50, every: 30, y: 9, colors: [0x4a3068, 0x6a4a8a], haze: 0.35 },
+      // High and hazed, so no island top reads as a ledge at jump height.
+      { piece: 'islands', z: -50, every: 30, y: 14, colors: [0x2a1a48, 0x2a1a48], haze: 0.55 },
       { piece: 'towers', z: -22, every: 14, colors: [0x3a2a5a, 0x5a3a78, 0xffc46a], haze: 0.3 },
     ],
     life: [
@@ -271,7 +297,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x4a7a8a,
     platform: 0xe8e0c8,
     lights: { sun: 0xc8d0ff, sky: 0xc0c8e0, ground: 0x2a3040 },
-    tiles: { cap: 'slate', soil: 'papier', hard: 'strap', shelf: 'news', decor: 'papers' },
+    tiles: { cap: 'slate', soil: 'papier', hard: 'strap', shelf: 'news', decor: 'papers', brick: 'folded', pipe: 'paper' },
     strips: [
       { edge: 'skyline', z: -60, top: 4, amp: 6, period: 5, color: 0x343c56, haze: 0.6 },
       { edge: 'scallop', z: -40, top: 16, amp: 2.5, period: 7, color: 0x2a3046, haze: 0.3, hang: true, texture: 'newsprint' },
@@ -287,9 +313,10 @@ export const THEMES: Record<ThemeId, Theme> = {
   },
   // "Shadow board" (Tool Pipes): a workshop pegboard that hangs tools.
   pipes: {
-    skyTop: '#0f3b3a',
-    skyMid: '#17564f',
-    skyBottom: '#1f6f68',
+    // The pegboard hides the sky; its colours set the workshop's haze, a warm hardboard brown.
+    skyTop: '#2a1e16',
+    skyMid: '#3a2a1e',
+    skyBottom: '#4a3626',
     ground: 0x4f7a6a,
     grass: 0x7fe0b8,
     brick: 0x3fb0a0,
@@ -297,13 +324,15 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x20b89a,
     platform: 0xffd23a,
     lights: { sun: 0xe0fff4, sky: 0xc0fff0, ground: 0x1a3a34 },
-    tiles: { cap: 'rubber', soil: 'hexmould', hard: 'screws', shelf: 'holes', decor: 'screws' },
+    tiles: { cap: 'rubber', soil: 'hexmould', hard: 'screws', shelf: 'holes', decor: 'screws', brick: 'moulded', pipe: 'toy' },
     strips: [],
     scenery: [
-      { piece: 'wall', z: -24, every: 10, colors: [0x0e3a36, 0x0a2e2a, 0x1c5a52], haze: 0.3, pattern: 'pegboard' },
-      { piece: 'tubes', z: -14, every: 16, colors: [0x124a44, 0x1c5a52], haze: 0.3 },
+      // Brown hardboard, so teal marks only the tools (and the function-call chips in front).
+      { piece: 'wall', z: -24, every: 10, colors: [0x3a2a1e, 0x22170f, 0x1fd1b0], haze: 0.3, pattern: 'pegboard' },
+      // Smoked plastic marble-run tubes with a gloss line, each one continuous spline with no open ends.
+      { piece: 'tubes', z: -14, every: 16, colors: [0x4a5a4a, 0xffffff], haze: 0.4 },
     ],
-    life: [{ kind: 'motes', count: 30, color: 0x3fffc8, z: -10 }],
+    life: [{ kind: 'motes', count: 30, color: 0xc8d8b0, z: -10 }],
     clouds: false,
     extras: ['marbles'],
   },
@@ -319,8 +348,12 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x3a6a5a,
     platform: 0xa87a50,
     lights: { sun: 0xb8c0ff, sky: 0xc0b0ff, ground: 0x2a1830 },
-    tiles: { cap: 'carpet', soil: 'wainscot', hard: 'corners', shelf: 'books', decor: 'candles' },
-    strips: [{ edge: 'roofs', z: -60, top: 5, amp: 4, period: 7, color: 0x120a20, haze: 0.6 }],
+    tiles: { cap: 'carpet', soil: 'wainscot', hard: 'corners', shelf: 'books', decor: 'candles', brick: 'tufted', pipe: 'velvet' },
+    strips: [
+      { edge: 'roofs', z: -60, top: 5, amp: 4, period: 7, color: 0x120a20, haze: 0.6 },
+      // The puppet theatre's velvet swag with a gold fringe, under the ceiling.
+      { edge: 'scallop', z: -8, top: 15.5, amp: 1.4, period: 6, color: 0x3a0a22, haze: 0.25, hang: true, rim: 0xd8b048 },
+    ],
     scenery: [
       { piece: 'wall', z: -10, every: 11, colors: [0x241238, 0x2e1a46], haze: 0.3, pattern: 'damask', hole: { w: 2, h: 5, y: 6 } },
       { piece: 'torches', z: -9.5, every: 11, y: 6.5, colors: [0xffd27a, 0xff9a3a], haze: 0 },
@@ -343,11 +376,12 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0xc07030,
     platform: 0xe8c070,
     lights: { sun: 0xffd9a0, sky: 0xffe8c8, ground: 0x4a3424 },
-    tiles: { cap: 'walkway', soil: 'plates', hard: 'crate', shelf: 'slots', decor: 'bolts' },
+    tiles: { cap: 'walkway', soil: 'plates', hard: 'crate', shelf: 'slots', decor: 'bolts', brick: 'litho', pipe: 'tincan' },
     strips: [{ edge: 'skyline', z: -65, top: 3, amp: 5, period: 6, color: 0x4a3e34, haze: 0.5 }],
     scenery: [
-      { piece: 'stacks', z: -40, every: 16, colors: [0x3a302a, 0x6a5040], haze: 0.35 },
-      { piece: 'gears', z: -24, every: 9, colors: [0x2e2622], haze: 0.25 },
+      { piece: 'stacks', z: -40, every: 16, y: -8, colors: [0x3a302a, 0x6a5040], haze: 0.35 },
+      // Brass: a bright rim and hub are baked into the gear (see backdrop.ts gearGeo).
+      { piece: 'gears', z: -28, every: 9, colors: [0x5a4428], haze: 0.5 },
     ],
     life: [{ kind: 'smoke', count: 24, color: 0x8a7a6a, z: -40 }],
     clouds: false,
@@ -364,10 +398,10 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x7a4ab0,
     platform: 0xd8b060,
     lights: { sun: 0xffd8a8, sky: 0xe0b0ff, ground: 0x6a1a3a },
-    tiles: { cap: 'trim', soil: 'resin', hard: 'star', shelf: 'rivets', decor: 'shards' },
+    tiles: { cap: 'trim', soil: 'resin', hard: 'star', shelf: 'rivets', decor: 'shards', brick: 'cast', pipe: 'glass' },
     strips: [{ edge: 'jagged', z: -60, top: 6, amp: 6, period: 8, color: 0x2a0e28, haze: 0.6, rim: 0xc9a44a }],
     scenery: [
-      { piece: 'spires', z: -24, every: 10, colors: [0x1a0c20, 0xff4fd8], haze: 0.25 },
+      { piece: 'spires', z: -24, every: 10, y: -8, colors: [0x1a0c20, 0xff4fd8], haze: 0.25 },
       { piece: 'prisms', z: -14, every: 17, colors: [0x14081a, 0xc9a44a], haze: 0.3 },
     ],
     life: [{ kind: 'embers', count: 40, color: 0xffb040, z: -4 }],
@@ -387,7 +421,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x6a8ae0,
     platform: 0xfff0c0,
     lights: { sun: 0xfff0c0, sky: 0xb8c8ff, ground: 0x6a5020 },
-    tiles: { cap: 'trim', soil: 'starfield', hard: 'star', shelf: 'glow', decor: 'twinkles' },
+    tiles: { cap: 'trim', soil: 'starfield', hard: 'star', shelf: 'glow', decor: 'twinkles', brick: 'cast', pipe: 'glass' },
     strips: [{ edge: 'rolling', z: -50, top: -1, amp: 1.5, period: 60, color: 0x141c50, haze: 0.25 }],
     scenery: [],
     life: [

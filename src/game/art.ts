@@ -17,14 +17,18 @@ export type TexScope = 'global' | 'theme';
 /** Set once per level by LevelView: 4 on desktop, 1 on touch. */
 export const artOptions = { anisotropy: 4 };
 
-/** A new (uncached, unshared) soft canvas texture: sRGB, linear filtering with mipmaps. */
-export function paintTexture(w: number, h: number, paint: Paint): THREE.CanvasTexture {
+/**
+ * A new (uncached, unshared) soft canvas texture: sRGB, linear filtering with mipmaps. `data` marks a
+ * texture read as numbers rather than colour (an alphaMap): it stays linear, because an sRGB tag would
+ * decode its greys (0.5 would come out as about 0.21) and crush every soft falloff.
+ */
+export function paintTexture(w: number, h: number, paint: Paint, data = false): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   paint(canvas.getContext('2d')!, w, h);
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
@@ -36,13 +40,14 @@ const caches: Record<TexScope, Map<string, THREE.CanvasTexture>> = { global: new
 
 /**
  * A cached soft canvas texture, marked shared so level teardown keeps it (a retry neither repaints
- * nor re-uploads). The key must identify everything the painter bakes in, colours included.
+ * nor re-uploads). The key must identify everything the painter bakes in, colours included. Pass
+ * `data` for alpha maps (see paintTexture).
  */
-export function softTexture(key: string, w: number, h: number, paint: Paint, scope: TexScope = 'global'): THREE.CanvasTexture {
+export function softTexture(key: string, w: number, h: number, paint: Paint, scope: TexScope = 'global', data = false): THREE.CanvasTexture {
   const cache = caches[scope];
   let tex = cache.get(key);
   if (!tex) {
-    tex = shared(paintTexture(w, h, paint));
+    tex = shared(paintTexture(w, h, paint, data));
     cache.set(key, tex);
   }
   return tex;

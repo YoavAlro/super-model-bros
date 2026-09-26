@@ -176,8 +176,11 @@ export class Stage implements StageCtx {
   private respawnTimer = 0;
   private hudTimer = 0;
   private readonly seen = new Set<string>();
-  /** Draw calls and triangles of the last frame (read by ?debug's draws()). */
-  private readonly draws = { calls: 0, triangles: 0 };
+  /**
+   * Draw calls and triangles of the last frame, and the most of each in any frame since the level
+   * was built (read by ?debug's draws(); the smoke sweeps a level and checks the maxima).
+   */
+  private readonly draws = { calls: 0, triangles: 0, maxCalls: 0, maxTriangles: 0 };
   /** The level's shaders are compiled once, behind the intro card (so the first pickup never hitches). */
   private prewarmed = false;
   private random: () => number;
@@ -270,6 +273,7 @@ export class Stage implements StageCtx {
     this.flag = null;
     this.accumulator = 0;
     this.prewarmed = false;
+    this.draws.maxCalls = this.draws.maxTriangles = 0;
     this.shakeTime = 0;
     this.clearTimer = 0;
     this.respawnTimer = 0;
@@ -336,7 +340,13 @@ export class Stage implements StageCtx {
         this.helper.visible = false;
         this.scene.add(this.helper);
       } else if (s.kind === 'flag') {
-        const group = makeFlag(`${spec.toward.name} · ${spec.outro.date.split(' · ')[0]}`);
+        const label = `${spec.toward.name} · ${spec.outro.date.split(' · ')[0]}`;
+        let group = makeFlag(label);
+        // Where the level ends too soon after the goal, the pennant flies left, so its tag stays on screen.
+        if (s.x + 0.5 + group.userData.reach > this.grid.width - 0.3) {
+          disposeObject(group);
+          group = makeFlag(label, 9, -1);
+        }
         group.position.set(s.x + 0.5, s.y - 1, 0);
         this.scene.add(group);
         this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0, stamp: -1 };
@@ -465,6 +475,8 @@ export class Stage implements StageCtx {
     renderer.render(this.scene, this.camera);
     this.draws.calls = renderer.info.render.calls;
     this.draws.triangles = renderer.info.render.triangles;
+    this.draws.maxCalls = Math.max(this.draws.maxCalls, this.draws.calls);
+    this.draws.maxTriangles = Math.max(this.draws.maxTriangles, this.draws.triangles);
 
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -1551,7 +1563,7 @@ export class Stage implements StageCtx {
         } else flag.stamp += dt;
         const k = Math.min(1, flag.stamp / 0.12);
         const s = 2.4 - 1.4 * k * k;
-        stamp.scale.set(2.2 * s, 1.1 * s, 1);
+        stamp.scale.set(2 * s, s, 1);
       }
     }
   }
@@ -1803,6 +1815,7 @@ export class Stage implements StageCtx {
         return b ? { x: b.body.x, y: b.body.y, w: b.body.w, h: b.body.h } : null;
       },
       flag: () => (this.flag ? { x: this.flag.x, y: this.flag.y } : null),
+      width: () => this.grid.width,
       draws: () => ({ ...this.draws }),
       /** Hits the block at (tx, ty) from below, as the lead player would (block and pickup FX). */
       hit: (tx: number, ty: number) => this.hitBlock(tx, ty, this.playersList[0]),
