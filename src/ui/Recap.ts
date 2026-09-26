@@ -1,7 +1,5 @@
 import type { Recap } from '../game/recap';
-import { el } from './dom';
-
-const stars = (n: number) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '—');
+import { el, stars } from './dom';
 
 /** The finale recap table, shown inside the last fact card: your run next to real history. */
 export function recapTable(recap: Recap): HTMLElement {

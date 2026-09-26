@@ -22,6 +22,8 @@ describe('finale recap', () => {
     expect(first.date).toMatch(/2018/);
     // Storm levels show the storm, not a repeated model name.
     expect(r.levels.find((l) => l.id === 'gpt-3-3')?.model).toBe(LEVELS['gpt-3-3'].name);
+    // Even one that changes your form: Jan 27, 2025 is the DeepSeek shock, not o1's release.
+    expect(r.levels.find((l) => l.id === 'gpt-5-2')).toMatchObject({ model: 'The DeepSeek Moment', date: 'Jan 27, 2025' });
     expect(r.levels.at(-1)?.model).toBe('GPT-6 Astra');
   });
 

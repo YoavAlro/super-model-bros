@@ -1,5 +1,5 @@
 import type { CharacterId } from './characters';
-import type { FactCard } from './types';
+import type { FactCard, FactLine } from './types';
 import { fact, tip } from './types';
 
 export type PathId = 'gpt' | 'claude';
@@ -8,6 +8,8 @@ export type PathId = 'gpt' | 'claude';
 export interface PathStep {
   level: string;
   when?: string;
+  /** Shown on the story timeline next to a conditional step. */
+  note?: string;
 }
 
 export interface PathSpec {
@@ -19,6 +21,8 @@ export interface PathSpec {
   partner: CharacterId;
   /** Name tag before the first level. */
   startForm: string;
+  /** Where the story starts, before the first level (the first row of the story timeline). */
+  origin: { name: string; date: string; line: FactLine };
   steps: PathStep[];
   /** Shown once, before the first level. */
   prologue?: FactCard;
@@ -31,6 +35,11 @@ export const PATHS: Record<PathId, PathSpec> = {
     hero: 'gpt',
     partner: 'claude',
     startForm: 'Transformer',
+    origin: {
+      name: 'Transformer',
+      date: 'Jun 2017',
+      line: fact('Google researchers introduced the Transformer in "Attention Is All You Need".', 'transformer'),
+    },
     steps: [
       { level: 'gpt-1-1' },
       { level: 'gpt-1-2' },
@@ -61,6 +70,11 @@ export const PATHS: Record<PathId, PathSpec> = {
     hero: 'claude',
     partner: 'gpt',
     startForm: 'Research model',
+    origin: {
+      name: 'Anthropic',
+      date: '2021',
+      line: fact('A group of former OpenAI researchers founded Anthropic, an AI safety and research company.', 'anthropicFounded'),
+    },
     steps: [
       { level: 'claude-2-1' },
       { level: 'claude-2-2' },
@@ -73,7 +87,7 @@ export const PATHS: Record<PathId, PathSpec> = {
       { level: 'claude-5-1' },
       { level: 'claude-5-2' },
       { level: 'claude-5-3' },
-      { level: 'claude-5-4', when: 'shadowBooks' },
+      { level: 'claude-5-4', when: 'shadowBooks', note: 'Only on runs that take Shadow library tokens' },
       { level: 'claude-5-5' },
       { level: 'claude-6-1' },
       { level: 'claude-6-2' },

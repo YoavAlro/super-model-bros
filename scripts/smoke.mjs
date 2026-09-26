@@ -5,6 +5,7 @@
 //   node scripts/smoke.mjs gpt-2-1 claude-2-2        # or: node scripts/smoke.mjs all
 //   node scripts/smoke.mjs kart-arc char:llama       # a Benchmark Kart race; a level played as a character
 //   node scripts/smoke.mjs path:gpt path:claude      # a whole path in one session, start to recap
+//   node scripts/smoke.mjs timeline                  # the story timeline, from the title and from the pause menu
 //
 // Env: SMOKE_URL (default http://localhost:4173/), SMOKE_OUT (default ./smoke-shots),
 //      SMOKE_VIEWPORTS=desktop,phone
@@ -153,6 +154,65 @@ async function completeAsCharacter(page, char, tag) {
   return `${trait}, ${await page.evaluate(() => window.__smb.card())}`;
 }
 
+/** The story timeline has no sideways scroll, at any viewport. */
+async function timelineFits(page, where) {
+  const fit = await page.evaluate(() => {
+    const list = document.querySelector('.timeline .tl-list');
+    return list && { sw: list.scrollWidth, cw: list.clientWidth, rows: list.querySelectorAll('.tl-item').length };
+  });
+  if (!fit) throw new Error(`${where}: no story timeline`);
+  if (fit.sw > fit.cw) throw new Error(`${where}: the list scrolls sideways (${fit.sw} > ${fit.cw})`);
+  if (!fit.rows) throw new Error(`${where}: an empty list`);
+  return fit.rows;
+}
+
+/**
+ * The story timeline from the title (each tab, then Esc back to the title with focus restored) and from
+ * the pause menu mid-level (the "you are here" row is the level being played).
+ */
+async function checkTimeline(page, tag) {
+  await page.goto(`${BASE}?debug`);
+  await waitFor(page, () => !!document.querySelector('.path-col'));
+  const open = page.locator('.path-col').nth(0).getByRole('button', { name: 'Story timeline' });
+  await open.click();
+  await waitFor(page, () => !!document.querySelector('.timeline .tl-item'));
+  await sleep(300);
+  await page.screenshot({ path: `${OUT}/${tag}-timeline-gpt.png` });
+  const gpt = await timelineFits(page, 'GPT tab');
+  await page.keyboard.press('ArrowRight');
+  const claudeTab = await waitFor(page, () => document.querySelector('.timeline [role=tab][aria-selected=true]')?.textContent === 'Claude path');
+  if (!claudeTab) throw new Error('→ did not switch to the Claude tab');
+  await sleep(300);
+  await page.screenshot({ path: `${OUT}/${tag}-timeline-claude.png` });
+  const claude = await timelineFits(page, 'Claude tab');
+  await page.getByRole('tab', { name: 'Both brothers' }).click();
+  await sleep(300);
+  await page.screenshot({ path: `${OUT}/${tag}-timeline-both.png` });
+  const both = await timelineFits(page, 'Both tab');
+  await page.keyboard.press('Escape');
+  const back = await waitFor(page, () => !document.querySelector('.timeline') && !!document.querySelector('.title-screen') && document.activeElement?.textContent === 'Story timeline');
+  if (!back) throw new Error('Esc did not return to the title (with focus on the Story timeline button)');
+
+  await page.goto(`${BASE}?debug&level=gpt-3-3`);
+  if (!(await waitFor(page, () => window.__smb?.card?.()))) throw new Error('gpt-3-3: no intro card');
+  await page.evaluate(() => window.__smb.next());
+  await waitFor(page, () => window.__smb.state() === 'playing');
+  await sleep(500);
+  await page.keyboard.press('Escape');
+  if (!(await waitFor(page, () => !!document.querySelector('.pause-row'), null, 10000))) throw new Error('Esc did not open the pause menu');
+  await page.locator('.pause-row').getByRole('button', { name: 'Story timeline' }).click();
+  await waitFor(page, () => !!document.querySelector('.timeline .tl-item'));
+  await sleep(300);
+  await page.screenshot({ path: `${OUT}/${tag}-timeline-pause.png` });
+  await timelineFits(page, 'from pause');
+  const here = await page.evaluate(() => document.querySelector('.timeline [aria-current="step"]')?.closest('.tl-item')?.dataset.level ?? null);
+  if (here !== 'gpt-3-3') throw new Error(`from pause, "you are here" is ${here}, not gpt-3-3`);
+  await page.keyboard.press('Escape');
+  const paused = await waitFor(page, () => !document.querySelector('.timeline') && window.__smb.state() === 'paused' && document.activeElement?.textContent === 'Story timeline');
+  if (!paused) throw new Error('closing the timeline did not return to the paused pause menu');
+  return `${gpt}/${claude}/${both} rows, you are here: ${here}`;
+}
+
 /**
  * Plays a whole path in one session, from its first level to the recap: every level, every card
  * between them (unlocks, world breaks) and every Benchmark Kart race. Logs renderer memory per level
@@ -215,12 +275,15 @@ for (const tag of wanted) {
       ...((await page.evaluate(() => window.__smbLevelIds?.())) ?? []),
       ...((await page.evaluate(() => window.__smbKartIds?.())) ?? []),
       ...((await page.evaluate(() => window.__smbUnlockables?.())) ?? []).map((c) => `char:${c}`),
+      'timeline',
     ];
   }
 
   for (const id of ids) {
     try {
-      const outro = id.startsWith('path:')
+      const outro = id === 'timeline'
+        ? await checkTimeline(page, tag)
+        : id.startsWith('path:')
         ? await completePath(page, id.slice(5), tag)
         : id.startsWith('kart-')
         ? await completeKart(page, id, tag)

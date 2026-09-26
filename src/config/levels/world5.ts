@@ -167,6 +167,7 @@ export const WORLD_5: LevelSpec[] = [
     hypes: ['reasoning'],
     moments: ['emDash'],
     puzzle: { kind: 'strawberry', word: 'STRAWBERRY', tokens: ['STR', 'AW', 'BERRY'], letter: 'R' },
+    headline: 'intro',
     intro: {
       title: 'World 5-1 · Strawberry House',
       date: 'Sep 2024 · Training toward o1',
@@ -300,6 +301,7 @@ export const WORLD_5: LevelSpec[] = [
     boss: 'hallucinationKing',
     moments: ['emDash', 'keep4o'],
     puzzle: { kind: 'chartCrime', bars: { '1': { label: '52.8%', lies: true, fixedHeight: 2 }, '2': { label: '69.1%' } } },
+    headline: 'intro',
     intro: {
       title: 'World 5-4 · GPT-5 Ghost Keep',
       date: 'Aug 2025 · Training toward GPT-5',

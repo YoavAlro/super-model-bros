@@ -37,6 +37,7 @@ export const WORLD_4: LevelSpec[] = [
     blockToken: 'tools',
     power: 'tool',
     moments: ['emDash'],
+    headline: 'intro',
     intro: {
       title: 'World 4-1 · Plugin Pipes',
       date: '2023 · Training toward tool use',
@@ -79,6 +80,7 @@ export const WORLD_4: LevelSpec[] = [
     hypes: ['gptStore'],
     moments: ['emDash'],
     zones: [{ from: 96, to: 150, moment: 'winterLaziness' }],
+    headline: 'intro',
     intro: {
       title: 'World 4-2 · 128K Pipeline',
       date: 'Nov 2023 · Training toward GPT-4 Turbo',
@@ -137,6 +139,7 @@ export const WORLD_4: LevelSpec[] = [
     boss: 'injectionPiranha',
     hypes: ['sora', 'gadgets'],
     moments: ['emDash'],
+    headline: 'intro',
     intro: {
       title: 'World 4-3 · Omni Keep',
       date: 'May 2024 · Training toward GPT-4o',
@@ -301,7 +304,7 @@ export const WORLD_4: LevelSpec[] = [
       date: 'Oct–Nov 2024 · Training toward computer use',
       lines: [
         fact(
-          'October 2024: an upgraded Claude 3.5 Sonnet can use a computer: look at a screen, move a cursor, click and type. Anthropic said it was the first frontier model to offer this in public beta.',
+          'October 22, 2024: an upgraded Claude 3.5 Sonnet can use a computer: look at a screen, move a cursor, click and type. Anthropic said it was the first frontier model to offer this in public beta.',
           'computerUse',
         ),
         tip('The hype block holds MCP: every pipe connects. The Injection Piranha waits in the keep: hit it when it pops out.'),
@@ -309,8 +312,12 @@ export const WORLD_4: LevelSpec[] = [
     },
     outro: {
       title: 'You learned computer use and MCP',
-      date: 'Nov 2024 · agents and tools',
-      lines: [fact('In November 2024, Anthropic open-sourced MCP, an open standard for connecting AI assistants to tools and data.', 'mcp'), ...INJECTION_FACTS],
+      date: 'Oct 22, 2024 · agents and tools',
+      lines: [
+        fact('On October 22, 2024, Anthropic released the upgraded Claude 3.5 Sonnet, with computer use in public beta.', 'computerUse'),
+        fact('In November 2024, Anthropic open-sourced MCP, an open standard for connecting AI assistants to tools and data.', 'mcp'),
+        ...INJECTION_FACTS,
+      ],
     },
     map: stitch(
       [

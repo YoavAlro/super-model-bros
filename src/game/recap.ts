@@ -14,9 +14,9 @@ import { nextStep } from './progress';
 export interface RecapLevel {
   id: string;
   label: string;
-  /** The model the level made you (or, for a storm that does not, the storm's name). */
+  /** The model the level made you (or, for a storm level, the storm's name). */
   model: string;
-  /** The real date, from the outro card. */
+  /** The real date, from the outro card (for a storm, the incident's). */
   date: string;
   /** 0 when the level has no result on this run. */
   stars: number;
@@ -61,6 +61,13 @@ export interface RecapRun {
   karts?: Record<string, number>;
 }
 
+/**
+ * A storm level that is not a castle. It is listed by the storm's name, because its dates are the
+ * incident's, not a release: gpt-5-2 turns you into o1, but Jan 27, 2025 is the DeepSeek shock. A castle
+ * that borrows a storm's gates (gpt-7-2) is still its model's release.
+ */
+export const isStormRow = (level: LevelSpec): boolean => !!level.storm && !level.boss;
+
 /** The levels this run actually went through, in order (conditional steps only with their flag). */
 export function playedSteps(path: PathSpec, flags: readonly string[]): string[] {
   const out: string[] = [];
@@ -74,11 +81,9 @@ export function rankFor(score: number): RecapRank {
 
 export function buildRecap(run: RecapRun, path: PathSpec, levels: Record<string, LevelSpec>): Recap {
   const ids = playedSteps(path, run.flags);
-  const recapLevels: RecapLevel[] = ids.map((id, i) => {
+  const recapLevels: RecapLevel[] = ids.map((id) => {
     const l = levels[id];
-    // A storm that does not evolve you is listed by its own name.
-    const same = i > 0 && levels[ids[i - 1]].toward.name === l.toward.name;
-    return { id, label: l.label, model: l.storm && same ? l.name : l.toward.name, date: l.outro.date.split(' · ')[0], stars: run.results[id]?.stars ?? 0 };
+    return { id, label: l.label, model: isStormRow(l) ? l.name : l.toward.name, date: l.outro.date.split(' · ')[0], stars: run.results[id]?.stars ?? 0 };
   });
   const got = recapLevels.reduce((s, l) => s + l.stars, 0);
   const max = recapLevels.length * 3;

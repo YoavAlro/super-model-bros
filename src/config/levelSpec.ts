@@ -85,6 +85,11 @@ export interface LevelSpec {
   /** Shown at the flag (or when the boss falls). */
   outro: FactCard;
   /**
+   * Which card's first fact line sums the level up on the story timeline. Default `outro`; set `intro`
+   * when the outro opens on the enemy or the boss rather than the release. (Storm levels use their intro.)
+   */
+  headline?: 'intro' | 'outro';
+  /**
    * Legend. Tiles: `#` ground, `X` hard, `B` brick, `P` pipe, `=` one-way platform, `>`/`<` conveyor,
    * `[`/`]` toggle blocks, `:` hidden block, `^` spikes, `L` lava, `D` gate.
    * Blocks: `?` token, `M` Scale crystal, `*` the level's power, `$` hype, `U` Tibo Reset 1-Up, `!` moment.

@@ -40,6 +40,8 @@ export class Hud {
   private readonly toasts = el('div', 'toasts');
   private readonly hint: HTMLDivElement | null = null;
   private pause: HTMLDivElement | null = null;
+  /** Opens the story timeline over the pause menu (set by Campaign); resolves when it closes. */
+  onTimeline: (() => Promise<void>) | null = null;
   private barsFor = '';
   private bossKey = '';
   private rows: { id: DataTypeId; fill: HTMLDivElement; value: HTMLSpanElement }[] = [];
@@ -159,7 +161,18 @@ export class Hud {
     quit.addEventListener('click', onQuit);
     panel.append(el('h2', undefined, 'Paused'), resume);
     if (extra) panel.append(extra);
-    panel.append(quit);
+    const open = this.onTimeline;
+    if (open) {
+      // One shared last row, so the pause panel grows no taller on a phone.
+      const row = el('div', 'pause-row');
+      const story = el('button', 'btn', 'Story timeline');
+      story.addEventListener('click', () => {
+        story.focus({ preventScroll: true });
+        void open();
+      });
+      row.append(story, quit);
+      panel.append(row);
+    } else panel.append(quit);
     backdrop.append(panel);
     this.root.append(backdrop);
     this.pause = backdrop;
