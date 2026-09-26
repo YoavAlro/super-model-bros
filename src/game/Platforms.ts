@@ -95,3 +95,34 @@ export class CloudRide extends Platform {
     this.mesh.visible = this.alive && (this.life > 2 || Math.floor(t * 10) % 2 === 0);
   }
 }
+
+/** A platform that stays put: built blocks, em dashes, Golden Gate bridges. Optionally temporary. */
+export class StaticPlatform extends Platform {
+  constructor(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    scene: THREE.Scene,
+    readonly mesh: THREE.Object3D,
+    private life = Infinity,
+  ) {
+    super(x, y, w, h, scene);
+    scene.add(mesh);
+  }
+
+  step(dt: number): void {
+    this.dx = 0;
+    this.dy = 0;
+    this.life -= dt;
+    if (this.life <= 0) {
+      this.alive = false;
+      this.mesh.visible = false;
+    }
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.visible = this.alive && (this.life > 1 || Math.floor(t * 10) % 2 === 0);
+  }
+}

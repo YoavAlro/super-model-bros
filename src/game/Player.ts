@@ -38,6 +38,12 @@ export class PlayerActor {
   speedScale = 1;
   ability: FormAbility | undefined;
   readonly perks = new Set<string>();
+  /** Temporary boosts from hype power-ups, set by the stage each step. */
+  boost: { glide?: number; airJumps?: number; speed?: number } = {};
+  /** For clones: turns the owner's pad into this clone's pad (copy it, ignore it, or improvise). */
+  brain: ((self: PlayerActor, owner: Pad) => Pad) | null = null;
+  /** Clones that vanish when their hype power-up ends. */
+  hypeClone = false;
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
   private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
@@ -54,6 +60,7 @@ export class PlayerActor {
     readonly padIndex: number,
     /** Fork clones copy their owner's moves and never cost a life. */
     readonly clone = false,
+    cloneTag = 'fork',
   ) {
     this.mover = newMover(x, y, 0.8, SMALL_H);
     this.mesh = makeCharacter(spec.color, spec.accent);
@@ -62,7 +69,7 @@ export class PlayerActor {
     this.cape.visible = false;
     this.mesh.add(this.cape);
     if (clone) this.mesh.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.setValues?.({ transparent: true, opacity: 0.55 }));
-    this.tag = this.makeTag(clone ? 'fork' : form);
+    this.tag = this.makeTag(clone ? cloneTag : form);
     scene.add(this.mesh, this.tag);
   }
 
@@ -98,6 +105,16 @@ export class PlayerActor {
   giveStar(kind: StarKind, seconds: number): void {
     this.star = seconds;
     this.starKind = kind;
+  }
+
+  /** Undo the latest power-up (flattery): the held power first, then size. Returns false if there was none. */
+  losePowerUp(): boolean {
+    if (this.power) this.power = null;
+    else if (this.big) {
+      this.big = false;
+      this.body.h = SMALL_H;
+    } else return false;
+    return true;
   }
 
   /** Returns true if the hit was absorbed; false means the player dies. */
@@ -147,15 +164,17 @@ export class PlayerActor {
   stats(): MoveStats {
     const s = this.spec;
     const a = this.ability ?? {};
+    const boost = this.boost;
+    const speed = boost.speed ?? 1;
     return {
-      walkSpeed: s.walkSpeed,
-      runSpeed: s.runSpeed,
+      walkSpeed: s.walkSpeed * speed,
+      runSpeed: s.runSpeed * speed,
       jumpVelocity: s.jumpVelocity * (a.jump ?? 1),
       gravity: s.gravity,
       fallGravity: s.fallGravity * (a.float ?? 1),
-      glide: this.power === 'cape' ? 0.28 : this.perks.has('glide') ? 0.6 : undefined,
+      glide: this.power === 'cape' ? 0.28 : (boost.glide ?? (this.perks.has('glide') ? 0.6 : undefined)),
       airDash: s.traitKind === 'airDash',
-      airJumps: this.perks.has('doubleJump') ? 1 : 0,
+      airJumps: Math.max(this.perks.has('doubleJump') ? 1 : 0, boost.airJumps ?? 0),
       accel: s.accel,
     };
   }

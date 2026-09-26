@@ -73,8 +73,12 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
 
 ## Wiring
 
-- Moments live in `src/config/events.ts` as `kind: 'moment'` and are placed in levels by the
-  level config (block contents, bonus rooms, or level modifiers). Most are optional.
+- Moments live in `MOMENTS` in `src/config/events.ts` (a toast and a sourced fact) and are placed by
+  the level config: `moments` (level modifiers: em dash trail, Code Red, #keep4o), `zones` (Winter
+  Laziness), `moment` (what `!` blocks release: Golden Gate Claude), `y` praise coins, and `oneUp: 'tibo'`
+  for Tibo Reset 1-Ups. Every Moment that happens in a level adds its fact to the outro card.
+  Built so far: em dash trail, Tibo Reset (+1 life, banked resets, more likely after 3 deaths),
+  Winter Laziness, Golden Gate Claude, the Glazing, #keep4o, Code Red, and "nothing without its people".
 - Two are **recurring gags** rather than one-offs: the Tibo Reset (a 1-Up block that shows up
   more often after you die a lot) and the Em Dash trail (a persistent gag until the fix unlocks).
 - Puzzles (the Strawberry count, the Naming Maze, Chart Crime) are bonus rooms built from normal tiles.

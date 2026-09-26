@@ -645,3 +645,95 @@ export function makeFogWall(): THREE.Group {
   g.add(plane);
   return g;
 }
+
+/** A built block (Artifacts): a glowing slab. Origin at its base center. */
+export function makeBuiltBlock(w: number, color: number): THREE.Group {
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, 1), lambert(color, color));
+  slab.position.y = 0.2;
+  g.add(slab);
+  return g;
+}
+
+/** An em dash platform: a long flat bar. */
+export function makeEmDash(w: number): THREE.Group {
+  const g = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, 0.5), lambert(0xf4f4f4, 0x404040));
+  bar.position.y = 0.19;
+  g.add(bar);
+  const label = labelSprite('—', '#111', 'rgba(255,255,255,0.0)');
+  label.scale.multiplyScalar(0.5);
+  label.position.y = 0.6;
+  g.add(label);
+  return g;
+}
+
+/** A Golden Gate bridge span in International Orange, with towers at both ends. */
+export function makeBridge(w: number): THREE.Group {
+  const g = new THREE.Group();
+  const orange = lambert(0xc0362c, 0x401008);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, 1), orange);
+  deck.position.y = 0.2;
+  g.add(deck);
+  for (const x of [-w / 2 + 0.2, w / 2 - 0.2]) {
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.6, 0.25), orange);
+    tower.position.set(x, 1.3, -0.35);
+    g.add(tower);
+  }
+  const cable = new THREE.Mesh(new THREE.TorusGeometry(w / 2 - 0.2, 0.04, 4, 24, Math.PI), orange);
+  cable.rotation.z = Math.PI;
+  cable.scale.y = 2.2 / Math.max(1, w / 2 - 0.2);
+  cable.position.set(0, 2.6, -0.35);
+  g.add(cable);
+  return g;
+}
+
+/** The GPT-4o ghost (#keep4o): a friendly translucent ghost. */
+export function makeGhost4o(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: 0xe8fff6, emissive: 0x6affc8, emissiveIntensity: 0.4, transparent: true, opacity: 0.65 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), mat);
+  body.position.y = 0.55;
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 12, 1, true), mat);
+  skirt.position.y = 0.3;
+  skirt.rotation.x = Math.PI;
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  for (const x of [-0.13, 0.13]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), black);
+    eye.position.set(x, 0.7, 0.35);
+    g.add(eye);
+  }
+  const tag = labelSprite('GPT-4o', '#063', 'rgba(230,255,245,0.8)');
+  tag.scale.multiplyScalar(0.35);
+  tag.position.y = 1.25;
+  g.add(body, skirt, tag);
+  return g;
+}
+
+/** Falling particles (confetti for the Sora spectacle, snow for Winter Laziness). */
+export function makeParticles(n: number, colors: number[], size: number): THREE.Points {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = ((i * 37) % 100) / 100;
+    pos[i * 3 + 1] = ((i * 71) % 100) / 100;
+    pos[i * 3 + 2] = ((i * 13) % 100) / 100;
+    c.setHex(colors[i % colors.length]);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false }));
+  pts.frustumCulled = false;
+  pts.userData.base = pos.slice();
+  return pts;
+}
+
+/** A floating label above the player (Q*: the power-up that is only a rumor). */
+export function makeAura(text: string, color: string): THREE.Sprite {
+  const s = labelSprite(text, color, 'rgba(20,0,40,0.45)');
+  s.scale.multiplyScalar(0.5);
+  return s;
+}

@@ -54,6 +54,7 @@ export const WORLD_3: LevelSpec[] = [
     blockToken: 'feedback',
     power: 'viral',
     timeline: 'hype',
+    moments: ['emDash'],
     setPieces: [
       { kind: 'starRain', from: 55, to: 95, every: 1.6 },
       { kind: 'toggles', period: 1.8, toast: 'So many new users! Some platforms are at capacity: wait for your color.' },
@@ -97,7 +98,7 @@ export const WORLD_3: LevelSpec[] = [
       ],
       [
         '                              ',
-        '      B?B?B        ?M?        ',
+        '      B?BUB        ?M?        ',
         '                              ',
         '  ff        ww         ff     ',
         '      e   e      e        e   ',
@@ -132,6 +133,8 @@ export const WORLD_3: LevelSpec[] = [
     power: 'viral',
     boss: 'danSydney',
     timeline: 'backlash',
+    hype: 'autogpt',
+    moments: ['emDash'],
     ability: { vision: true },
     intro: {
       title: 'World 3-2 · Vision Keep',
@@ -175,7 +178,7 @@ export const WORLD_3: LevelSpec[] = [
       ],
       [
         '                          ',
-        '        B?B?B      ww     ',
+        '        B$B?B      ww     ',
         '                          ',
         '                          ',
         '    j        j     j      ',
@@ -208,6 +211,7 @@ export const WORLD_3: LevelSpec[] = [
     blockToken: 'feedback',
     power: 'viral',
     storm: 'boardCrisis',
+    hype: 'qstar',
     intro: {
       title: 'Storm · Five Days in November',
       date: 'Nov 17–22, 2023 · OpenAI board crisis',
@@ -263,7 +267,7 @@ export const WORLD_3: LevelSpec[] = [
         '                                    ',
         '        +  +  +  +  +               ',
         '                                    ',
-        '       ===============      ?*?     ',
+        '       ===============      ?$?     ',
         '                                    ',
         '   ff                    ff    +    ',
         '         e       e     e            ',
@@ -378,6 +382,7 @@ export const WORLD_3: LevelSpec[] = [
     blockToken: 'books',
     power: 'viral',
     timeline: 'hype',
+    hype: 'autogpt',
     ability: { float: 0.8 },
     intro: {
       title: 'World 3-2 · 100K Skies',
@@ -418,7 +423,7 @@ export const WORLD_3: LevelSpec[] = [
       ],
       [
         '                               ',
-        '       B?B?B       ?M?         ',
+        '       B$B?B       ?M?         ',
         '                               ',
         '   oo        ff         cc     ',
         '      e    e        e       e  ',

@@ -21,9 +21,20 @@ In-game posts paraphrase moments anonymously. Never fabricate a quote attributed
 
 ## Hype power-ups: lasting or passing?
 
-A glowing hype block releases a timed power-up. When it ends, a **"Hype or shift?"** card gives the verdict.
-**Lasting** hypes leave a permanent upgrade; **passing** ones evaporate and leave a short hangover
-(a slowdown). The world recap scores your judgment.
+A glowing hype block (`$` in a map, `hype` on the level) releases a timed power-up. When it ends, a
+**"Hype or shift?"** card asks you to call it, then gives history's verdict. **Lasting** hypes leave a
+permanent upgrade for the rest of the run (whatever you called); **passing** ones evaporate and leave a
+short hangover (a slowdown). The recap scores your calls. Config: `HYPES` in `src/config/events.ts`;
+rules: `src/game/hype.ts`. Built: all twelve effects below; placed so far: AutoGPT (GPT 3-2, Claude 3-2),
+Q* (GPT 3-3), the rest with their worlds.
+
+| Lasting hype | Upgrade it leaves |
+|---|---|
+| Artifacts | A safety net: once per level, a fall into a pit builds a platform |
+| Reasoning models | A light glide: hold jump while falling |
+| MCP | Springy pipes: land on a pipe to bounce high |
+| Vibe coding | One vibe-coded mid-air jump |
+| Agent teams | Every level starts with a fork on your team |
 
 | When | Hype | Verdict | Power while it lasts | | |
 |---|---|---|---|---|---|

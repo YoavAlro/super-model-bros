@@ -24,6 +24,8 @@ export interface RunState {
   deaths: number;
   /** Benchmark Kart finishing places, by race id. */
   karts: Record<string, number>;
+  /** Banked Tibo resets (they cancel a rate-limit crush). */
+  resets?: number;
 }
 
 export interface Settings {

@@ -82,7 +82,8 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/config/levels/world*.ts` | Levels: ASCII map (stitched from chunks), theme, the recipe, sourced intro/outro cards |
 | `src/config/levelSpec.ts` | The `LevelSpec` type and the map legend |
 | `src/config/paths.ts` | The GPT and Claude paths: which levels, in order (steps can be conditional) |
-| `src/config/events.ts` | Storms (and, from M4, hype power-ups and Moments) |
+| `src/config/events.ts` | Storms, hype power-ups (effect, verdict, perk, sourced verdict card) and Moments (toast + sourced fact) |
+| `src/game/hype.ts` | Pure hype and Moment rules: judging a call, scoring, Tibo resets, Code Red par (unit tested) |
 | `src/config/sources.ts`, `types.ts` | Every cited source; `fact()` lines need one, `tip()` lines don't |
 | `src/config/characters.ts` | Playable roster: physics tuning, trait, unlock rule |
 | `src/config/themes.ts`, `dataTypes.ts` | Visual themes and token types (each token has a glyph as well as a color) |
@@ -107,7 +108,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M1 ✅ | World 1 | Engine, co-op, touch, 1-1 BookCorpus Plains, 1-2 WebText Caves, 1-3 Common Crawl Castle + the Garbage In boss |
 | M2 ✅ | World 2: Alignment Hills | Codex, InstructGPT; Claude joins; RLHF star; Reward Hacker boss; Claude's own path begins |
 | M3 ✅ | World 3: Viral Skies | ChatGPT launch; the Timeline (Lakitu-style) cloud; DAN & Sydney twin boss; board-crisis storm level (GPT) and pause-letter fog storm (Claude) |
-| M4 | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
+| M4 ✅ | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
 | M5 | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
 | M6 | Worlds 6–7 | Swarm Factory (double cherry = fork agents, Rogue Swarm boss); Frontier Castle (Paperclip Maximizer) → Astra / Opus 5.5 finales and recap |
 | M7 | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits; kart races between worlds |

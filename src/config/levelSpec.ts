@@ -1,5 +1,5 @@
 import type { DataTypeId } from './dataTypes';
-import type { StormId } from './events';
+import type { HypeId, MomentId, StormId } from './events';
 import type { ThemeId } from './themes';
 import type { FactCard, Mix } from './types';
 
@@ -53,6 +53,16 @@ export interface LevelSpec {
   setPieces?: SetPiece[];
   /** The Timeline's mood: hype (hot takes) or backlash (the red cloud). */
   timeline?: 'hype' | 'backlash';
+  /** What `$` blocks release. */
+  hype?: HypeId;
+  /** What `!` blocks release (a Moment item, like Golden Gate Claude). */
+  moment?: MomentId;
+  /** Moments that shape the whole level (the em dash trail, Code Red, #keep4o...). */
+  moments?: MomentId[];
+  /** Column ranges where a Moment applies (Winter Laziness). */
+  zones?: { from: number; to: number; moment: MomentId }[];
+  /** What `U` blocks are: a Tibo Reset (2026) or a plain checkpoint (+1 life). */
+  oneUp?: 'tibo' | 'checkpoint';
   ability?: FormAbility;
   /** Shown before the level starts. */
   intro: FactCard;

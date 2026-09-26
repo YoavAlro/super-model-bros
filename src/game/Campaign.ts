@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
 import { LEVELS } from '../config/levels';
+import { HYPES, MOMENTS } from '../config/events';
 import { PATHS, type PathSpec } from '../config/paths';
 import { tip, type FactCard, type FactLine } from '../config/types';
 import { newRun, writeSave, type RunState, type SaveData } from '../save';
@@ -86,7 +87,18 @@ export class Campaign {
       const spec = LEVELS[this.path.steps[i].level];
       const form = formBefore(this.path, i, this.run.flags, LEVELS);
       const stage = new Stage(
-        { spec, path: this.path, form, chars: this.run.chars, lives: this.lives, perks: this.run.perks, flags: this.run.flags, settings: save.settings },
+        {
+        spec,
+        path: this.path,
+        form,
+        chars: this.run.chars,
+        lives: this.lives,
+        perks: this.run.perks,
+        flags: this.run.flags,
+        settings: save.settings,
+        root: this.root,
+        resets: this.run.resets ?? 0,
+      },
         this.input,
         this.hud,
         this.isTouch,
@@ -133,6 +145,9 @@ export class Campaign {
     this.lives = result.lives;
     this.run.deaths += result.deaths;
     for (const f of result.flags) if (!this.run.flags.includes(f)) this.run.flags.push(f);
+    for (const h of result.hypes) this.run.hypes[h.id] = { call: h.call, correct: h.correct };
+    for (const perk of result.perks) if (!this.run.perks.includes(perk)) this.run.perks.push(perk);
+    this.run.resets = result.resets;
     const levelResult = { stars: result.stars, match: result.match, alignment: result.alignment };
     this.run.results[spec.id] = levelResult;
     const worldDone = endsWorld(this.path, i, this.run.flags, LEVELS);
@@ -148,6 +163,11 @@ export class Campaign {
     ];
     if (result.alignment !== null) lines.push(tip(`Alignment: ${Math.round(result.alignment)}%. ${result.alignment >= 70 ? 'Helpful and harmless.' : 'Watch out for fake rewards.'}`));
     lines.push(...spec.outro.lines);
+    for (const id of result.moments) lines.push({ ...MOMENTS[id].fact, text: `Moment · ${MOMENTS[id].name}: ${MOMENTS[id].fact.text}` });
+    for (const h of result.hypes) {
+      const hype = HYPES[h.id as keyof typeof HYPES];
+      lines.push(tip(`Hype or shift? ${hype.name}: you called it ${h.call === 'lasting' ? 'a lasting shift' : 'a passing hype'}, and history ${h.correct ? 'agrees' : 'disagrees'}.`));
+    }
     const diet = total(result.counts) > 0 ? { mine: shares(result.counts), real: spec.recipe, kind: spec.recipeKind } : undefined;
     await showFactCard(this.root, { card: { ...spec.outro, lines }, color: CHARACTERS[this.path.hero].color, diet, button: 'Continue' });
     this.input.clear();
@@ -218,7 +238,7 @@ export class Campaign {
         const api = this.stage?.debug() as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {

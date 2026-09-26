@@ -1,5 +1,7 @@
 import './style.css';
 import { CHARACTERS, type CharacterId } from './config/characters';
+import type { MomentId } from './config/events';
+import { LEVELS } from './config/levels';
 import { PATHS, type PathId } from './config/paths';
 import { Campaign } from './game/Campaign';
 import { unlockAudio } from './game/sfx';
@@ -25,6 +27,18 @@ if (params.has('debug')) {
 }
 const level = params.get('level');
 if (params.has('debug') && level) {
+  // Test-only overrides: &moments=keep4o,codeRed&zones=winterLaziness:20-60
+  const spec = LEVELS[level];
+  const moments = params.get('moments');
+  const zones = params.get('zones');
+  if (spec && moments) spec.moments = [...(spec.moments ?? []), ...(moments.split(',') as MomentId[])];
+  if (spec && zones) {
+    spec.zones = zones.split(',').map((z) => {
+      const [moment, range] = z.split(':');
+      const [from, to] = range.split('-').map(Number);
+      return { moment: moment as MomentId, from, to };
+    });
+  }
   const path = (params.get('path') as PathId) ?? (level.startsWith('claude') ? 'claude' : 'gpt');
   const char = params.get('char') as CharacterId | null;
   play(
