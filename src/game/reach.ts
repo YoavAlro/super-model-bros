@@ -23,6 +23,11 @@ export interface ReachOptions {
   gatesOpen?: boolean;
   /** Opens just these gate tiles (a storm's gates that open once you wait). */
   openGate?: (tx: number, ty: number) => boolean;
+  /**
+   * The camera only scrolls forward: from a spot, a player can walk back at most this many tiles.
+   * Spots whose every way on goes further back than that are reported as camera traps.
+   */
+  viewBack?: number;
 }
 
 export interface ReachReport {
@@ -31,6 +36,8 @@ export interface ReachReport {
   spots: number;
   /** Reachable spots from which the goal can never be reached. */
   deadEnds: { x: number; y: number }[];
+  /** Reachable spots that can reach the goal, but only by walking back further than `viewBack`. */
+  cameraTraps: { x: number; y: number }[];
   /** The furthest x the player can reach (useful when the goal is not reachable). */
   furthestX: number;
 }
@@ -252,5 +259,43 @@ export function analyzeReach(grid: LevelGrid, start: { x: number; y: number }, g
     }
   }
   const deadEnds = [...visited].filter((n) => !canFinish.has(n)).map((n) => ({ x: n % W, y: Math.floor(n / W) }));
-  return { goalReachable: canFinish.has(startKey), spots: visited.size, deadEnds, furthestX };
+  const cameraTraps = opts.viewBack === undefined ? [] : findCameraTraps(reverse, reachesGoal, visited, W, opts.viewBack);
+  return { goalReachable: canFinish.has(startKey), spots: visited.size, deadEnds, cameraTraps, furthestX };
+}
+
+/**
+ * For every spot, the best route to the goal is the one whose leftmost spot is furthest right
+ * (a widest-path search backwards from the goal, bucketed by x). A spot is a trap when even that
+ * route dips more than `viewBack` tiles behind it, off the left edge of a forward-only camera.
+ */
+function findCameraTraps(
+  reverse: Map<number, number[]>,
+  reachesGoal: Set<number>,
+  visited: Set<number>,
+  W: number,
+  viewBack: number,
+): { x: number; y: number }[] {
+  const best = new Map<number, number>();
+  const buckets: number[][] = Array.from({ length: W }, () => []);
+  for (const g of reachesGoal) {
+    best.set(g, g % W);
+    buckets[g % W].push(g);
+  }
+  for (let v = W - 1; v >= 0; v--) {
+    const bucket = buckets[v];
+    while (bucket.length) {
+      const n = bucket.pop()!;
+      if (best.get(n) !== v) continue;
+      for (const from of reverse.get(n) ?? []) {
+        const cand = Math.min(v, from % W);
+        if (cand > (best.get(from) ?? -1)) {
+          best.set(from, cand);
+          buckets[cand].push(from);
+        }
+      }
+    }
+  }
+  return [...visited]
+    .filter((n) => best.has(n) && best.get(n)! < (n % W) - viewBack)
+    .map((n) => ({ x: n % W, y: Math.floor(n / W) }));
 }

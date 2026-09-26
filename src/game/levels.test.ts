@@ -38,6 +38,13 @@ const DELIBERATE_CLIMBS: Record<string, number> = {
   'gpt-5-4': LAXEST_MARGIN, // the 4-tall lying bar in the chart puzzle
 };
 
+/**
+ * The camera only scrolls forward. A 4:3 desktop window, the narrowest landscape view, shows about
+ * 10 tiles either side of the camera, which leads the player by 1.5: so from the furthest point it
+ * has reached, a player can walk back about 8 tiles. No way on may need more (a tile to spare).
+ */
+const VIEW_BACK = 7;
+
 describe('paths', () => {
   it('reference levels that exist, in world order', () => {
     for (const path of Object.values(PATHS)) {
@@ -94,7 +101,7 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     expect(sum).toBeCloseTo(1, 5);
   });
 
-  const expectFinishable = (h: number, jumpScale: number) => {
+  const expectFinishable = (h: number, jumpScale: number, gatesOpen = false) => {
     const spawn = grid.spawnOf('spawn')!;
     const goal = grid.spawnOf('flag') ?? grid.spawnOf('boss')!;
     // The level's form ability (longer context = floatier jumps) applies to whoever plays it.
@@ -103,15 +110,25 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     // Storm gates that open once you wait count as open; closed roads stay shut.
     const gates = spec.storm ? STORMS[spec.storm].gates : undefined;
     const open = gates ? openingGateTiles(gateGroups(grid), gates.map((g) => g.wait)) : null;
-    const r = analyzeReach(grid, spawn, goal.x, { stats, h, openGate: open ? (x, y) => open.has(`${x},${y}`) : undefined });
+    const viewBack = jumpScale === 1 ? VIEW_BACK : undefined;
+    const r = analyzeReach(grid, spawn, goal.x, { stats, h, gatesOpen, viewBack, openGate: open ? (x, y) => open.has(`${x},${y}`) : undefined });
     expect(r.goalReachable, `stuck around x=${r.furthestX}`).toBe(true);
     expect(r.deadEnds, 'soft-lock spots').toEqual([]);
+    expect(r.cameraTraps, 'spots whose only way on is behind the forward-only camera').toEqual([]);
   };
 
   it.each([
     ['small', 0.95],
     ['big', 1.75],
   ])('can be finished, with no soft-locks, by the weakest %s character', (_size, h) => expectFinishable(h, 1));
+
+  // A solved puzzle opens its gates, and whatever they lead to must not strand you off-screen.
+  if (spec.puzzle) {
+    it.each([
+      ['small', 0.95],
+      ['big', 1.75],
+    ])('strands no %s character behind the camera once its puzzle is solved', (_size, h) => expectFinishable(h, 1, true));
+  }
 
   const margin = DELIBERATE_CLIMBS[spec.id] ?? HUMAN_MARGIN;
   it.each([

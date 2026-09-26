@@ -44,14 +44,16 @@ export const CRUSHER_HALL = [
 
 /**
  * A two-key switch: plates `1` two tiles apart must be held at once (a fork lined up behind you,
- * or a co-op partner). The gated corridor above holds the reward; its only door is the gate.
+ * or a co-op partner). The gated corridor above holds the reward. It runs out the far end onto
+ * the next chunk's roof: the camera only scrolls forward, so by the time you reach the far end
+ * the gate can already be behind the screen's left edge.
  */
 export const FORK_ROOM = [
   'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
   '                              ',
   '              XXXXXXXXXXXXXXXX',
-  '              D  YYYYYYYY    X',
-  '              D  YYYYYYYY    X',
+  '              D  YYYYYYYY     ',
+  '              D  YYYYYYYY     ',
   '              XXXXXXXXXXXXXXXX',
   '         =====                ',
   '                              ',
