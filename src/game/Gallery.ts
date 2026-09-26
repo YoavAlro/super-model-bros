@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { ROSTER } from '../config/characters';
 import { characterGallery } from './characterMeshes';
 import { enemyGallery } from './enemyMeshes';
-import { canvasTexture, labelSprite } from './meshes';
+import { itemGallery } from './itemMeshes';
+import { animateItem, canvasTexture, labelSprite, propGallery } from './meshes';
 
 /**
- * Debug-only mesh gallery (`?debug&gallery=characters` or `=enemies`): every mesh in a lit lineup
+ * Debug-only mesh gallery (`?debug&gallery=characters`, `=enemies`, `=items` or `=props`): every mesh in a lit lineup
  * with its name, at close-up size and at in-game size, so looks can be reviewed side by side.
  */
-export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'): void {
+export function showGallery(root: HTMLElement, which: 'characters' | 'enemies' | 'items' | 'props'): void {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -26,10 +27,11 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
   sun.position.set(-4, 10, 8);
   scene.add(sun);
 
-  const items = which === 'characters' ? characterGallery(ROSTER) : enemyGallery();
-  const perRow = which === 'characters' ? items.length : 7;
-  const close = which === 'characters' ? 2 : 1;
-  const cell = which === 'characters' ? 2.6 : 4.2;
+  const items =
+    which === 'characters' ? characterGallery(ROSTER) : which === 'enemies' ? enemyGallery() : which === 'items' ? itemGallery() : propGallery();
+  const perRow = which === 'characters' ? items.length : which === 'items' ? 9 : which === 'props' ? 5 : 7;
+  const close = which === 'characters' ? 2 : which === 'items' ? 2.4 : which === 'props' ? 1.5 : 1;
+  const cell = which === 'characters' ? 2.6 : which === 'items' ? 2.6 : which === 'props' ? 6.4 : 4.2;
   const spinners: THREE.Object3D[] = [];
   items.forEach((item, i) => {
     const row = Math.floor(i / perRow);
@@ -66,7 +68,12 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
   const t0 = performance.now();
   renderer.setAnimationLoop((now) => {
     const t = (now - t0) / 1000;
-    for (const m of spinners) m.rotation.y = Math.sin(t * 0.8) * 0.5;
+    for (const m of spinners) {
+      // Items sit in a holder (so the close-up scale survives their idles) and play their own idle.
+      const inner = m.userData.inner as THREE.Object3D | undefined;
+      if (inner?.userData.anim) animateItem(inner, t);
+      else (inner ?? m).rotation.y = Math.sin(t * 0.8) * 0.5;
+    }
     renderer.render(scene, camera);
   });
   (window as unknown as { __smbGallery: () => number }).__smbGallery = () => items.length;

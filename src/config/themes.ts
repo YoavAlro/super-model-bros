@@ -34,6 +34,8 @@ export interface Strip {
   hang?: boolean;
   /** Colour of the thin rim ribbon along the edge (default: the colour lightened). */
   rim?: number;
+  /** A printed surface instead of flat card: sewn patches or newsprint. */
+  texture?: 'patchwork' | 'newsprint';
 }
 export type PieceId = 'trees' | 'books' | 'prisms' | 'towers' | 'islands' | 'spires' | 'stacks' | 'wall' | 'torches' | 'gears' | 'tubes';
 export type WallPattern = 'stone' | 'damask' | 'pegboard';
@@ -68,6 +70,12 @@ export interface Celestial {
   dx: number;
   y: number;
 }
+/**
+ * Signature set pieces beyond the standard kit, one or two per world (built in src/game/backdrop.ts):
+ * fairy-light strands, kites, hot-air balloons, marbles in the tube run, felt pennants, moonbeams
+ * with gilt frames and a chalkboard, lightning, an aurora and a brass orrery.
+ */
+export type ExtraId = 'fairyLights' | 'kites' | 'balloons' | 'marbles' | 'pennants' | 'moonbeams' | 'lightning' | 'aurora' | 'orrery';
 /** Light colours only; intensities are the same in every theme. Keep every sun channel ≥ 0xa0. */
 export interface Lights {
   sun: number;
@@ -97,6 +105,7 @@ export interface Theme {
   clouds: boolean;
   /** Default 0xffffff. */
   cloudColor?: number;
+  extras?: ExtraId[];
   /** Pits glow with lava instead of dropping into the void. */
   lavaPits?: boolean;
   /** Scene light level (ghost houses are dim). */
@@ -150,6 +159,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     scenery: [{ piece: 'prisms', z: -20, every: 11, colors: [0x1c2a6a, 0x4a5ac0], haze: 0.35 }],
     life: [{ kind: 'motes', count: 40, color: 0x7ad8ff, z: -12 }],
     clouds: false,
+    extras: ['fairyLights'],
   },
   // "Toy fort" (Common Crawl Castle, the RLHF Keep, HHH Keep).
   castle: {
@@ -171,6 +181,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ],
     life: [{ kind: 'embers', count: 30, color: 0xffb040, z: -4 }],
     clouds: false,
+    extras: ['pennants'],
     lavaPits: true,
   },
   // "Patchwork sunset" (GitHub Hills, Constitution Hills).
@@ -188,13 +199,14 @@ export const THEMES: Record<ThemeId, Theme> = {
     tiles: { cap: 'felt', soil: 'soil', hard: 'rings', shelf: 'rope', decor: 'tufts' },
     strips: [
       { edge: 'rolling', z: -70, top: 7, amp: 3, period: 40, color: 0xe8a0a8, haze: 0.6 },
-      { edge: 'rolling', z: -34, top: 4, amp: 2.5, period: 24, color: 0xf0c8a0, haze: 0.45 },
+      { edge: 'rolling', z: -34, top: 4, amp: 2.5, period: 24, color: 0xf0c8a0, haze: 0.45, texture: 'patchwork' },
       { edge: 'rolling', z: -16, top: 1.5, amp: 1.2, period: 12, color: 0xc8d8a0, haze: 0.35 },
     ],
     scenery: [{ piece: 'trees', z: -20, every: 13, colors: [0xf4c8a0, 0xe0c8a8], haze: 0.4 }],
     life: [{ kind: 'birds', count: 4, color: 0x8a5a6a, z: -30 }],
     celestial: { kind: 'sunset', color: 0xfff2b0, accent: 0xffc38a, r: 8, dx: -18, y: 4 },
     clouds: true,
+    extras: ['kites'],
     cloudColor: 0xffffff,
   },
   // "Cloud sea" (Launch Day, 100K Skies): pale blue banks, so white tiles always read as solid.
@@ -219,6 +231,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     life: [{ kind: 'planes', count: 5, color: 0xffffff, z: -10 }],
     celestial: { kind: 'sun', color: 0xfffbe8, accent: 0xffe9a0, r: 3, dx: 22, y: 30 },
     clouds: false,
+    extras: ['balloons'],
   },
   // "Lantern keep" (Vision Keep, 200K Keep): dusk silhouettes against a bright sky.
   skycastle: {
@@ -261,7 +274,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     tiles: { cap: 'slate', soil: 'papier', hard: 'strap', shelf: 'news', decor: 'papers' },
     strips: [
       { edge: 'skyline', z: -60, top: 4, amp: 6, period: 5, color: 0x343c56, haze: 0.6 },
-      { edge: 'scallop', z: -40, top: 16, amp: 2.5, period: 7, color: 0x2a3046, haze: 0.3, hang: true },
+      { edge: 'scallop', z: -40, top: 16, amp: 2.5, period: 7, color: 0x2a3046, haze: 0.3, hang: true, texture: 'newsprint' },
       { edge: 'roofs', z: -26, top: 3, amp: 3, period: 4, color: 0x1e2436, haze: 0.3 },
     ],
     scenery: [],
@@ -270,6 +283,7 @@ export const THEMES: Record<ThemeId, Theme> = {
       { kind: 'pages', count: 6, color: 0xe8e0c8, z: -8 },
     ],
     clouds: false,
+    extras: ['lightning'],
   },
   // "Shadow board" (Tool Pipes): a workshop pegboard that hangs tools.
   pipes: {
@@ -291,6 +305,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ],
     life: [{ kind: 'motes', count: 30, color: 0x3fffc8, z: -10 }],
     clouds: false,
+    extras: ['marbles'],
   },
   // "Puppet theatre" (Reasoning Ghost House): velvet, with the moon seen through the windows.
   ghost: {
@@ -313,6 +328,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     life: [{ kind: 'fireflies', count: 30, color: 0xd8ff7a, z: -6 }],
     celestial: { kind: 'moon', color: 0xf4ecd0, accent: 0xd8cfb0, r: 3.5, dx: 10, y: 10 },
     clouds: false,
+    extras: ['moonbeams'],
     light: 0.75,
   },
   // "Clockwork" (Swarm Factory): tin and brass.
@@ -356,6 +372,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     ],
     life: [{ kind: 'embers', count: 40, color: 0xffb040, z: -4 }],
     clouds: false,
+    extras: ['aurora'],
     lavaPits: true,
   },
   // "Orrery" (Frontier Castle, the finale): the lid of the box is open to the stars.
@@ -379,5 +396,6 @@ export const THEMES: Record<ThemeId, Theme> = {
     ],
     celestial: { kind: 'ringed', color: 0x6a8ae0, accent: 0xffd166, r: 4, dx: -28, y: 22 },
     clouds: false,
+    extras: ['orrery'],
   },
 };

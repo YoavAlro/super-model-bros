@@ -121,3 +121,16 @@ describe('fx pool', () => {
     expect(pool.x[1]).toBeCloseTo(7);
   });
 });
+
+describe('backdrop extras', () => {
+  it('only asks for extras whose set pieces the theme has', () => {
+    const needs: Partial<Record<string, (t: (typeof THEMES)[ThemeId]) => boolean>> = {
+      pennants: (t) => t.scenery.some((s) => s.piece === 'torches'),
+      moonbeams: (t) => t.scenery.some((s) => s.piece === 'wall' && !!s.hole),
+      marbles: (t) => t.scenery.some((s) => s.piece === 'tubes'),
+    };
+    for (const [id, t] of themes) {
+      for (const extra of t.extras ?? []) expect(needs[extra]?.(t) ?? true, `${id}: ${extra}`).toBe(true);
+    }
+  });
+});

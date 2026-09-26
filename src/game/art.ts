@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { shared } from './shared';
-import { cachedGeo } from './toonKit';
+import { basic, cachedGeo } from './toonKit';
 
 /**
  * Shared art helpers for the "scale model" look: soft (mipmapped) canvas textures with a theme-scoped
@@ -53,6 +53,23 @@ export function evictThemeTextures(): void {
   for (const tex of caches.theme.values()) tex.dispose();
   caches.theme.clear();
 }
+
+const matCache = new Map<string, THREE.Material>();
+/**
+ * One cached material per key, marked shared: for props and items, which the engine moves but never
+ * recolours. Never use it for a material the engine or an enemy tints.
+ */
+export function cachedMat<M extends THREE.Material>(key: string, make: () => M): M {
+  let m = matCache.get(key) as M | undefined;
+  if (!m) {
+    m = shared(make());
+    matCache.set(key, m);
+  }
+  return m;
+}
+
+/** Overshoots a little, then settles at 1 (k in 0..1). */
+export const easeOutBack = (k: number) => 1 + 2.70158 * (k - 1) ** 3 + 1.70158 * (k - 1) ** 2;
 
 /** A UV rectangle [u0, v0, u1, v1]. */
 export type Rect = readonly [number, number, number, number];
@@ -180,4 +197,30 @@ export function roundBlock(): THREE.BufferGeometry {
     s.quadraticCurveTo(-h, -h, -h + r, -h);
     return extrudedBlock(s, b, 2, 3);
   });
+}
+
+/**
+ * Runs fn(t) (t = performance.now() in seconds) each time the mesh is drawn, then refreshes its world
+ * matrix: three computes matrixWorld before onBeforeRender, so a transform written here would
+ * otherwise show a frame late. Leaf meshes only; build the closure once, never per frame.
+ */
+export function onDraw(mesh: THREE.Object3D, fn: (t: number) => void): void {
+  mesh.onBeforeRender = () => {
+    fn(performance.now() / 1000);
+    mesh.updateMatrix();
+    if (mesh.parent) mesh.matrixWorld.multiplyMatrices(mesh.parent.matrixWorld, mesh.matrix);
+    else mesh.matrixWorld.copy(mesh.matrix);
+  };
+}
+
+let glintMat: THREE.MeshBasicMaterial | null = null;
+/**
+ * A flat white highlight w × h: place it upper left, just in front of the part it shines on (the sun
+ * is upper left). Geometry and material are cached and shared.
+ */
+export function glint(w: number, h: number): THREE.Mesh {
+  glintMat ??= shared(basic(0xffffff));
+  const m = new THREE.Mesh(cachedGeo('glint', () => new THREE.SphereGeometry(1, 8, 6)), glintMat);
+  m.scale.set(w, h, 0.01);
+  return m;
 }

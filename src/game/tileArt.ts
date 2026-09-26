@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CapStyle, HardStyle, ShelfStyle, SoilStyle, Theme } from '../config/themes';
+import type { CapStyle, DecorStyle, HardStyle, ShelfStyle, SoilStyle, Theme } from '../config/themes';
 import { css, evictThemeTextures, softTexture, type Paint } from './art';
 import { hash01, shade } from './palette';
 import { mulberry32 } from './rng';
@@ -1000,4 +1000,175 @@ export function shelfAtlas(style: ShelfStyle, C: number): THREE.Texture {
     },
     'theme',
   );
+}
+
+// --------------------------------------------------------------------- decor
+/**
+ * Little cut-outs standing on some caps (daisies, shrooms, screws…), 64 px, transparent around them.
+ * The quad they go on is 0.5 × 0.3, so painters draw in a 64 × 38.4 space (scaled up to fill the
+ * canvas) with the ground line at the bottom. Ink edges, like the tiles.
+ */
+export function decorTexture(style: DecorStyle): THREE.Texture {
+  return softTexture(`decor:${style}`, 64, 64, (c) => {
+    c.clearRect(0, 0, 64, 64);
+    c.setTransform(1, 0, 0, 64 / 38.4, 0, 0);
+    const G = 38.4;
+    const ink = (w = 2) => {
+      c.strokeStyle = rgba(INK, 0.75);
+      c.lineWidth = w;
+      c.lineJoin = 'round';
+      c.stroke();
+    };
+    const blob = (x: number, y: number, r: number, hex: number, ry = r) => {
+      c.beginPath();
+      c.ellipse(x, y, r, ry, 0, 0, TAU);
+      c.fillStyle = rgba(hex);
+      c.fill();
+      ink(1.5);
+    };
+    const poly = (pts: number[], hex: number) => {
+      c.beginPath();
+      c.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+      c.closePath();
+      c.fillStyle = rgba(hex);
+      c.fill();
+      ink(1.5);
+    };
+    const star4 = (x: number, y: number, r: number, hex: number) => {
+      const pts: number[] = [];
+      for (let k = 0; k < 8; k++) {
+        const rr = k % 2 ? r * 0.3 : r;
+        const a = (k / 8) * TAU - Math.PI / 2;
+        pts.push(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      poly(pts, hex);
+    };
+    const hexNut = (x: number, y: number, r: number, hex: number, hole: number) => {
+      const pts: number[] = [];
+      for (let k = 0; k < 6; k++) pts.push(x + Math.cos((k / 6) * TAU) * r, y + Math.sin((k / 6) * TAU) * r * 0.8);
+      poly(pts, hex);
+      disc(c, x, y, r * 0.38, hole);
+    };
+    switch (style) {
+      case 'daisies':
+        for (const [x, h] of [[14, 22], [30, 28], [47, 18]]) {
+          line(c, [x, G, x + 1, G - h], 2.5, 0x2f8a3a);
+          for (let k = 0; k < 5; k++) {
+            const a = (k / 5) * TAU;
+            blob(x + 1 + Math.cos(a) * 4.2, G - h + Math.sin(a) * 4.2, 3.2, 0xffffff);
+          }
+          blob(x + 1, G - h, 2.6, 0xffc933);
+        }
+        for (const [dx, dy] of [[-3, 0], [3, 0], [0, -3.5]]) blob(56 + dx, G - 5 + dy, 3, 0x46c04a);
+        break;
+      case 'shrooms':
+        for (const [x, h, r] of [[16, 16, 8], [34, 24, 10], [50, 12, 6]]) {
+          c.beginPath();
+          c.rect(x - r * 0.3, G - h, r * 0.6, h);
+          c.fillStyle = rgba(0xcfe8ff);
+          c.fill();
+          ink(1.5);
+          c.beginPath();
+          c.ellipse(x, G - h, r, r * 0.75, 0, Math.PI, TAU);
+          c.closePath();
+          c.fillStyle = rgba(0x5ad8ff);
+          c.fill();
+          ink(1.5);
+          disc(c, x - r * 0.35, G - h - r * 0.35, r * 0.18, 0xffffff, 0.85);
+        }
+        break;
+      case 'tufts':
+        for (let k = 0; k < 5; k++) {
+          const x = 10 + k * 7;
+          line(c, [x, G, x + (k - 2) * 3, G - 14 - (k % 2) * 6], 3, 0x9ac050);
+        }
+        line(c, [48, G, 49, G - 16], 2.5, 0x6a9a3a);
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU;
+          blob(49 + Math.cos(a) * 4, G - 18 + Math.sin(a) * 4, 3, 0xff8a3a);
+        }
+        blob(49, G - 18, 2.2, 0xffe08a);
+        break;
+      case 'papers':
+        for (const [x, r] of [[20, 10], [44, 8]]) {
+          blob(x, G - r, r, 0xe8e0c8);
+          line(c, [x - r * 0.6, G - r * 1.2, x - 1, G - r * 0.8, x + r * 0.5, G - r * 1.3], 1.2, 0xb8b0a0);
+          line(c, [x - r * 0.3, G - r * 0.4, x + r * 0.4, G - r * 0.6], 1.2, 0xb8b0a0);
+        }
+        break;
+      case 'screws':
+      case 'bolts': {
+        const [a, b] = style === 'screws' ? [0xc0c8d0, 0xa0a8b0] : [0x8a8e96, 0x6a6e76];
+        // A screw (or bolt) lying down, and a hex nut.
+        c.beginPath();
+        c.rect(10, G - 9, 22, 7);
+        c.fillStyle = rgba(b);
+        c.fill();
+        ink(1.5);
+        for (let x = 13; x < 32; x += 4) line(c, [x, G - 9, x + 2, G - 2], 1, shade(b, 0.7));
+        blob(10, G - 5.5, 6, a, 7);
+        line(c, [10, G - 11, 10, G], 1.5, shade(a, 0.6));
+        hexNut(46, G - 7, 8, a, shade(b, 0.55));
+        if (style === 'bolts') hexNut(58, G - 5, 5, b, shade(b, 0.5));
+        break;
+      }
+      case 'candles':
+        for (const [x, h] of [[20, 18], [42, 12]]) {
+          c.beginPath();
+          c.rect(x - 5, G - h, 10, h);
+          c.fillStyle = rgba(0xf0e0c0);
+          c.fill();
+          ink(1.5);
+          blob(x - 2, G - h + 3, 2.2, 0xf0e0c0, 3.5);
+          line(c, [x, G - h, x, G - h - 3], 1.2, INK);
+          c.beginPath();
+          c.ellipse(x, G - h - 7, 3.2, 5.5, 0, 0, TAU);
+          c.fillStyle = rgba(0xffd27a);
+          c.fill();
+          disc(c, x, G - h - 6, 1.4, 0xffffff, 0.9);
+        }
+        break;
+      case 'shards':
+        for (const [x, h, w, tilt] of [[18, 22, 8, -4], [34, 30, 10, 2], [50, 16, 7, 5]]) {
+          poly([x - w / 2, G, x + w / 2, G, x + tilt + w * 0.2, G - h, x + tilt - w * 0.3, G - h + 3], 0xd8b458);
+          poly([x, G, x + w / 2, G, x + tilt + w * 0.2, G - h], shade(0xd8b458, 1.2));
+        }
+        break;
+      case 'twinkles':
+        star4(16, G - 12, 9, 0xffe08a);
+        star4(36, G - 20, 7, 0xffe08a);
+        star4(52, G - 9, 6, 0xffe08a);
+        break;
+    }
+  });
+}
+
+/** A lava bubble: a molten crest-yellow ball with a darker rim and a glint (the hazard palette only). */
+export function bubbleTexture(): THREE.Texture {
+  return softTexture('lava:bubble', 32, 32, (c) => {
+    c.clearRect(0, 0, 32, 32);
+    disc(c, 16, 16, 14, 0xff5a1a);
+    disc(c, 16, 15, 11, 0xffd23a);
+    disc(c, 11, 10, 3, 0xffffff, 0.85);
+  });
+}
+
+/** A conveyor pulley's face: a dark rubber wheel with four spokes, a yellow hub and an ink rim. */
+export function pulleyTexture(): THREE.Texture {
+  return softTexture('conveyor:pulley', 64, 64, (c) => {
+    c.clearRect(0, 0, 64, 64);
+    disc(c, 32, 32, 32, 0x1a1c22);
+    disc(c, 32, 32, 27, 0x3c404a);
+    for (let k = 0; k < 4; k++) {
+      c.save();
+      c.translate(32, 32);
+      c.rotate((k * Math.PI) / 2);
+      rect(c, -3, 6, 6, 20, 0x1a1c22);
+      c.restore();
+    }
+    disc(c, 32, 32, 9, 0xffcf3a);
+    disc(c, 32, 32, 4, 0x1a1c22);
+    disc(c, 24, 22, 3, 0xffffff, 0.35);
+  });
 }

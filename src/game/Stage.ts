@@ -111,7 +111,8 @@ export class Stage implements StageCtx {
   private debris: Debris[] = [];
   private bosses: Boss[] = [];
   private helper: THREE.Group | null = null;
-  private flag: { group: THREE.Group; x: number; y: number; slide: number } | null = null;
+  /** The goal pennant; `stamp` is −1 until the RELEASED stamp lands, then its age in seconds. */
+  private flag: { group: THREE.Group; x: number; y: number; slide: number; stamp: number } | null = null;
   private crowd: THREE.Group | null = null;
   private readonly trail: { x: number; y: number }[] = [];
 
@@ -177,6 +178,8 @@ export class Stage implements StageCtx {
   private readonly seen = new Set<string>();
   /** Draw calls and triangles of the last frame (read by ?debug's draws()). */
   private readonly draws = { calls: 0, triangles: 0 };
+  /** The level's shaders are compiled once, behind the intro card (so the first pickup never hitches). */
+  private prewarmed = false;
   private random: () => number;
   private resolve!: (r: StageResult) => void;
   readonly done: Promise<StageResult>;
@@ -266,6 +269,7 @@ export class Stage implements StageCtx {
     this.helper = null;
     this.flag = null;
     this.accumulator = 0;
+    this.prewarmed = false;
     this.shakeTime = 0;
     this.clearTimer = 0;
     this.respawnTimer = 0;
@@ -335,7 +339,7 @@ export class Stage implements StageCtx {
         const group = makeFlag(`${spec.toward.name} · ${spec.outro.date.split(' · ')[0]}`);
         group.position.set(s.x + 0.5, s.y - 1, 0);
         this.scene.add(group);
-        this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0 };
+        this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0, stamp: -1 };
       }
     }
 
@@ -363,6 +367,8 @@ export class Stage implements StageCtx {
       this.fogWall = makeFogWall();
       this.scene.add(this.fogWall);
       this.scene.fog = new THREE.Fog(0xc8ccd8, 18, 42);
+      // The cardboard backdrop fogs out, so the sky goes the same grey (no dark gap between its layers).
+      this.scene.background = new THREE.Color(0xc8ccd8);
     }
     this.gates = this.storm?.gates ? gateGroups(this.grid) : [];
     this.crowd = makeCrowd(10);
@@ -450,6 +456,12 @@ export class Stage implements StageCtx {
     this.animateParticles(t);
     if (this.fogWall) this.fogWall.position.x = this.fogX;
     this.placeCamera(dt);
+    if (this.state === 'intro' && !this.prewarmed) {
+      this.prewarmed = true;
+      this.view.fx.showAll(true);
+      renderer.compile(this.scene, this.camera);
+      this.view.fx.showAll(false);
+    }
     renderer.render(this.scene, this.camera);
     this.draws.calls = renderer.info.render.calls;
     this.draws.triangles = renderer.info.render.triangles;
@@ -1519,13 +1531,28 @@ export class Stage implements StageCtx {
       if (reached) {
         sfx.flag();
         for (const p of this.playersList) p.body.x = Math.min(p.body.x, flag.x - p.body.w);
+        // Two confetti poppers.
+        this.view.fx.burst('star', flag.x - 0.6, flag.y + 1.5, 10, 0xffd166, 6);
+        this.view.fx.burst('spark', flag.x + 0.6, flag.y + 1.5, 10, THEMES[this.spec.theme].grass, 6);
         this.beginClear();
       }
     }
     if (this.state === 'clear') {
       flag.slide = Math.min(1, flag.slide + dt * 1.2);
-      const sprite = flag.group.getObjectByName('flag');
-      if (sprite) sprite.position.y = 8.4 - flag.slide * 6.5;
+      const banner = flag.group.getObjectByName('flag');
+      if (banner) banner.position.y = 8.4 - flag.slide * 6.5;
+      // Once the banner is down, a RELEASED stamp slams onto it.
+      const stamp = banner?.getObjectByName('stamp');
+      if (stamp && flag.slide >= 1) {
+        if (flag.stamp < 0) {
+          flag.stamp = 0;
+          stamp.visible = true;
+          this.shake(0.1);
+        } else flag.stamp += dt;
+        const k = Math.min(1, flag.stamp / 0.12);
+        const s = 2.4 - 1.4 * k * k;
+        stamp.scale.set(2.2 * s, 1.1 * s, 1);
+      }
     }
   }
 

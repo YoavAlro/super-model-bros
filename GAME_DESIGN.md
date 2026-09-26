@@ -104,6 +104,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/art.ts`, `tileArt.ts`, `palette.ts`, `edges.ts`, `shared.ts` | The toy-box art kit: cached soft canvas textures, the 2×2 tile atlas and its per-theme painters, colour and contrast maths, backdrop edge profiles (readability rules unit tested in `art.test.ts`) |
 | `src/game/fx.ts`, `fxPool.ts` | Pooled particle FX owned by the level view: bursts, rings, trails, "+1" (the pool is pure and unit tested) |
+| `src/game/backdrop.ts`, `itemMeshes.ts` | The cardboard backdrop dioramas (strips, set pieces, celestials, clouds, ambient life and each world's signature extras, built from the theme config) and the collectibles: board-game data chips, trap coins, power-up toys and their idles (`animateItem`) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
 | `src/config/music.ts`, `src/game/music.ts`, `musicTheory.ts` | Original background tunes (scale degrees over chords), the lookahead WebAudio sequencer, and its pure note math (unit tested) |
 | `src/ui/Settings.ts`, `src/game/prefs.ts` | Settings toggles (title screen and pause menus) and the reduce-motion flag that rendering reads |

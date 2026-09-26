@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import { DATA_TYPES, type DataTypeId } from '../config/dataTypes';
-import { paintTexture } from './art';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { atlasUV, cachedMat, CELL, easeOutBack, onDraw, paintTexture, softTexture } from './art';
+import { fxTexture } from './fx';
+import { css, shade } from './palette';
+import { prefs } from './prefs';
 import { shared } from './shared';
 // Only called inside builders, never at module load (toonKit imports ./shared, not this module).
-import { basic, cachedGeo } from './toonKit';
+import { basic, cachedGeo, INK, inkOutline, RAMP, roundedBox, toon } from './toonKit';
 
 /** Mesh and texture builders. Every mesh's origin is at its feet, horizontally centered. */
 
@@ -140,328 +143,445 @@ export const lambert = (color: number, emissive = 0) =>
   new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: emissive ? 0.6 : 0 });
 
 export { shared } from './shared';
+export { glint, onDraw } from './art';
+export {
+  animateItem,
+  makeFunctionCall,
+  makeHeart,
+  makeHeartMesh,
+  makePowerItem,
+  makeScaleCrystal,
+  makeToken,
+  makeTrap,
+} from './itemMeshes';
 
+// ------------------------------------------------------------------ props
 /**
- * Runs fn(t) (t = performance.now() in seconds) each time the mesh is drawn, then refreshes its world
- * matrix: three computes matrixWorld before onBeforeRender, so a transform written here would
- * otherwise show a frame late. Leaf meshes only; build the closure once, never per frame.
+ * Props are toy pieces too: toon-shaded on the kit's ramp, ink baked into their small textures, one
+ * outline at most. Their materials are cached and shared, except where the engine or an enemy tints
+ * one (clouds, hearts and the plate's pad get a new material per call).
  */
-export function onDraw(mesh: THREE.Object3D, fn: (t: number) => void): void {
-  mesh.onBeforeRender = () => {
-    fn(performance.now() / 1000);
-    mesh.updateMatrix();
-    if (mesh.parent) mesh.matrixWorld.multiplyMatrices(mesh.parent.matrixWorld, mesh.matrix);
-    else mesh.matrixWorld.copy(mesh.matrix);
-  };
+
+const toonC = (color: number, emissive = 0, intensity?: number) =>
+  cachedMat(`toon:${color}:${emissive}:${intensity}`, () => toon(color, emissive, intensity));
+const toonMap = (key: string, map: THREE.Texture, extra: THREE.MeshToonMaterialParameters = {}) =>
+  cachedMat(key, () => new THREE.MeshToonMaterial({ color: 0xffffff, map, gradientMap: RAMP, ...extra }));
+
+/** Paints a whole geometry one vertex colour (for merged, vertex-coloured props). */
+function tint(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
+  const c = new THREE.Color(hex);
+  const n = geo.getAttribute('position').count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) c.toArray(col, i * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
 }
 
-let glintMat: THREE.MeshBasicMaterial | null = null;
-/**
- * A flat white highlight w × h: place it upper left, just in front of the part it shines on (the sun
- * is upper left). Geometry and material are cached and shared.
- */
-export function glint(w: number, h: number): THREE.Mesh {
-  glintMat ??= shared(basic(0xffffff));
-  const m = new THREE.Mesh(cachedGeo('glint', () => new THREE.SphereGeometry(1, 8, 6)), glintMat);
-  m.scale.set(w, h, 0.01);
-  return m;
+const lathe = (pts: number[][], segments: number) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), segments);
+
+/** Plays fn(k) with k going 0 → 1 over `dur` seconds from the mesh's first draw, then stops. */
+function introOnDraw(mesh: THREE.Mesh, dur: number, fn: (k: number, age: number) => void): void {
+  let start = -1;
+  onDraw(mesh, (t) => {
+    if (start < 0) start = t;
+    const age = t - start;
+    fn(Math.min(1, age / dur), age);
+    if (age >= dur + 0.12) mesh.onBeforeRender = () => {};
+  });
 }
 
-const tokenGeo = shared(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 20));
-const rimGeo = shared(new THREE.TorusGeometry(0.3, 0.035, 6, 20));
-const rimMat = shared(lambert(0xffffff));
-const tokenMats = new Map<string, THREE.Material[]>();
-
-/** A glyph on a colored disk: tokens are told apart by shape, not only color. */
-function faceTexture(glyph: string, color: number, ink = '#10131f'): THREE.CanvasTexture {
-  const tex = canvasTexture(64, (c, s) => {
-    c.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
-    c.fillRect(0, 0, s, s);
-    c.fillStyle = ink;
-    c.font = `bold ${glyph.length > 1 ? 26 : 34}px system-ui, sans-serif`;
+/** The release pennant's "RELEASED" rubber stamp. */
+function stampTexture(): THREE.Texture {
+  return softTexture('flag:stamp', 128, 64, (c) => {
+    c.clearRect(0, 0, 128, 64);
+    c.globalAlpha = 0.92;
+    c.strokeStyle = '#d8283e';
+    c.lineWidth = 5;
+    c.beginPath();
+    c.roundRect(5, 7, 118, 50, 9);
+    c.stroke();
+    c.fillStyle = '#d8283e';
+    c.font = '900 30px system-ui, sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    // A cylinder's cap maps the texture sideways; once the coin is turned to face the camera, a
-    // glyph drawn a quarter-turn counter-clockwise reads upright.
-    c.translate(s / 2, s / 2);
-    c.rotate(-Math.PI / 2);
-    c.fillText(glyph, 0, 2);
+    c.fillText('RELEASED', 64, 33, 108);
   });
-  tex.magFilter = THREE.LinearFilter;
-  return tex;
 }
 
-function coinMaterials(key: string, glyph: string, color: number, ink?: string): THREE.Material[] {
-  let mats = tokenMats.get(key);
-  if (!mats) {
-    const side = shared(new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.45 }));
-    const face = shared(new THREE.MeshLambertMaterial({ map: faceTexture(glyph, color, ink), emissive: color, emissiveIntensity: 0.25 }));
-    // Cylinder groups: side, top, bottom. The coin is turned to face the camera, so top/bottom are its faces.
-    mats = [side, face, face];
-    tokenMats.set(key, mats);
-  }
-  return mats;
+function spoolGeo(): THREE.BufferGeometry {
+  const wood = 0xb98a5a;
+  return mergeGeometries([
+    tint(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 20).translate(0, 1.015, 0), 0x3a2a4a),
+    tint(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16).translate(0, 1.05 + 0.02, 0), wood),
+    tint(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16).translate(0, 1.65, 0), wood),
+    tint(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 16).translate(0, 1.35, 0), wood),
+    tint(new THREE.CylinderGeometry(0.34, 0.34, 0.36, 16).translate(0, 1.35, 0), 0x10a37f),
+  ])!;
 }
 
-function coin(key: string, glyph: string, color: number, ink?: string): THREE.Group {
-  const g = new THREE.Group();
-  const disk = new THREE.Mesh(tokenGeo, coinMaterials(key, glyph, color, ink));
-  disk.rotation.x = Math.PI / 2;
-  disk.position.y = 0.5;
-  const rim = new THREE.Mesh(rimGeo, rimMat);
-  rim.position.y = 0.5;
-  g.add(disk, rim);
-  return g;
+/** The pennant: pinked top and bottom edges and a V notch at the fly end; origin at its left middle. */
+function pennantShape(w: number): THREE.Shape {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0.5);
+  let i = 0;
+  for (let x = 0.15; x < w - 0.05; x += 0.15, i++) s.lineTo(x, i % 2 ? 0.5 : 0.45);
+  s.lineTo(w, 0.5);
+  s.lineTo(w - 0.3, 0);
+  s.lineTo(w, -0.5);
+  i = 0;
+  for (let x = w - 0.15; x > 0.05; x -= 0.15, i++) s.lineTo(x, i % 2 ? -0.5 : -0.45);
+  s.lineTo(0, -0.5);
+  s.closePath();
+  return s;
 }
 
-export function makeToken(type: DataTypeId): THREE.Group {
-  const t = DATA_TYPES[type];
-  return coin(type, t.glyph, t.color);
-}
-
-/** Reward orbs look almost like tokens; praise coins say "brilliant!". */
-export function makeTrap(kind: 'rewardOrb' | 'praise'): THREE.Group {
-  const g = kind === 'rewardOrb' ? coin('trap-orb', '+1', 0xffc21a, '#5a2a00') : coin('trap-praise', '★', 0xff9ad5, '#5a0034');
-  const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.42, 12, 10),
-    new THREE.MeshBasicMaterial({ color: kind === 'rewardOrb' ? 0xffa000 : 0xff5ab4, transparent: true, opacity: 0.22, depthWrite: false }),
-  );
-  glow.position.y = 0.5;
-  g.add(glow);
-  return g;
-}
-
-function star(color: number, emissive: number): THREE.Mesh {
-  const shape = new THREE.Shape();
-  for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? 0.42 : 0.18;
-    const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
-    if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-  }
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: false });
-  geo.translate(0, 0, -0.08);
-  const mesh = new THREE.Mesh(geo, lambert(color, emissive));
-  mesh.position.y = 0.45;
-  return mesh;
-}
-
-/** Power-up meshes by kind. `color` tints hype and moment items. */
-export function makePowerItem(kind: string, color = 0xff4fd8): THREE.Group {
-  const g = new THREE.Group();
-  if (kind === 'scale' || kind === 'mega') {
-    const crystal = new THREE.Mesh(
-      new THREE.OctahedronGeometry(kind === 'mega' ? 0.45 : 0.38),
-      new THREE.MeshLambertMaterial({ color: kind === 'mega' ? 0xffd166 : 0x3ff2d0, emissive: kind === 'mega' ? 0xc08a00 : 0x19c2a2, emissiveIntensity: 0.8 }),
-    );
-    crystal.position.y = 0.45;
-    crystal.scale.y = 1.25;
-    g.add(crystal);
-  } else if (kind === 'rlhf') {
-    g.add(star(0xffd84d, 0xffb000));
-  } else if (kind === 'viral') {
-    g.add(star(0xffffff, 0x66ccff));
-  } else if (kind === 'tool') {
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4), lambert(0x2fae4a));
-    stem.position.y = 0.2;
-    const head = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.09, 8, 6), lambert(0x1fd1b0, 0x0a8a74));
-    head.position.y = 0.55;
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), lambert(0xffffff, 0xffffff));
-    core.position.y = 0.55;
-    g.add(stem, head, core);
-  } else if (kind === 'cape') {
-    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.06), lambert(0x7a3cff, 0x3a1080));
-    cloth.position.y = 0.45;
-    cloth.rotation.z = 0.2;
-    g.add(cloth);
-  } else if (kind === 'fork') {
-    for (const x of [-0.16, 0.16]) {
-      const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), lambert(0xe0304a, 0x600010));
-      cherry.position.set(x, 0.25, 0);
-      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4), lambert(0x2fae4a));
-      stem.position.set(x * 0.5, 0.55, 0);
-      stem.rotation.z = -x * 2;
-      g.add(cherry, stem);
-    }
-  } else if (kind === 'frozen') {
-    const inside = makePowerItem('fork');
-    inside.position.y = 0.05;
-    const ice = new THREE.Mesh(
-      new THREE.BoxGeometry(0.78, 0.78, 0.78),
-      new THREE.MeshLambertMaterial({ color: 0xbfe8ff, emissive: 0x3a7aa0, emissiveIntensity: 0.5, transparent: true, opacity: 0.55, depthWrite: false }),
-    );
-    ice.position.y = 0.42;
-    g.add(inside, ice);
-  } else if (kind === 'oneup') {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 20, Math.PI * 1.6), lambert(0x46e07a, 0x138a3a));
-    ring.position.y = 0.45;
-    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.22, 3), lambert(0x46e07a, 0x138a3a));
-    arrow.position.set(0.27, 0.58, 0);
-    arrow.rotation.z = -0.4;
-    g.add(ring, arrow);
-  } else {
-    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 1), lambert(color, color));
-    orb.position.y = 0.45;
-    const halo = new THREE.Mesh(
-      new THREE.TorusGeometry(0.46, 0.04, 6, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }),
-    );
-    halo.position.y = 0.45;
-    g.add(orb, halo);
-  }
-  return g;
-}
-
-/** A function call: a glowing pair of brackets. */
-export function makeFunctionCall(): THREE.Group {
-  const g = new THREE.Group();
-  const mat = lambert(0x1fd1b0, 0x1fd1b0);
-  for (const x of [-0.12, 0.12]) {
-    const bracket = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 6, 10, Math.PI), mat);
-    bracket.position.set(x, 0.22, 0);
-    bracket.rotation.z = x < 0 ? Math.PI / 2 : -Math.PI / 2;
-    g.add(bracket);
-  }
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), lambert(0xffffff, 0xffffff));
-  dot.position.y = 0.22;
-  g.add(dot);
-  return g;
-}
-
-/** The Scale power-up: a glowing parameter crystal. */
-export function makeScaleCrystal(): THREE.Group {
-  const g = new THREE.Group();
-  const crystal = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.38),
-    new THREE.MeshLambertMaterial({ color: 0x3ff2d0, emissive: 0x19c2a2, emissiveIntensity: 0.8 }),
-  );
-  crystal.position.y = 0.45;
-  crystal.scale.y = 1.25;
-  g.add(crystal);
-  return g;
-}
-
-/** A flagpole whose flag carries the model's name and release date. */
+/**
+ * The goal: a release pennant on a thread spool, with a bell on top. The origin is at the ground
+ * tile's bottom (the ground top is local y 1). The banner is the group named 'flag' (Stage slides its
+ * position.y down at the clear) and carries the hidden 'stamp' sprite.
+ */
 export function makeFlag(label: string, height = 9): THREE.Group {
   const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, height), lambert(0xdddddd));
+  const barber = cachedMat(`flag:pole:${height}`, () => {
+    const tex = softTexture('flag:barber', 16, 16, (c) => {
+      c.fillStyle = '#fff4d6';
+      c.fillRect(0, 0, 16, 16);
+      c.fillStyle = '#10a37f';
+      c.beginPath();
+      for (const o of [-16, 0, 16]) {
+        c.moveTo(o, 16);
+        c.lineTo(o + 6, 16);
+        c.lineTo(o + 22, 0);
+        c.lineTo(o + 16, 0);
+        c.closePath();
+      }
+      c.fill();
+    }).clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, height * 2);
+    shared(tex);
+    return new THREE.MeshToonMaterial({ color: 0xffffff, map: tex, gradientMap: RAMP });
+  });
+  const pole = new THREE.Mesh(cachedGeo(`flag:pole:${height}`, () => new THREE.CylinderGeometry(0.07, 0.07, height, 10)), barber);
   pole.position.y = height / 2;
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), lambert(0x46c04a));
-  ball.position.y = height + 0.1;
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), lambert(0x9c7a55));
-  base.position.y = 0.5;
-  const flag = labelSprite(label, '#ffffff', '#10a37f');
-  flag.name = 'flag';
-  flag.scale.multiplyScalar(0.8);
-  flag.center.set(0, 0.5);
-  flag.position.set(0.1, height - 0.6, 0);
-  g.add(pole, ball, base, flag);
+  const spool = new THREE.Mesh(cachedGeo('flag:spool', spoolGeo), cachedMat('flag:spool', () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP })));
+  const bell = new THREE.Mesh(
+    cachedGeo('flag:bell', () => lathe([[0, 0], [0.14, 0], [0.11, 0.06], [0.07, 0.16], [0.02, 0.2], [0, 0.22]], 12)),
+    toonC(0xd9a53a, 0x6a4a10, 0.3),
+  );
+  bell.position.y = height;
+
+  const banner = new THREE.Group();
+  banner.name = 'flag';
+  banner.position.set(0.1, height - 0.6, 0.45);
+  const text = labelSprite(label, '#ffffff', 'rgba(0,0,0,0)');
+  text.scale.multiplyScalar(0.8);
+  text.center.set(0, 0.5);
+  text.position.set(0.25, 0, 0.1);
+  const w = text.scale.x + 0.5;
+  const geo = new THREE.ShapeGeometry(pennantShape(w));
+  const pennant = new THREE.Mesh(geo, cachedMat('flag:pennant', () => new THREE.MeshToonMaterial({ color: 0x10a37f, gradientMap: RAMP, side: THREE.DoubleSide })));
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+  const baseX = Float32Array.from({ length: pos.count }, (_, i) => pos.getX(i));
+  onDraw(pennant, (t) => {
+    if (prefs.reduceMotion) return;
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.08 * Math.sin(4 * t - 1.4 * baseX[i]) * (baseX[i] / w));
+    pos.needsUpdate = true;
+  });
+  const stamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: stampTexture(), rotation: -0.21, transparent: true, depthWrite: false }));
+  stamp.name = 'stamp';
+  stamp.visible = false;
+  stamp.position.set(Math.max(1.2, w * 0.6), 0.05, 0.16);
+  stamp.scale.set(2.2, 1.1, 1);
+  banner.add(pennant, text, stamp);
+  g.add(pole, spool, bell, banner);
   return g;
 }
 
-/** A puffy cloud, origin at its base. */
+/**
+ * "Cotton pillow": a flat pillow you can stand on under five puffs, origin at the base. One new
+ * material per call, because enemies tint theirs (the Timeline).
+ */
 export function makeCloud(color: number, emissive = 0x9ab8ff): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: 0.3 });
-  const geo = new THREE.SphereGeometry(0.5, 12, 8);
-  for (const [x, y, s] of [[-0.6, 0.3, 1], [0, 0.45, 1.25], [0.6, 0.3, 1], [-0.25, 0.15, 0.9], [0.3, 0.15, 0.9]]) {
-    const puff = new THREE.Mesh(geo, mat);
-    puff.position.set(x, y, 0);
-    puff.scale.set(s, s * 0.8, s * 0.7);
-    g.add(puff);
-  }
+  const mat = toon(color, emissive, 0.3);
+  const pillow = new THREE.Mesh(roundedBox(1.8, 0.34, 0.8, 0.17, 0.05), mat);
+  pillow.position.y = 0.17;
+  const puffs = new THREE.Mesh(
+    cachedGeo('cloud:puffs', () =>
+      mergeGeometries(
+        [[-0.6, 0.3, 1], [0, 0.45, 1.25], [0.6, 0.3, 1], [-0.25, 0.32, 0.9], [0.3, 0.32, 0.9]].map(([x, y, s]) =>
+          new THREE.SphereGeometry(0.5, 12, 8).scale(s, 0.8 * s, 0.7 * s).translate(x, y, 0),
+        ),
+      )!,
+    ),
+    mat,
+  );
+  // A new ink material per cloud too: bosses fade every material under their mesh.
+  inkOutline(puffs, 0.03);
+  g.add(pillow, puffs);
   return g;
 }
 
-export function makeHeartMesh(color: number): THREE.Mesh {
-  const s = new THREE.Shape();
-  s.moveTo(0, -0.35);
-  s.bezierCurveTo(-0.5, 0, -0.35, 0.4, 0, 0.18);
-  s.bezierCurveTo(0.35, 0.4, 0.5, 0, 0, -0.35);
-  const geo = new THREE.ExtrudeGeometry(s, { depth: 0.14, bevelEnabled: false });
-  geo.translate(0, 0, -0.07);
-  return new THREE.Mesh(geo, lambert(color, color));
+/** A plank's face: its colour, a lighter top stripe, grain and a soft ink border. */
+function plankTexture(color: number): THREE.Texture {
+  return softTexture(`plank:${color}`, 128, 32, (c) => {
+    c.fillStyle = css(color);
+    c.fillRect(0, 0, 128, 32);
+    c.fillStyle = css(shade(color, 1.2));
+    c.fillRect(0, 0, 128, 4);
+    c.strokeStyle = css(shade(color, 0.9));
+    c.lineWidth = 1.5;
+    for (const y of [12, 22]) {
+      c.beginPath();
+      c.moveTo(4, y);
+      c.bezierCurveTo(40, y - 3, 80, y + 3, 124, y - 1);
+      c.stroke();
+    }
+    c.strokeStyle = 'rgba(29,20,36,0.5)';
+    c.lineWidth = 2;
+    c.strokeRect(1, 1, 126, 30);
+  });
 }
 
-/** A heart token ("nothing without its people"). */
-export function makeHeart(): THREE.Group {
-  const g = new THREE.Group();
-  const heart = makeHeartMesh(0xff4d7a);
-  heart.position.y = 0.5;
-  g.add(heart);
-  return g;
-}
-
-/** A floating platform actor, three tiles wide. */
+/**
+ * "Wind-up plank", three tiles wide, origin at the base: brass rivets, a key at its right end that
+ * turns as it travels, and tassels underneath so it reads as a lift you can jump up through.
+ */
 export function makeMovingPlatform(color: number): THREE.Group {
   const g = new THREE.Group();
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 1), lambert(color, 0x202020));
-  slab.position.y = 0.2;
-  g.add(slab);
+  const body = new THREE.Mesh(
+    cachedGeo('plank:body', () => atlasUV(roundedBox(3, 0.4, 1, 0.12, 0.05).clone(), CELL.FULL)),
+    toonMap(`plank:${color}`, plankTexture(color)),
+  );
+  body.position.y = 0.2;
+  const brass = toonC(0xd9a53a, 0x6a4a10, 0.3);
+  const rivets = new THREE.Mesh(
+    cachedGeo('plank:rivets', () => mergeGeometries([-1.2, -0.4, 0.4, 1.2].map((x) => new THREE.SphereGeometry(0.04, 6, 4).translate(x, 0, 0.5)))!),
+    brass,
+  );
+  rivets.position.y = 0.2;
+  const key = new THREE.Mesh(
+    cachedGeo('plank:key', () =>
+      mergeGeometries([new THREE.TorusGeometry(0.12, 0.035, 6, 12).translate(1.72, 0, 0), new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).rotateZ(Math.PI / 2).translate(1.6, 0, 0)])!,
+    ),
+    brass,
+  );
+  key.position.y = 0.2;
+  let lastX = Number.NaN;
+  onDraw(key, () => {
+    const x = g.position.x;
+    if (!Number.isNaN(lastX)) key.rotation.x += Math.abs(x - lastX) * 6;
+    lastX = x;
+  });
+  const tassels = new THREE.Mesh(
+    cachedGeo('plank:tassels', () => mergeGeometries([-1.2, -0.6, 0, 0.6, 1.2].map((x) => new THREE.ConeGeometry(0.06, 0.16, 5).rotateX(Math.PI).translate(x, -0.08, 0.2)))!),
+    toonC(shade(color, 0.7)),
+  );
+  g.add(body, rivets, key, tassels);
   return g;
 }
 
-/** A wall of fog that rolls across the level. Origin at its leading edge. */
+/** Tileable cotton wool: soft pale blobs on a mostly opaque base. */
+function cottonTexture(): THREE.Texture {
+  return softTexture('fog:cotton', 64, 64, (c) => {
+    c.fillStyle = 'rgba(220,226,238,0.86)';
+    c.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 12; i++) {
+      const x = (i * 23) % 64;
+      const y = (i * 37) % 64;
+      const r = 8 + ((i * 7) % 9);
+      for (const [dx, dy] of [[0, 0], [64, 0], [-64, 0], [0, 64], [0, -64]]) {
+        const grad = c.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
+        grad.addColorStop(0, 'rgba(240,244,250,0.95)');
+        grad.addColorStop(1, 'rgba(240,244,250,0)');
+        c.fillStyle = grad;
+        c.fillRect(x + dx - r, y + dy - r, 2 * r, 2 * r);
+      }
+    }
+  });
+}
+
+/** Opaque on the left, fading out from u 0.75 with a scalloped (sine-shifted) leading edge. */
+function fogEdgeAlpha(): THREE.Texture {
+  return softTexture('fog:edge', 64, 64, (c) => {
+    const img = c.createImageData(64, 64);
+    for (let y = 0; y < 64; y++) {
+      const shift = 4 * Math.sin((y / 64) * Math.PI * 4);
+      for (let x = 0; x < 64; x++) {
+        const k = Math.min(1, Math.max(0, (x - 48 - shift) / (16 - 4)));
+        const v = Math.round(255 * (1 - k * k * (3 - 2 * k)));
+        const o = (y * 64 + x) * 4;
+        img.data[o] = img.data[o + 1] = img.data[o + 2] = v;
+        img.data[o + 3] = 255;
+      }
+    }
+    c.putImageData(img, 0, 0);
+  });
+}
+
+/** "Cotton-wool front": three drifting layers of fog, origin at the leading edge. */
 export function makeFogWall(): THREE.Group {
   const g = new THREE.Group();
-  const tex = canvasTexture(64, (c, s) => {
-    const grad = c.createLinearGradient(0, 0, s, 0);
-    grad.addColorStop(0, 'rgba(225,230,240,0.95)');
-    grad.addColorStop(0.75, 'rgba(225,230,240,0.7)');
-    grad.addColorStop(1, 'rgba(225,230,240,0)');
-    c.fillStyle = grad;
-    c.fillRect(0, 0, s, s);
-  });
-  tex.magFilter = THREE.LinearFilter;
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
-  plane.position.set(-20, 7, 1.2);
-  g.add(plane);
+  const noise = cottonTexture();
+  const edge = fogEdgeAlpha();
+  const layers: [number, number, number, number, number, number][] = [
+    [40, 30, -20, 1.2, 0xffffff, 0.02],
+    [38, 28, -19, 0.4, 0xffffff, 0.035],
+    [36, 26, -18, -2, 0xa8acc0, 0.05],
+  ];
+  for (const [w, h, x, z, color, speed] of layers) {
+    const map = noise.clone();
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(4, 3);
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map, alphaMap: edge, color, transparent: true, depthWrite: false }),
+    );
+    plane.position.set(x, 7, z);
+    onDraw(plane, (t) => (map.offset.x = t * speed));
+    g.add(plane);
+  }
+  g.add(fogPages());
   return g;
 }
 
-/** A built block (Artifacts): a glowing slab. Origin at its base center. */
+/** Six letter pages tumbling inside the fog, half veiled by its front layer. */
+function fogPages(): THREE.InstancedMesh {
+  const tex = softTexture('fog:page', 32, 32, (c) => {
+    c.fillStyle = '#f4efe2';
+    c.fillRect(0, 0, 32, 32);
+    c.fillStyle = 'rgba(70,70,90,0.5)';
+    c.fillRect(5, 5, 12, 2);
+    for (const y of [11, 16, 21, 26]) c.fillRect(5, y, 22, 1.5);
+  });
+  const pages = new THREE.InstancedMesh(
+    cachedGeo('fog:page', () => new THREE.PlaneGeometry(0.5, 0.65)),
+    cachedMat('fog:page', () => new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })),
+    6,
+  );
+  pages.frustumCulled = false;
+  pages.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const p = new THREE.Vector3();
+  const one = new THREE.Vector3(1, 1, 1);
+  onDraw(pages, (t) => {
+    const k = prefs.reduceMotion ? 0.3 : 1;
+    for (let i = 0; i < 6; i++) {
+      const u = (0.05 * t * k + i / 6) % 1;
+      p.set(-12 + 11 * u, 2 + ((i * 5) % 11) + 0.6 * Math.sin(1.1 * t * k + i), 0.8);
+      q.setFromEuler(e.set(0.3 * Math.sin(t * k + i), 2.1 * t * k + i, 1.3 * t * k + 2 * i));
+      pages.setMatrixAt(i, m.compose(p, q, one));
+    }
+    pages.instanceMatrix.needsUpdate = true;
+  });
+  return pages;
+}
+
+/**
+ * An artifact panel's material: its face is a title bar with three dots, two code lines and a soft ink
+ * border, repeated along the block. Cached per colour and width.
+ */
+function panelMat(color: number, w: number): THREE.MeshToonMaterial {
+  return cachedMat(`panel:${color}:${w}`, () => {
+    const tex = softTexture(`panel:${color}`, 128, 32, (c) => {
+      c.fillStyle = css(color);
+      c.fillRect(0, 0, 128, 32);
+      c.fillStyle = css(shade(color, 0.75));
+      c.fillRect(0, 0, 128, 10);
+      c.fillStyle = '#fff4d6';
+      for (const x of [8, 16, 24]) {
+        c.beginPath();
+        c.arc(x, 5, 2.2, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.fillStyle = css(shade(color, 1.25));
+      c.fillRect(8, 15, 70, 3);
+      c.fillRect(8, 23, 44, 3);
+      c.strokeStyle = 'rgba(29,20,36,0.5)';
+      c.lineWidth = 2;
+      c.strokeRect(1, 1, 126, 30);
+    }).clone();
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.x = Math.max(1, Math.round(w / 2));
+    return new THREE.MeshToonMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 0.3, map: shared(tex), gradientMap: RAMP });
+  });
+}
+
+/** "Artifact panel": a built block (Artifacts), origin at its base centre. It scans in when it appears. */
 export function makeBuiltBlock(w: number, color: number): THREE.Group {
   const g = new THREE.Group();
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, 1), lambert(color, color));
-  slab.position.y = 0.2;
-  g.add(slab);
+  const body = new THREE.Mesh(cachedGeo(`panel:${w}`, () => atlasUV(roundedBox(w, 0.4, 1, 0.08, 0.04).clone(), CELL.FULL)), panelMat(color, w));
+  body.position.y = 0.2;
+  introOnDraw(body, 0.16, (k) => (body.scale.x = 0.05 + 0.95 * easeOutBack(k)));
+  g.add(body);
   return g;
 }
 
-/** An em dash platform: a long flat bar. */
+/** "Typeset em dash": a warm white bar that drops in and lands with a squash. */
 export function makeEmDash(w: number): THREE.Group {
   const g = new THREE.Group();
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.22, 0.5), lambert(0xf4f4f4, 0x404040));
+  const tex = softTexture('emdash', 64, 16, (c) => {
+    c.fillStyle = '#fff6e6';
+    c.fillRect(0, 0, 64, 16);
+    c.fillStyle = 'rgba(255,255,255,0.7)';
+    c.fillRect(0, 3, 64, 3);
+    c.fillStyle = 'rgba(29,20,36,0.7)';
+    c.fillRect(0, 0, 64, 2);
+    c.fillRect(0, 14, 64, 2);
+  });
+  const bar = new THREE.Mesh(cachedGeo(`emdash:${w}`, () => atlasUV(roundedBox(w, 0.22, 0.5, 0.1, 0.04).clone(), CELL.FULL)), toonMap('emdash', tex));
   bar.position.y = 0.19;
+  introOnDraw(bar, 0.25, (_k, age) => {
+    if (age < 0.15) {
+      const k = age / 0.15;
+      bar.position.y = 0.19 + 0.4 * (1 - k) * (1 - k);
+      bar.scale.y = 1;
+    } else {
+      const sy = 0.8 + 0.2 * Math.min(1, (age - 0.15) / 0.1);
+      bar.scale.y = sy;
+      bar.position.y = 0.08 + 0.11 * sy;
+    }
+  });
   g.add(bar);
-  const label = labelSprite('—', '#111', 'rgba(255,255,255,0.0)');
-  label.scale.multiplyScalar(0.5);
-  label.position.y = 0.6;
-  g.add(label);
   return g;
 }
 
-/** A Golden Gate bridge span in International Orange, with towers at both ends. */
+function bridgeGeo(w: number): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [new THREE.BoxGeometry(w, 0.3, 1).translate(0, 0.2, 0)];
+  const tx = w / 2 - 0.2;
+  for (const x of [-tx, tx]) {
+    parts.push(
+      new THREE.BoxGeometry(0.28, 1.2, 0.28).translate(x, 0.95, -0.35),
+      new THREE.BoxGeometry(0.22, 1.0, 0.22).translate(x, 2.05, -0.35),
+      new THREE.BoxGeometry(0.16, 0.6, 0.16).translate(x, 2.85, -0.35),
+    );
+  }
+  const cableY = (x: number) => 0.9 + 1.9 * ((2 * x) / (2 * tx)) ** 2;
+  const pts = Array.from({ length: 24 }, (_, i) => {
+    const x = -tx + (2 * tx * i) / 23;
+    return new THREE.Vector3(x, cableY(x), -0.35);
+  });
+  parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.04, 4));
+  for (let x = -tx + 0.5; x < tx - 0.25; x += 0.5) {
+    const h = cableY(x) - 0.35;
+    if (h > 0.05) parts.push(new THREE.BoxGeometry(0.03, h, 0.03).translate(x, 0.35 + h / 2, -0.35));
+  }
+  return mergeGeometries(parts)!;
+}
+
+/** "Kit-built Golden Gate" in International Orange: one mesh, one draw. It extends as it appears. */
 export function makeBridge(w: number): THREE.Group {
   const g = new THREE.Group();
-  const orange = lambert(0xc0362c, 0x401008);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, 1), orange);
-  deck.position.y = 0.2;
-  g.add(deck);
-  for (const x of [-w / 2 + 0.2, w / 2 - 0.2]) {
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.6, 0.25), orange);
-    tower.position.set(x, 1.3, -0.35);
-    g.add(tower);
-  }
-  const cable = new THREE.Mesh(new THREE.TorusGeometry(w / 2 - 0.2, 0.04, 4, 24, Math.PI), orange);
-  cable.rotation.z = Math.PI;
-  cable.scale.y = 2.2 / Math.max(1, w / 2 - 0.2);
-  cable.position.set(0, 2.6, -0.35);
-  g.add(cable);
+  const bridge = new THREE.Mesh(cachedGeo(`bridge:${w}`, () => bridgeGeo(w)), toonC(0xc0362c, 0x401008, 0.35));
+  introOnDraw(bridge, 0.4, (k) => (bridge.scale.x = 0.2 + 0.8 * easeOutBack(k)));
+  g.add(bridge);
   return g;
 }
 
-/** Falling particles (confetti for the Sora spectacle, snow for Winter Laziness). */
+/** Falling particles (confetti for the Sora spectacle, snow for Winter Laziness): felt pom-poms. */
 export function makeParticles(n: number, colors: number[], size: number): THREE.Points {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
@@ -476,27 +596,114 @@ export function makeParticles(n: number, colors: number[], size: number): THREE.
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false }));
+  const pts = new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({ size, map: fxTexture('puff'), alphaTest: 0.4, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false }),
+  );
   pts.frustumCulled = false;
   pts.userData.base = pos.slice();
   return pts;
 }
 
-/** A floating label above the player (Q*: the power-up that is only a rumor). */
+/**
+ * "Rumor bubble" above the player (Q*: the power-up that is only a rumor): a thought cloud with a
+ * dashed outline, because dashed means unconfirmed.
+ */
 export function makeAura(text: string, color: string): THREE.Sprite {
-  const s = labelSprite(text, color, 'rgba(20,0,40,0.45)');
-  s.scale.multiplyScalar(0.5);
-  return s;
+  const font = '600 28px system-ui, sans-serif';
+  const probe = document.createElement('canvas').getContext('2d')!;
+  probe.font = font;
+  const W = Math.ceil(probe.measureText(text).width) + 40;
+  const tex = paintTexture(W, 64, (c) => {
+    const [x0, x1, yT, yB] = [16, W - 16, 12, 44];
+    const mid = (yT + yB) / 2;
+    const bumps = Math.max(2, Math.round((x1 - x0) / 26));
+    const step = (x1 - x0) / bumps;
+    c.beginPath();
+    c.moveTo(x0, yB);
+    c.arc(x0, mid, (yB - yT) / 2, Math.PI / 2, (3 * Math.PI) / 2);
+    for (let i = 0; i < bumps; i++) c.quadraticCurveTo(x0 + step * (i + 0.5), yT - 11, x0 + step * (i + 1), yT);
+    c.arc(x1, mid, (yB - yT) / 2, -Math.PI / 2, Math.PI / 2);
+    for (let i = bumps; i > 0; i--) c.quadraticCurveTo(x0 + step * (i - 0.5), yB + 9, x0 + step * (i - 1), yB);
+    c.closePath();
+    c.fillStyle = 'rgba(20,0,40,0.55)';
+    c.fill();
+    c.setLineDash([6, 5]);
+    c.lineWidth = 3;
+    c.strokeStyle = color;
+    c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = 'rgba(20,0,40,0.55)';
+    for (const [x, y, r] of [[12, 54, 5], [5, 61, 3]]) {
+      c.beginPath();
+      c.arc(x, y, r, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+    }
+    c.font = font;
+    c.fillStyle = color;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, W / 2, mid + 1);
+  });
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
+  sprite.scale.set((W / 64) * 0.5, 0.5, 1);
+  return sprite;
 }
 
-/** A pressure plate on the floor: glows when something stands on it. */
+/** A keyhole: a round top over a flared slot, centred on its circle. */
+function keyholeGeo(x: number): THREE.BufferGeometry {
+  const s = new THREE.Shape();
+  s.moveTo(-0.012, 0);
+  s.lineTo(-0.022, -0.05);
+  s.lineTo(0.022, -0.05);
+  s.lineTo(0.012, 0);
+  s.absarc(0, 0.01, 0.025, -0.3, Math.PI + 0.3, false);
+  s.closePath();
+  return new THREE.ShapeGeometry(s, 8).translate(x, 0.07, 0.49);
+}
+
+/**
+ * "Two-key arcade button": a dark housing, two keyholes on the lip and a domed amber pad that glows
+ * when pressed. 'pad' keeps a new toon material per call: Puzzles writes its emissive.
+ */
 export function makePlate(): THREE.Group {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.08, 0.96), lambert(0x3a3a44));
-  base.position.y = 0.04;
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.06, 0.76), lambert(0xffc040, 0x000000));
+  const housing = new THREE.Mesh(roundedBox(0.96, 0.12, 0.96, 0.06, 0.03), toonC(0x2a2a34));
+  housing.position.y = 0.06;
+  const keys = new THREE.Mesh(cachedGeo('plate:keys', () => mergeGeometries([keyholeGeo(-0.25), keyholeGeo(0.25)])!), cachedMat('ink', () => basic(INK)));
+  const padMat = toon(0xffc040);
+  const pad = new THREE.Mesh(cachedGeo('plate:pad', () => lathe([[0, 0], [0.34, 0], [0.33, 0.05], [0.25, 0.09], [0, 0.1]], 20)), padMat);
   pad.name = 'pad';
   pad.position.y = 0.1;
-  g.add(base, pad);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xffc040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glow = new THREE.Mesh(cachedGeo('plate:glow', () => new THREE.RingGeometry(0.34, 0.44, 24).rotateX(-Math.PI / 2)), glowMat);
+  glow.position.y = 0.121;
+  onDraw(glow, () => (glowMat.opacity = padMat.emissive.r > 0 ? 0.6 : 0));
+  g.add(housing, keys, pad, glow);
   return g;
+}
+
+/** Every prop, for the `?debug&gallery=props` lineup. */
+export function propGallery(): { name: string; mesh: THREE.Object3D }[] {
+  const flag = makeFlag('GPT-2 · 2019', 3.2);
+  const stamp = flag.getObjectByName('stamp')!;
+  stamp.visible = true;
+  flag.getObjectByName('flag')!.position.y = 2;
+  flag.position.y = -1;
+  const fog = makeFogWall();
+  fog.scale.setScalar(0.08);
+  fog.position.set(1.4, -0.4, 0);
+  return [
+    { name: 'flag', mesh: flag },
+    { name: 'cloud', mesh: makeCloud(0xffffff) },
+    { name: 'plank', mesh: makeMovingPlatform(0xc98a4b) },
+    { name: 'built block', mesh: makeBuiltBlock(3, 0xd97757) },
+    { name: 'em dash', mesh: makeEmDash(3) },
+    { name: 'bridge', mesh: makeBridge(4) },
+    { name: 'plate', mesh: makePlate() },
+    { name: 'rumor', mesh: makeAura('Q* ?', '#e8d8ff') },
+    { name: 'fog', mesh: fog },
+    { name: 'confetti', mesh: makeParticles(40, [0xffd166, 0xef476f, 0x06d6a0], 0.25) },
+  ];
 }
