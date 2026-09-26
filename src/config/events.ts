@@ -1,3 +1,4 @@
+import type { CharacterId } from './characters';
 import { fact, tip, type FactLine } from './types';
 
 /**
@@ -8,7 +9,7 @@ import { fact, tip, type FactLine } from './types';
  * The engine reads these; it never hardcodes history.
  */
 
-export type StormId = 'boardCrisis' | 'pauseLetter';
+export type StormId = 'boardCrisis' | 'pauseLetter' | 'deepseek' | 'settlement';
 
 export interface StormSpec {
   id: StormId;
@@ -25,6 +26,8 @@ export interface StormSpec {
   heartsDone?: string;
   /** A fog wall that rolls in from the left and slows anyone it catches. */
   fog?: { speed: number; slow: number; start: number };
+  /** A friendly rival races you to the flag; beat it for a bonus life. */
+  race?: { rival: CharacterId; tag: string; speed: number; win: string; lose: string };
 }
 
 export const STORMS: Record<StormId, StormSpec> = {
@@ -41,6 +44,21 @@ export const STORMS: Record<StormId, StormSpec> = {
     id: 'pauseLetter',
     name: 'The Pause Letter',
     fog: { speed: 3.4, slow: 0.55, start: -14 },
+  },
+  deepseek: {
+    id: 'deepseek',
+    name: 'The DeepSeek Moment',
+    race: {
+      rival: 'deepseek',
+      tag: 'DeepSeek-R1',
+      speed: 7.2,
+      win: 'You beat the efficient rival to the flag! +1 life.',
+      lose: 'DeepSeek-R1 got there first, on less compute. Good race, friend.',
+    },
+  },
+  settlement: {
+    id: 'settlement',
+    name: 'The Settlement',
   },
 };
 

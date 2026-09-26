@@ -78,7 +78,9 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
   Laziness), `moment` (what `!` blocks release: Golden Gate Claude), `y` praise coins, and `oneUp: 'tibo'`
   for Tibo Reset 1-Ups. Every Moment that happens in a level adds its fact to the outro card.
   Built so far: em dash trail, Tibo Reset (+1 life, banked resets, more likely after 3 deaths),
-  Winter Laziness, Golden Gate Claude, the Glazing, #keep4o, Code Red, and "nothing without its people".
+  Winter Laziness (GPT 4-2), Golden Gate Claude (Claude 4-2), the Glazing (GPT 5-3), #keep4o (GPT 5-4),
+  Code Red, "nothing without its people" (GPT 3-3), and the puzzles: strawberry (GPT 5-1), the Naming
+  Maze (GPT 5-3), Chart Crime (GPT 5-4) and Claude Plays Pokémon's cave (Claude 5-2).
 - Two are **recurring gags** rather than one-offs: the Tibo Reset (a 1-Up block that shows up
   more often after you die a lot) and the Em Dash trail (a persistent gag until the fix unlocks).
 - Puzzles (the Strawberry count, the Naming Maze, Chart Crime) are bonus rooms built from normal tiles.

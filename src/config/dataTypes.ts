@@ -9,6 +9,7 @@ export type DataTypeId =
   | 'reasoning'
   | 'tools'
   | 'agentic'
+  | 'audio'
   | 'shadow';
 
 export interface DataType {
@@ -30,6 +31,7 @@ export const DATA_TYPES: Record<DataTypeId, DataType> = {
   reasoning: { id: 'reasoning', label: 'Reasoning', color: 0xb07cff, glyph: '∴' },
   tools: { id: 'tools', label: 'Tool use', color: 0x1fd1b0, glyph: 'fn' },
   agentic: { id: 'agentic', label: 'Agent tasks', color: 0xff6b4a, glyph: '▶' },
+  audio: { id: 'audio', label: 'Audio', color: 0xd7a6ff, glyph: '♪' },
   shadow: { id: 'shadow', label: 'Shadow library', color: 0x8a8a9a, glyph: '☠' },
 };
 

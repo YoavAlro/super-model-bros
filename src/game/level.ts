@@ -86,6 +86,7 @@ export const TOKEN_CHARS: Record<string, DataTypeId> = {
   t: 'reasoning',
   u: 'tools',
   a: 'agentic',
+  m: 'audio',
   s: 'shadow',
 };
 

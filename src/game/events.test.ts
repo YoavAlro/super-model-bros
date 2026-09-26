@@ -59,9 +59,10 @@ describe('event placement', () => {
     for (const l of ALL_LEVELS) {
       const grid = new LevelGrid(l.map);
       const blocks = [...grid.contents.values()];
-      expect(blocks.includes('hype'), `${l.id}: $ block vs hype`).toBe(!!l.hype);
+      const hypeBlocks = blocks.filter((b) => b === 'hype').length;
+      expect(hypeBlocks, `${l.id}: one $ block per hype`).toBe(l.hypes?.length ?? 0);
       expect(blocks.includes('moment'), `${l.id}: ! block vs moment`).toBe(!!l.moment);
-      if (l.hype) expect(HYPES[l.hype], l.id).toBeDefined();
+      for (const h of l.hypes ?? []) expect(HYPES[h], `${l.id}: ${h}`).toBeDefined();
       if (l.moment) expect(MOMENTS[l.moment], l.id).toBeDefined();
       for (const m of l.moments ?? []) expect(MOMENTS[m], `${l.id}: ${m}`).toBeDefined();
       if (l.storm) expect(STORMS[l.storm], l.id).toBeDefined();
@@ -71,8 +72,44 @@ describe('event placement', () => {
 
   it('uses each hype at most once per path', () => {
     for (const path of ['gpt', 'claude']) {
-      const hypes = ALL_LEVELS.filter((l) => l.id.startsWith(path) && l.hype).map((l) => l.hype);
+      const hypes = ALL_LEVELS.filter((l) => l.id.startsWith(path)).flatMap((l) => l.hypes ?? []);
       expect(new Set(hypes).size, path).toBe(hypes.length);
     }
+  });
+});
+
+describe('puzzle rules', async () => {
+  const { enterInOrder, letterCount, tokenCount } = await import('./puzzleRules');
+
+  it('counts three R’s in letters but two in tokens', () => {
+    expect(letterCount('STRAWBERRY', 'R')).toBe(3);
+    expect(tokenCount(['STR', 'AW', 'BERRY'], 'R')).toBe(2);
+  });
+
+  it('checks the Naming Maze release order, with same-day releases in either order', () => {
+    const steps = [
+      { label: 'o1', order: 1 },
+      { label: 'o2', order: null },
+      { label: 'GPT-4.5', order: 2 },
+      { label: 'GPT-4.1', order: 3 },
+      { label: 'o3', order: 4 },
+      { label: 'o4-mini', order: 4 },
+    ];
+    const done = new Set<string>();
+    expect(enterInOrder(steps, done, 'o2')).toBe('sealed');
+    expect(enterInOrder(steps, done, 'o1')).toBe('ok');
+    expect(enterInOrder(steps, done, 'o1')).toBe('repeat');
+    expect(enterInOrder(steps, done, 'GPT-4.1')).toBe('wrong');
+    expect(done.size).toBe(0);
+    for (const l of ['o1', 'GPT-4.5', 'GPT-4.1', 'o4-mini']) expect(enterInOrder(steps, done, l)).toBe('ok');
+    expect(enterInOrder(steps, done, 'o3')).toBe('solved');
+  });
+
+  it('ships the maze in the real release order', () => {
+    const lvl = ALL_LEVELS.find((l) => l.puzzle?.kind === 'namingMaze')!;
+    const pipes = (lvl.puzzle as { pipes: Record<string, { label: string; order: number | null }> }).pipes;
+    const byLabel = Object.fromEntries(Object.values(pipes).map((p) => [p.label, p.order]));
+    // o1 (Dec 2024) < GPT-4.5 (Feb 27, 2025) < GPT-4.1 (Apr 14, 2025) < o3 = o4-mini (Apr 16, 2025); o2 skipped.
+    expect(byLabel).toEqual({ o1: 1, 'GPT-4.5': 2, 'GPT-4.1': 3, o3: 4, 'o4-mini': 4, o2: null });
   });
 });

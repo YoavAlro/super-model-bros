@@ -44,6 +44,8 @@ export class PlayerActor {
   brain: ((self: PlayerActor, owner: Pad) => Pad) | null = null;
   /** Clones that vanish when their hype power-up ends. */
   hypeClone = false;
+  /** In levels with three model sizes: 0 small and quick, 1 regular, 2 large and strong. */
+  sizeMode = 1;
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
   private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
@@ -97,6 +99,17 @@ export class PlayerActor {
     this.body.h = BIG_H;
   }
 
+  /** Switch model size (Claude 3 Haiku / Sonnet / Opus). */
+  setSize(mode: number): void {
+    this.sizeMode = mode;
+    if (mode === 0 && this.big) {
+      this.big = false;
+      this.body.h = SMALL_H;
+    } else if (mode === 2) {
+      this.grow();
+    }
+  }
+
   givePower(power: HeldPower): void {
     this.grow();
     this.power = power;
@@ -121,7 +134,13 @@ export class PlayerActor {
   hurt(): boolean {
     if (this.invulnerable > 0 || this.star > 0 || this.dead || this.finished) return true;
     if (this.clone) return false;
-    if (this.power) {
+    if (this.ability?.sizes && this.sizeMode === 2) {
+      // The largest model shrinks back to the regular size instead of dying.
+      this.sizeMode = 1;
+      this.big = false;
+      this.body.h = SMALL_H;
+      this.setForm(this.ability.sizes[1]);
+    } else if (this.power) {
       this.power = null;
     } else if (this.big) {
       this.big = false;
@@ -165,11 +184,13 @@ export class PlayerActor {
     const s = this.spec;
     const a = this.ability ?? {};
     const boost = this.boost;
-    const speed = boost.speed ?? 1;
+    const sized = a.sizes ? [1.15, 1, 0.9][this.sizeMode] : 1;
+    const sizedJump = a.sizes ? [1.05, 1, 0.97][this.sizeMode] : 1;
+    const speed = (boost.speed ?? 1) * sized;
     return {
       walkSpeed: s.walkSpeed * speed,
       runSpeed: s.runSpeed * speed,
-      jumpVelocity: s.jumpVelocity * (a.jump ?? 1),
+      jumpVelocity: s.jumpVelocity * (a.jump ?? 1) * sizedJump,
       gravity: s.gravity,
       fallGravity: s.fallGravity * (a.float ?? 1),
       glide: this.power === 'cape' ? 0.28 : (boost.glide ?? (this.perks.has('glide') ? 0.6 : undefined)),

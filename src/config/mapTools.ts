@@ -21,3 +21,13 @@ export const flat = (n: number): string[] => ['#'.repeat(n), '#'.repeat(n)];
 
 /** A pit `n` tiles wide. */
 export const pit = (n: number): string[] => [' '.repeat(n), ' '.repeat(n)];
+
+/**
+ * Fills token placeholders in a shared chunk: `Q`, `V` and `Y` become this level's token letters,
+ * so one chunk can carry Tool tokens in one level and Reasoning tokens in another.
+ */
+export function fill(chunk: string[], tokens: { Q: string; V?: string; Y?: string }): string[] {
+  return chunk.map((row) =>
+    row.replace(/Q/g, tokens.Q).replace(/V/g, tokens.V ?? tokens.Q).replace(/Y/g, tokens.Y ?? tokens.V ?? tokens.Q),
+  );
+}

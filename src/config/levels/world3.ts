@@ -133,7 +133,7 @@ export const WORLD_3: LevelSpec[] = [
     power: 'viral',
     boss: 'danSydney',
     timeline: 'backlash',
-    hype: 'autogpt',
+    hypes: ['autogpt'],
     moments: ['emDash'],
     ability: { vision: true },
     intro: {
@@ -211,7 +211,7 @@ export const WORLD_3: LevelSpec[] = [
     blockToken: 'feedback',
     power: 'viral',
     storm: 'boardCrisis',
-    hype: 'qstar',
+    hypes: ['qstar'],
     intro: {
       title: 'Storm · Five Days in November',
       date: 'Nov 17–22, 2023 · OpenAI board crisis',
@@ -382,7 +382,7 @@ export const WORLD_3: LevelSpec[] = [
     blockToken: 'books',
     power: 'viral',
     timeline: 'hype',
-    hype: 'autogpt',
+    hypes: ['autogpt'],
     ability: { float: 0.8 },
     intro: {
       title: 'World 3-2 · 100K Skies',

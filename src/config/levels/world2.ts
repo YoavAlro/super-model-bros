@@ -251,6 +251,7 @@ export const WORLD_2: LevelSpec[] = [
         fact("Anthropic's Constitutional AI method trains a model to critique and revise its own answers using a written list of principles: a constitution.", 'constitutionalAi'),
         tip('Collect pink Principles and gold Human Feedback in equal measure: in the paper, helpfulness came from human feedback and harmlessness from principle-guided AI feedback.'),
         tip('Gold RLHF stars make you invincible and raise your Alignment. Reward orbs look like tokens, but they drain it.'),
+        tip('Grey ☠ tokens are shadow-library books: free to grab, but not free of consequences.'),
       ],
     },
     outro: {
@@ -307,7 +308,7 @@ export const WORLD_2: LevelSpec[] = [
         '#######      #######    ######',
       ],
       [
-        '                                  ',
+        '                 sss              ',
         '                  PP              ',
         '     n f n f      PP     r        ',
         '                  PP    nff       ',

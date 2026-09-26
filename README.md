@@ -5,10 +5,11 @@ AI history: the tokens you collect are the real training data, each flag shows a
 and the bosses are the real dangers AI labs faced.
 
 **Two paths.** The GPT path starts as an untrained Transformer in 2017; the Claude path starts when
-Anthropic is founded in 2021. Worlds 1–3 are playable: pre-training; alignment (Codex, InstructGPT,
-Constitutional AI, Claude 1) with the RLHF star and the Reward Hacker; and Viral Skies (ChatGPT, GPT-4,
-Claude 2 and 2.1) with the viral star, the Timeline cloud, the DAN & Sydney twin boss, and two storm levels.
-Solo, or co-op on one keyboard.
+Anthropic is founded in 2021. Worlds 1–5 are playable: pre-training; alignment (RLHF star, Reward Hacker);
+Viral Skies (viral star, the Timeline, DAN & Sydney, storm levels); Tool Pipes (tool flower, injection
+piranhas, Claude 3's three sizes); and the Reasoning Ghost House (reasoning cape, hallucination ghosts,
+the Hallucination King, and puzzles like "how many R's in strawberry?"). Hype power-ups ask you to call
+them "passing hype" or "lasting shift". Solo, or co-op on one keyboard.
 
 - Design: [GAME_DESIGN.md](GAME_DESIGN.md)
 - Goal and done-conditions: [GOAL.md](GOAL.md)

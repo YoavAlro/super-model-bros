@@ -25,8 +25,9 @@ A glowing hype block (`$` in a map, `hype` on the level) releases a timed power-
 **"Hype or shift?"** card asks you to call it, then gives history's verdict. **Lasting** hypes leave a
 permanent upgrade for the rest of the run (whatever you called); **passing** ones evaporate and leave a
 short hangover (a slowdown). The recap scores your calls. Config: `HYPES` in `src/config/events.ts`;
-rules: `src/game/hype.ts`. Built: all twelve effects below; placed so far: AutoGPT (GPT 3-2, Claude 3-2),
-Q* (GPT 3-3), the rest with their worlds.
+rules: `src/game/hype.ts`. Placed: AutoGPT (GPT 3-2, Claude 3-2), Q* (GPT 3-3), GPT Store (GPT 4-2),
+Sora and AI gadgets (GPT 4-3), AI gadgets (Claude 4-1), Artifacts (Claude 4-2), MCP (Claude 4-3), reasoning models
+(GPT 5-1, Claude 5-2), vibe coding (GPT 5-3, Claude 5-2), Ghibli images (GPT 5-3); Moltbook and agent teams in World 6.
 
 | Lasting hype | Upgrade it leaves |
 |---|---|
@@ -61,9 +62,9 @@ Auto-scrolling or hazard levels pinned to real incidents. Surviving one earns a 
 | Mar 31–Apr 28, 2023 | Italy temporarily bans ChatGPT | Part of the level closes; reroute | G | ✅ |
 | Mar 2023 | "Pause giant AI experiments" open letter **built** (Claude 3-1) | Slow fog | B | ✅ |
 | Nov 17–22, 2023 | OpenAI board crisis **built** (GPT 3-3) | Five auto-scrolling "days"; the ground shifts each day; heart tokens end it early | G | ✅ |
-| Dec 2023 | NYT copyright lawsuit | Copyright-lawyer gauntlet | G | ✅ |
-| Jan 2025 | DeepSeek R1 shock | Speed-run against a cheap rival | B | ✅ |
-| Sep 2025 | Authors' lawsuit settlement (~$1.5B) | Triggered if the Claude path grabbed "shadow library" books earlier | C | ✅ |
+| Dec 2023 | NYT copyright lawsuit **built** (in GPT 4-2) | Copyright claims throw briefs; fact on the outro | G | ✅ |
+| Jan 2025 | DeepSeek R1 shock **built** (GPT 5-2, Claude 5-1) | Speed-run against a cheap rival | B | ✅ |
+| Sep 2025 | Authors' lawsuit settlement (~$1.5B) **built** (Claude 5-4) | Triggered if the Claude path grabbed "shadow library" books earlier (in 2-1) | C | ✅ |
 | Jan–Feb 2026 | Agent security exposure (OpenClaw) | Your forks go rogue | B | 🔎 |
 | Feb–Aug 2026 | Pentagon "supply chain risk" dispute | A closed region; hold your red lines; a court later rules the label unlawful | C | 🔎 |
 | Jun 12–Jul 1, 2026 | Export-control suspension of Fable 5 / Mythos 5 | Your newest power-up is frozen | C | 🔎 |

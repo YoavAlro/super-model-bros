@@ -79,7 +79,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 
 | Path | What it is |
 |---|---|
-| `src/config/levels/world*.ts` | Levels: ASCII map (stitched from chunks), theme, the recipe, sourced intro/outro cards |
+| `src/config/levels/world*.ts`, `chunks.ts` | Levels: ASCII map (stitched from chunks, with token placeholders), theme, the recipe, sourced intro/outro cards |
 | `src/config/levelSpec.ts` | The `LevelSpec` type and the map legend |
 | `src/config/paths.ts` | The GPT and Claude paths: which levels, in order (steps can be conditional) |
 | `src/config/events.ts` | Storms, hype power-ups (effect, verdict, perk, sourced verdict card) and Moments (toast + sourced fact) |
@@ -93,7 +93,8 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/Campaign.ts` | A run through a path: cards, saves, unlocks, world breaks |
 | `src/game/Stage.ts` | One level: fixed-step loop, camera, collisions, powers, bosses |
 | `src/game/Player.ts`, `Enemies.ts`, `Bosses.ts`, `Items.ts`, `Platforms.ts` | Actors (platforms are rideable actors: moving platforms, Timeline clouds) |
-| `src/game/storm.ts` | Pure storm rules (unit tested) |
+| `src/game/storm.ts`, `puzzleRules.ts` | Pure storm and puzzle rules (unit tested) |
+| `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
 | `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape |
@@ -109,7 +110,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M2 ✅ | World 2: Alignment Hills | Codex, InstructGPT; Claude joins; RLHF star; Reward Hacker boss; Claude's own path begins |
 | M3 ✅ | World 3: Viral Skies | ChatGPT launch; the Timeline (Lakitu-style) cloud; DAN & Sydney twin boss; board-crisis storm level (GPT) and pause-letter fog storm (Claude) |
 | M4 ✅ | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
-| M5 | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
+| M5 ✅ | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
 | M6 | Worlds 6–7 | Swarm Factory (double cherry = fork agents, Rogue Swarm boss); Frontier Castle (Paperclip Maximizer) → Astra / Opus 5.5 finales and recap |
 | M7 | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits; kart races between worlds |
 | M8 | Polish | Music, accessibility, performance, a fact-verification pass over every 🔎 |

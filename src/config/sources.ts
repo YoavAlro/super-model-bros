@@ -175,4 +175,61 @@ export const SOURCES: Record<string, Source> = {
     url: 'https://techcrunch.com/2025/02/25/anthropics-claude-ai-is-playing-pokemon-on-twitch-slowly',
   },
   projectVend: { title: 'Project Vend: Can Claude run a small shop?', publisher: 'Anthropic', url: 'https://www.anthropic.com/research/project-vend-1' },
+
+  // World 4: tools
+  plugins: { title: 'ChatGPT plugins', publisher: 'OpenAI', url: 'https://openai.com/index/chatgpt-plugins/' },
+  functionCalling: { title: 'Function calling and other API updates', publisher: 'OpenAI', url: 'https://openai.com/index/function-calling-and-other-api-updates/' },
+  devday: {
+    title: 'New models and developer products announced at DevDay',
+    publisher: 'OpenAI',
+    url: 'https://openai.com/index/new-models-and-developer-products-announced-at-devday/',
+  },
+  gpt4o: { title: 'Hello GPT-4o', publisher: 'OpenAI', url: 'https://openai.com/index/hello-gpt-4o/' },
+  promptInjection: { title: 'Prompt injection attacks against GPT-3', publisher: 'Simon Willison', url: 'https://simonwillison.net/2022/Sep/12/prompt-injection/' },
+  indirectInjection: {
+    title: 'Not what you’ve signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection',
+    publisher: 'arXiv (Greshake et al.)',
+    url: 'https://arxiv.org/abs/2302.12173',
+  },
+  nytLawsuit: {
+    title: 'New York Times sues Microsoft, ChatGPT maker OpenAI over copyright infringement',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2023/12/27/new-york-times-sues-microsoft-chatgpt-maker-openai-over-copyright-infringement.html',
+  },
+  claude3: { title: 'Introducing the next generation of Claude', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-3-family' },
+  computerUse: {
+    title: 'Introducing computer use, a new Claude 3.5 Sonnet, and Claude 3.5 Haiku',
+    publisher: 'Anthropic',
+    url: 'https://www.anthropic.com/news/3-5-models-and-computer-use',
+  },
+
+  // World 5: reasoning
+  hallucinate: { title: 'Why language models hallucinate', publisher: 'OpenAI', url: 'https://openai.com/index/why-language-models-hallucinate/' },
+  hallucinationSurvey: { title: 'Survey of Hallucination in Natural Language Generation', publisher: 'arXiv (Ji et al.)', url: 'https://arxiv.org/abs/2202.03629' },
+  deepseekR1: { title: 'DeepSeek-R1 Release', publisher: 'DeepSeek API Docs', url: 'https://api-docs.deepseek.com/news/news250120/' },
+  nvidiaDrop: {
+    title: 'Nvidia sheds almost $600 billion in market cap, biggest drop ever',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2025/01/27/nvidia-sheds-almost-600-billion-in-market-cap-biggest-drop-ever.html',
+  },
+  o3o4: { title: 'Introducing OpenAI o3 and o4-mini', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-o3-and-o4-mini/' },
+  gpt5: { title: 'Introducing GPT-5', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-gpt-5/' },
+  claude37: { title: 'Claude 3.7 Sonnet and Claude Code', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-3-7-sonnet' },
+  claude4: { title: 'Introducing Claude 4', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-4' },
+  sonnet45: { title: 'Introducing Claude Sonnet 4.5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-sonnet-4-5' },
+  bartzOrder: {
+    title: 'Bartz v. Anthropic: order on fair use (N.D. Cal., June 23, 2025)',
+    publisher: 'Copyright Alliance (court document)',
+    url: 'https://copyrightalliance.org/wp-content/uploads/2025/06/Bartz-v.-Anthropic-Order.pdf',
+  },
+  settlementPrelim: {
+    title: 'Judge gives preliminary OK to $1.5B settlement with authors',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2025/09/25/judge-anthropic-case-preliminary-ok-to-1point5b-settlement-with-authors.html',
+  },
+  settlementFinal: {
+    title: 'Anthropic’s landmark $1.5B copyright settlement is approved',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2026/07/20/anthropics-landmark-1-5b-copyright-settlement-is-approved/',
+  },
 };

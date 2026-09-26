@@ -15,6 +15,19 @@ export type SetPiece =
   /** Toggle blocks swap every `period` seconds ("at capacity": platforms freeze and unfreeze). */
   | { kind: 'toggles'; period: number; toast?: string };
 
+/**
+ * Bonus puzzles built from marks (digits) in the map. Solving one opens the level's gates (`D`).
+ * - strawberry: mark `1` sits above the first of ten `X` letter blocks spelling the word.
+ * - namingMaze: marks sit on the tile above each pipe's top (on the pipe's left column).
+ * - chartCrime: marks sit above each bar (a two-wide pillar of `X`); stomp the bar that lies.
+ * - cave: stepping onto a `7` sends you back to the `8`, until you find the way through.
+ */
+export type PuzzleSpec =
+  | { kind: 'strawberry'; word: string; tokens: string[]; letter: string }
+  | { kind: 'namingMaze'; pipes: Record<string, { label: string; order: number | null }> }
+  | { kind: 'chartCrime'; bars: Record<string, { label: string; lies?: boolean; fixedHeight?: number }> }
+  | { kind: 'cave' };
+
 /** Abilities that come with the model you are in this level (your "form"). */
 export interface FormAbility {
   /** Sees and stands on hidden blocks (vision, multimodal). */
@@ -53,8 +66,9 @@ export interface LevelSpec {
   setPieces?: SetPiece[];
   /** The Timeline's mood: hype (hot takes) or backlash (the red cloud). */
   timeline?: 'hype' | 'backlash';
-  /** What `$` blocks release. */
-  hype?: HypeId;
+  /** What `$` blocks release, in order (one hype per block). */
+  hypes?: HypeId[];
+  puzzle?: PuzzleSpec;
   /** What `!` blocks release (a Moment item, like Golden Gate Claude). */
   moment?: MomentId;
   /** Moments that shape the whole level (the em dash trail, Code Red, #keep4o...). */
@@ -76,7 +90,7 @@ export interface LevelSpec {
    * Enemies: `e` Spambot, `j` Jailbreaker, `g` hallucination ghost, `p` injection piranha, `r` reward orb,
    * `l` copyright lawyer, `z` rate limit, `y` praise coin.
    * Tokens: `o` Books, `w` Web, `k` Wikipedia, `c` Code, `f` Human Feedback, `n` Principles, `v` Images,
-   * `t` Reasoning, `u` Tool use, `a` Agent tasks, `s` Shadow library.
+   * `t` Reasoning, `u` Tool use, `a` Agent tasks, `m` Audio, `s` Shadow library.
    * Digits are level-specific markers.
    * Physics: a standing jump clears about 4 tiles, and a 4-tall wall needs a running jump.
    */

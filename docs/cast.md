@@ -30,12 +30,12 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | Enemy | Analog | Represents | Behavior |
 |---|---|---|---|
 | **Spambot** ✅ | Goomba | Junk web text | Walks and turns at walls; stomp it |
-| **Hallucination ghost** | Boo | Hallucinations | Creeps closer only while you look away, just as hallucinations appear when you stop checking |
+| **Hallucination ghost** ✅ | Boo | Hallucinations | Creeps closer only while you look away, just as hallucinations appear when you stop checking |
 | **Jailbreaker** ✅ | Koopa | Jailbreak prompts | Stomp it into its shell, then kick the shell |
-| **Injection piranha** | Piranha Plant | Prompt injection | Hides in tool pipes |
+| **Injection piranha** ✅ | Piranha Plant | Prompt injection | Hides in tool pipes |
 | **The Timeline** ✅ | Lakitu | X/Twitter hot takes | A cloud that drops spiky takes; ride it once it's beaten |
 | **Rate limit** | Thwomp | Usage limits | Crushes you; the Tibo Reset stops it |
-| **Copyright lawyer** | Hammer Bro | Copyright lawsuits | Throws briefs in arcs |
+| **Copyright lawyer** ✅ | Hammer Bro | Copyright lawsuits | A walking briefcase ("copyright claim") that throws briefs in arcs |
 | **Reward orb** ✅ | Coin trap | Reward hacking | Looks like a token but drains Alignment |
 
 ## Power-ups
@@ -44,9 +44,9 @@ Traits are affectionate nods to each model's real reputation, never digs.
 |---|---|---|
 | **Tokens** ✅ | Coins | The training data. The mix sets your history stars. |
 | **Scale crystal** ✅ | Mushroom | Grow bigger (more parameters) and break bricks |
-| **Tool flower** | Fire Flower | Shoot function calls |
+| **Tool flower** ✅ | Fire Flower | Shoot function calls |
 | **Viral star** ✅ | Star | Invincibility, like the ChatGPT launch |
-| **Reasoning cape** | Cape | Glide slowly; hold to "think" and see hidden paths |
+| **Reasoning cape** ✅ | Cape | Glide slowly; hold to "think" and see hidden paths |
 | **Fork cherry** | Double Cherry | Clone into agents that copy your moves |
 | **Tibo Reset** | 1-Up | An extra life and cleared rate limits; bank up to 3 |
 | **Distill mushroom** | Mini mushroom | Shrink into a mini model (Haiku, 4o-mini): fit through small gaps |
@@ -60,7 +60,7 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | 1 | **Garbage In** ✅ | Unfiltered web data | Giant Spambot: charges, leaps (screen shake), spawns junk. Three stomps. |
 | 2 | **Reward Hacker** ✅ | Reward hacking | Collects fake reward orbs to heal; make it chase the real objective |
 | 3 | **DAN & Sydney** ✅ | The DAN jailbreak (2023) and the Bing "Sydney" transcripts | Twin boss. Based on "The Waluigi Effect", a real alignment idea: train for X and anti-X gets easier to elicit. |
-| 4 | **Injection Piranha** | Prompt injection | Spits hidden instructions out of the pipes |
-| 5 | **The Hallucination King** | Confident falsehoods | Only visible in Think mode |
+| 4 | **Injection Piranha** ✅ | Prompt injection | Spits hidden instructions out of the pipes |
+| 5 | **The Hallucination King** ✅ | Confident falsehoods | Only visible in Think mode |
 | 6 | **The Rogue Swarm** | Runaway agents | Many small copies; defeat the orchestrator |
 | 7 | **The Paperclip Maximizer** | The classic AI-safety thought experiment | The final castle. A thought experiment, not a company. |

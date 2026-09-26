@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { BossId } from '../config/levelSpec';
 import type { StageCtx } from './ctx';
-import { HotTake, Spambot } from './Enemies';
+import { Brief, HallucinationGhost, HotTake, Spambot } from './Enemies';
+import { T } from './level';
 import { Trap } from './Items';
-import { labelSprite, makeDan, makeRewardHacker, makeShield, makeSpambot, makeSydney } from './meshes';
+import { labelSprite, makeDan, makeGhostKing, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
 
 /**
@@ -372,6 +373,189 @@ class SydneyBoss extends TwinBoss {
   }
 }
 
+/**
+ * World 4: the Injection Piranha. It hides in the arena's pipes, pops out of one, and spits hidden
+ * instructions at you. Hit it while it is out: stomp its head or call functions at it.
+ */
+class InjectionPiranhaBoss extends Boss {
+  readonly mesh: THREE.Group;
+  readonly name = 'Injection Piranha';
+  readonly intro = 'The Injection Piranha! It hides in the pipes. Hit it when it pops out.';
+  private pipes: { x: number; top: number }[] = [];
+  private pipeIndex = 0;
+  private phase: 'hidden' | 'rise' | 'out' | 'sink' = 'hidden';
+  private t = 0;
+  private spit = 0;
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x, y, 1.6, 2.2, 4, scene);
+    this.mesh = makePiranha(2.2);
+    this.addLabel('INJECTION PIRANHA', '#ffe0e8', 'rgba(90,0,30,0.65)');
+    scene.add(this.mesh);
+  }
+
+  vulnerable(): boolean {
+    return super.vulnerable() && this.phase === 'out';
+  }
+
+  harmful(): boolean {
+    return super.harmful() && this.phase !== 'hidden';
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    if (!this.pipes.length) this.findPipes(ctx);
+    const pipe = this.pipes[this.pipeIndex % this.pipes.length];
+    if (!pipe) return false;
+    const rage = this.maxHp - this.hp;
+    b.x = pipe.x + 1 - b.w / 2;
+    const outY = pipe.top;
+    const inY = pipe.top - b.h - 0.2;
+    this.t += dt;
+    if (this.phase === 'hidden') {
+      b.y = inY;
+      if (this.t > 1.2 - rage * 0.15) this.go('rise');
+    } else if (this.phase === 'rise') {
+      b.y = Math.min(outY, b.y + 5 * dt);
+      if (b.y >= outY) this.go('out');
+    } else if (this.phase === 'out') {
+      b.y = outY;
+      this.spit -= dt;
+      if (this.spit <= 0) {
+        this.spit = 0.9 - rage * 0.12;
+        const lead = ctx.lead();
+        const toward = lead ? Math.sign(lead.body.x - b.x) || -1 : -1;
+        ctx.addEnemy(new Brief(b.x + b.w / 2, b.y + b.h, toward * (3.5 + ctx.rng() * 3), 10 + ctx.rng() * 3, ctx.scene, makeScroll()));
+      }
+      if (this.t > 2.6) this.go('sink');
+    } else {
+      b.y = Math.max(inY, b.y - 5 * dt);
+      if (b.y <= inY) {
+        this.go('hidden');
+        // Hop to another pipe, in a fixed, seeded order.
+        this.pipeIndex += 1 + Math.floor(ctx.rng() * (this.pipes.length - 1));
+      }
+    }
+    return false;
+  }
+
+  protected onHit(ctx: StageCtx): void {
+    if (this.alive) {
+      ctx.toast(`Injection blocked! ${this.hp} more to go.`, 'good');
+      this.go('sink');
+    }
+  }
+
+  private go(phase: InjectionPiranhaBoss['phase']): void {
+    this.phase = phase;
+    this.t = 0;
+  }
+
+  /** The arena's pipes: every two-wide pipe top near the boss's spawn. */
+  private findPipes(ctx: StageCtx): void {
+    const g = ctx.grid;
+    const x0 = Math.floor(this.body.x);
+    for (let x = Math.max(0, x0 - 16); x < Math.min(g.width - 1, x0 + 12); x++) {
+      for (let y = 0; y < g.height - 1; y++) {
+        if (g.get(x, y) === T.PIPE && g.get(x + 1, y) === T.PIPE && g.get(x, y + 1) === T.EMPTY && g.get(x - 1, y) !== T.PIPE) {
+          this.pipes.push({ x, top: y + 1 });
+        }
+      }
+    }
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.y = 0;
+    this.mesh.rotation.z = this.alive ? Math.sin(t * 5) * 0.08 : t * 4;
+    const jaw = this.mesh.getObjectByName('jaw');
+    if (jaw) jaw.rotation.x = Math.abs(Math.sin(t * 7)) * 0.6;
+    this.label.visible = this.alive && this.phase !== 'hidden';
+  }
+}
+
+/**
+ * World 5: the Hallucination King. A confident falsehood: nearly invisible until you think
+ * (hold the power button with the reasoning cape), and only hittable while seen.
+ */
+class HallucinationKing extends Boss {
+  readonly mesh: THREE.Group;
+  readonly name = 'The Hallucination King';
+  readonly intro = 'The Hallucination King! You can only see it, and hit it, while you think (hold the power button with the cape).';
+  private seen = false;
+  private spawnTimer = 4;
+  private readonly home: { x: number; y: number };
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x, y + 1.5, 2.4, 2.4, 3, scene);
+    this.home = { x, y: y + 1.5 };
+    this.mesh = makeGhostKing();
+    this.addLabel('THE HALLUCINATION KING', '#f0e8ff', 'rgba(40,0,80,0.6)');
+    scene.add(this.mesh);
+  }
+
+  vulnerable(): boolean {
+    return super.vulnerable() && this.seen;
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    this.seen = ctx.players().some((p) => p.thinking || p.spec.traitKind === 'seeHidden' || !!p.ability?.vision);
+    const lead = ctx.lead();
+    if (lead) {
+      const dx = lead.body.x + lead.body.w / 2 - (b.x + b.w / 2);
+      const dy = lead.body.y + 0.6 - b.y;
+      const d = Math.hypot(dx, dy) || 1;
+      // Like its ghosts it creeps closer when unwatched, and drifts when seen.
+      const speed = this.seen ? 0.8 : 1.9 + (this.maxHp - this.hp) * 0.5;
+      b.x += (dx / d) * speed * dt;
+      b.y = Math.max(this.home.y - 1.5, Math.min(this.home.y + 3, b.y + (dy / d) * speed * dt));
+      this.dir = Math.sign(dx) || this.dir;
+    }
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0) {
+      this.spawnTimer = 5;
+      if (ctx.enemies().filter((e) => e instanceof HallucinationGhost && e.alive).length < 3) {
+        const g = new HallucinationGhost(b.x, b.y + b.h, ctx.scene, 1.8);
+        g.active = true;
+        ctx.addEnemy(g);
+      }
+    }
+    return false;
+  }
+
+  protected onHit(ctx: StageCtx): void {
+    if (!this.alive) return;
+    ctx.toast(`Fact-checked! ${this.hp} more to go.`, 'good');
+    // It vanishes and reappears on the other side of the arena.
+    this.body.x = ctx.camLeft + (this.body.x > (ctx.camLeft + ctx.camRight) / 2 ? 2 : ctx.camRight - ctx.camLeft - 5);
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.z = this.alive ? Math.sin(t * 2) * 0.06 : t * 4;
+    const alpha = !this.alive ? 0.6 : this.seen ? 0.9 : 0.12;
+    this.mesh.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+      if (m && 'opacity' in m) {
+        m.transparent = true;
+        m.opacity = alpha;
+      }
+    });
+    this.label.visible = this.alive && this.seen;
+  }
+}
+
 /** Builds the boss (or bosses) a level's `G` spawns. */
 export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scene): Boss[] {
   switch (id) {
@@ -379,6 +563,10 @@ export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scen
       return [new GarbageBoss(x, y, scene)];
     case 'rewardHacker':
       return [new RewardHacker(x, y, scene)];
+    case 'injectionPiranha':
+      return [new InjectionPiranhaBoss(x, y, scene)];
+    case 'hallucinationKing':
+      return [new HallucinationKing(x, y, scene)];
     case 'danSydney': {
       const dan = new DanBoss(x, y, scene);
       const sydney = new SydneyBoss(x - 6, y, scene);

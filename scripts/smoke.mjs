@@ -41,7 +41,7 @@ async function waitFor(page, fn, arg, timeout = 30000, every = 250) {
 
 /** Plays one level from its intro card to its outro card. */
 async function completeLevel(page, id, tag) {
-  await page.goto(`${BASE}?debug&level=${id}`);
+  await page.goto(`${BASE}?debug&level=${id}&flags=shadowBooks`);
   const intro = await waitFor(page, () => window.__smb?.card?.());
   if (!intro) throw new Error(`${id}: no intro card`);
   await page.screenshot({ path: `${OUT}/${tag}-${id}-intro.png` });
@@ -59,7 +59,10 @@ async function completeLevel(page, id, tag) {
     await page.keyboard.up('ArrowRight');
     if (!done) throw new Error(`${id}: never reached the flag`);
   } else {
-    // Boss level: fly to the arena, then stomp every boss until the level clears.
+    // Boss level: fly to the arena, then stomp every boss until the level clears. Holding the
+    // power button with the cape keeps the player thinking, which reveals the Hallucination King.
+    await page.evaluate(() => window.__smb.give('cape'));
+    await page.keyboard.down('KeyS');
     const t0 = Date.now();
     while (Date.now() - t0 < 90000) {
       const state = await page.evaluate(() => window.__smb.state());
@@ -72,6 +75,7 @@ async function completeLevel(page, id, tag) {
       await page.evaluate(() => window.__smb.stomp());
       await sleep(700);
     }
+    await page.keyboard.up('KeyS');
     await page.screenshot({ path: `${OUT}/${tag}-${id}-boss.png` });
   }
   const outro = await waitFor(page, () => window.__smb.card(), null, 20000);

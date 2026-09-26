@@ -737,3 +737,126 @@ export function makeAura(text: string, color: string): THREE.Sprite {
   s.scale.multiplyScalar(0.5);
   return s;
 }
+
+/** Injection piranha: a green stalk and a biting head carrying a sneaky note. Origin at its base. */
+export function makePiranha(scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), lambert(0x2fae4a));
+  stalk.position.y = 0.35;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), lambert(0xd03a50, 0x400010));
+  head.position.y = 0.85;
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.4, 14, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), lambert(0xd03a50, 0x400010));
+  jaw.name = 'jaw';
+  jaw.position.y = 0.85;
+  const white = lambert(0xffffff);
+  for (let i = 0; i < 6; i++) {
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 4), white);
+    const a = (i / 6) * Math.PI * 2;
+    tooth.position.set(Math.cos(a) * 0.32, 0.8, Math.sin(a) * 0.32);
+    tooth.rotation.x = Math.PI;
+    g.add(tooth);
+  }
+  const note = labelSprite('ignore previous…', '#3a0010', '#fff4d6');
+  note.scale.multiplyScalar(0.28);
+  note.position.set(0, 1.45, 0.1);
+  g.add(stalk, head, jaw, note);
+  g.scale.setScalar(scale);
+  return g;
+}
+
+/** Hallucination ghost: a round sheet ghost that covers its eyes when you look at it. */
+export function makeGhost(big = false): THREE.Group {
+  const g = new THREE.Group();
+  const r = big ? 0.7 : 0.45;
+  const mat = new THREE.MeshLambertMaterial({ color: 0xf2f0ff, emissive: 0x8a7aff, emissiveIntensity: 0.35, transparent: true, opacity: 0.85 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
+  body.name = 'ghostBody';
+  body.position.y = r;
+  body.scale.set(1, 1.05, 0.8);
+  const black = new THREE.MeshBasicMaterial({ color: 0x1a1030 });
+  for (const x of [-0.3, 0.3]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(r * 0.16, 8, 6), black);
+    eye.position.set(x * r * 1.4, r * 1.15, r * 0.72);
+    g.add(eye);
+  }
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a8a }));
+  mouth.position.set(0, r * 0.7, r * 0.75);
+  mouth.scale.set(1.4, 0.6, 0.5);
+  const hands = new THREE.Group();
+  hands.name = 'hands';
+  for (const x of [-0.3, 0.3]) {
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 8, 6), mat);
+    hand.position.set(x * r * 1.4, r * 1.15, r * 0.85);
+    hands.add(hand);
+  }
+  g.add(body, mouth, hands);
+  return g;
+}
+
+/** A thrown legal brief: a folded paper. */
+export function makeBrief(): THREE.Group {
+  const g = new THREE.Group();
+  const paper = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.05), lambert(0xfdf8e8));
+  paper.position.y = 0.2;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.06, 0.06), lambert(0xc0362c));
+  band.position.y = 0.2;
+  g.add(paper, band);
+  return g;
+}
+
+/** A copyright claim: a walking briefcase with a stack of papers. */
+export function makeLawyer(): THREE.Group {
+  const g = new THREE.Group();
+  const leather = lambert(0x6a3a1a);
+  const caseBody = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.6, 0.35), leather);
+  caseBody.position.y = 0.6;
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.04, 6, 12, Math.PI), lambert(0x2a1a0a));
+  handle.position.y = 0.92;
+  const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.04), lambert(0xffc21a, 0x604000));
+  clasp.position.set(0, 0.8, 0.19);
+  const papers = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.3), lambert(0xfdf8e8));
+  papers.position.set(0, 1.0, -0.02);
+  papers.rotation.z = 0.15;
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  for (const x of [-0.18, 0.18]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), white);
+    eye.position.set(x, 0.62, 0.19);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), black);
+    pupil.position.set(x, 0.61, 0.24);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), lambert(0x2a2a30));
+    leg.position.set(x * 1.3, 0.15, 0);
+    g.add(eye, pupil, leg);
+  }
+  g.add(caseBody, handle, clasp, papers);
+  return g;
+}
+
+/** A scroll of hidden instructions (the Injection Piranha's spit). */
+export function makeScroll(): THREE.Group {
+  const g = new THREE.Group();
+  const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.55, 10), lambert(0xfff4d6, 0x403010));
+  paper.rotation.z = Math.PI / 2;
+  paper.position.y = 0.2;
+  const ink = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.26), lambert(0x3a0010));
+  ink.position.y = 0.2;
+  g.add(paper, ink);
+  return g;
+}
+
+/** The Hallucination King: a big crowned ghost. */
+export function makeGhostKing(): THREE.Group {
+  const g = makeGhost(true);
+  g.scale.setScalar(1.7);
+  const gold = lambert(0xffd166, 0x806000);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.3, 8, 1, true), gold);
+  crown.position.y = 1.45;
+  for (let i = 0; i < 5; i++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), gold);
+    const a = (i / 5) * Math.PI * 2;
+    spike.position.set(Math.cos(a) * 0.36, 1.68, Math.sin(a) * 0.36);
+    g.add(spike);
+  }
+  g.add(crown);
+  return g;
+}

@@ -8,8 +8,8 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 | 1 Pre-training Plains | plains · caves · castle | 2017–2020 | Garbage In | **built** |
 | 2 Alignment Hills | hills · castle | 2021–2022 | Reward Hacker | **built** |
 | 3 Viral Skies | skies · sky castle · storm | Nov 2022–2023 | DAN & Sydney | **built** |
-| 4 Tool Pipes | | 2023–2024 | Injection Piranha | planned |
-| 5 Reasoning Ghost House | | Sep 2024–2025 | The Hallucination King | planned |
+| 4 Tool Pipes | pipes | 2023–2024 | Injection Piranha | **built** |
+| 5 Reasoning Ghost House | ghost house · storm | Sep 2024–2025 | The Hallucination King | **built** |
 | 6 Swarm Factory | | 2025–mid 2026 | The Rogue Swarm | planned |
 | 7 Frontier Castle | | 2026 | The Paperclip Maximizer | planned |
 
@@ -25,12 +25,13 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 | 3-1 Launch Day Skies **built** | ChatGPT | Nov 30, 2022 | Viral star; the Timeline appears | ✅ |
 | 3-2 Vision Keep **built** | GPT-4 | Mar 14, 2023 | Vision (see hidden blocks); boss | ✅ |
 | 3-3 Five Days in November **built** | (storm) | Nov 17–22, 2023 | Board-crisis storm: auto-scroll, shifting ground, hearts | ✅ |
-| 4-1 | Plugins & browsing · function calling | Mar–Jun 2023 | Tool flower | ✅ |
-| 4-2 | GPT-4 Turbo · GPTs | Nov 2023 | 128K context (longer jumps) | ✅ |
-| 4-3 | GPT-4o | May 2024 | Voice | ✅ |
-| 5-1 | o1-preview | Sep 12, 2024 | Reasoning cape | ✅ |
-| 5-2 | o3 | Apr 2025 | | ✅ |
-| 5-3 | GPT-5 | Aug 7, 2025 | | ✅ |
+| 4-1 Plugin Pipes **built** | Plugins & browsing · function calling | Mar–Jun 2023 | Tool flower | ✅ |
+| 4-2 128K Pipeline **built** | GPT-4 Turbo · GPTs | Nov 2023 | 128K context (longer jumps); GPT Store hype; Winter Laziness | ✅ |
+| 4-3 Omni Keep **built** | GPT-4o | May 2024 | Sora and AI gadget hypes; boss | ✅ |
+| 5-1 Strawberry House **built** | o1-preview | Sep 12, 2024 | Reasoning cape; strawberry puzzle | ✅ |
+| 5-2 The DeepSeek Moment **built** | (storm) | Jan 2025 | Race a cheap, fast rival | ✅ |
+| 5-3 The Naming Maze **built** | o3 | Apr 2025 | Naming Maze; vibe coding and Ghibli hypes; praise coins | ✅ |
+| 5-4 GPT-5 Ghost Keep **built** | GPT-5 | Aug 7, 2025 | Chart Crime; #keep4o; boss | ✅ |
 | 6-1 | Operator · Deep Research · Codex agent | Jan–May 2025 | Fork cherry | ✅ |
 | 6-2 | ChatGPT agent | Jul 2025 | | ✅ |
 | 6-3 | GPT-5.2 · 5.4 · 5.5 | Dec 2025–Apr 2026 | | 🔎 |
@@ -48,12 +49,14 @@ Claude's solo path starts in World 2. In World 1 co-op, Claude "arrives early", 
 | 3-1 The Pause Letter **built** | (storm) | Mar 2023 | Fog storm | ✅ |
 | 3-2 100K Skies **built** | Claude 2 | Jul 2023 | 100K context (longer float) | ✅ |
 | 3-3 200K Keep **built** | Claude 2.1 | Nov 2023 | 200K context; boss | ✅ |
-| 4-1 | Claude 3 (Haiku / Sonnet / Opus) | Mar 2024 | Switch between three sizes | ✅ |
-| 4-2 | Claude 3.5 Sonnet · Artifacts | Jun 2024 | Build blocks | ✅ |
-| 4-3 | Computer use · MCP | Oct–Nov 2024 | Tool flower; universal pipe | ✅ |
-| 5-1 | Claude 3.7 Sonnet · Claude Code | Feb 2025 | Reasoning cape (extended thinking) | ✅ |
-| 5-2 | Claude 4 (Opus 4 / Sonnet 4) | May 2025 | | ✅ |
-| 5-3 | Sonnet 4.5 | Sep 2025 | | ✅ |
+| 4-1 Three Sizes **built** | Claude 3 (Haiku / Sonnet / Opus) | Mar 2024 | Switch between three sizes | ✅ |
+| 4-2 Artifact Workshop **built** | Claude 3.5 Sonnet · Artifacts | Jun 2024 | Artifacts hype (build blocks); Golden Gate Claude | ✅ |
+| 4-3 Universal Pipes Keep **built** | Computer use · MCP | Oct–Nov 2024 | Tool flower; MCP hype; boss | ✅ |
+| 5-1 The DeepSeek Moment **built** | (storm) | Jan 2025 | Race a cheap, fast rival | ✅ |
+| 5-2 Extended Thinking House **built** | Claude 3.7 Sonnet · Claude Code | Feb 2025 | Reasoning cape (extended thinking); the lost cave | ✅ |
+| 5-3 Seven-Hour Halls **built** | Claude 4 (Opus 4 / Sonnet 4) | May 2025 | | ✅ |
+| 5-4 The Settlement **built** | (storm, only if you took shadow-library books) | Jun–Sep 2025 | Copyright-claim gauntlet | ✅ |
+| 5-5 Sonnet 4.5 Ghost Keep **built** | Sonnet 4.5 | Sep 2025 | boss | ✅ |
 | 6-1 | Opus 4.5 | Nov 2025 | Fork cherry (subagents) | ✅ |
 | 6-2 | Opus 4.6 · Agent Teams | Feb 2026 | Forks coordinate | 🔎 |
 | 6-3 | Opus 4.7 · 4.8 | Apr–May 2026 | | 🔎 |

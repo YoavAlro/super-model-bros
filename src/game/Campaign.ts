@@ -23,6 +23,8 @@ export interface CampaignOptions {
   onExit: () => void;
   /** Debug: jump straight to this level id on the chosen path. */
   startLevel?: string;
+  /** Debug: run flags to start with (e.g. shadowBooks). */
+  flags?: string[];
 }
 
 /** Plays a path: intro card, level, outro card, save, unlocks, world breaks, and the ending. */
@@ -50,6 +52,7 @@ export class Campaign {
       const i = this.path.steps.findIndex((s) => s.level === opts.startLevel);
       if (i >= 0) this.run.step = i;
     }
+    for (const f of opts.flags ?? []) if (!this.run.flags.includes(f)) this.run.flags.push(f);
     save.runs[choice.path] = this.run;
     this.lives = save.settings.assist ? ASSIST_LIVES : START_LIVES;
     setMuted(!save.settings.sfx);
@@ -238,7 +241,7 @@ export class Campaign {
         const api = this.stage?.debug() as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {

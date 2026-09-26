@@ -11,13 +11,14 @@ import type { Hud } from '../ui/Hud';
 import { createBosses, type Boss } from './Bosses';
 import type { StageCtx } from './ctx';
 import { dietHint, dietMatch, emptyCounts, historyStars, total, type Counts } from './diet';
-import { Enemy, Jailbreaker, Spambot, Timeline } from './Enemies';
+import { Enemy, HallucinationGhost, InjectionPiranha, Jailbreaker, Lawyer, Spambot, Timeline } from './Enemies';
 import type { Input } from './Input';
 import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } from './Items';
 import { LevelGrid, T } from './level';
 import { LevelView } from './LevelView';
 import { HANGOVER_SPEED, bankReset, codeRedPar, judgeHype, tiboDue, type HypeCallValue } from './hype';
-import { makeAura, makeBridge, makeBuiltBlock, makeCrowd, makeEmDash, makeFlag, makeFogWall, makeGhost4o, makeHelper, makeParticles } from './meshes';
+import { labelSprite, makeAura, makeBridge, makeBuiltBlock, makeCharacter, makeCrowd, makeEmDash, makeFlag, makeFogWall, makeGhost4o, makeHelper, makeParticles } from './meshes';
+import { createPuzzle, type Puzzle } from './Puzzles';
 import type { Pad } from './pad';
 import { bumpedTile, forTilesUnder, overlaps, type Body } from './physics';
 import { emptyPad } from './pad';
@@ -113,6 +114,7 @@ export class Stage implements StageCtx {
   private toggleTimer = 0;
 
   private hype: ActiveHype | null = null;
+  private hypeBlocks = 0;
   private readonly hypeCalls: StageResult['hypes'] = [];
   private readonly perksEarned: string[] = [];
   private hangover = 0;
@@ -129,6 +131,8 @@ export class Stage implements StageCtx {
   private confetti: THREE.Points | null = null;
   private snow: THREE.Points | null = null;
   private yawn = 0;
+  private puzzle: Puzzle | null = null;
+  private rival: { mesh: THREE.Group; x: number; done: boolean } | null = null;
 
   private state: State = 'intro';
   lives: number;
@@ -246,6 +250,7 @@ export class Stage implements StageCtx {
     this.toggleTimer = 0;
     this.trail.length = 0;
     this.hype = null;
+    this.hypeBlocks = 0;
     this.hangover = 0;
     this.emDashes = [];
     this.goldenGate = 0;
@@ -274,6 +279,9 @@ export class Stage implements StageCtx {
     for (const s of this.grid.spawns) {
       if (s.kind === 'spambot') this.enemyList.push(new Spambot(s.x, s.y, this.scene));
       else if (s.kind === 'jailbreaker') this.enemyList.push(new Jailbreaker(s.x, s.y, this.scene));
+      else if (s.kind === 'piranha') this.enemyList.push(new InjectionPiranha(s.x, s.y, this.scene, (s.x % 3) * 0.7));
+      else if (s.kind === 'ghost') this.enemyList.push(new HallucinationGhost(s.x, s.y, this.scene));
+      else if (s.kind === 'lawyer') this.enemyList.push(new Lawyer(s.x, s.y, this.scene));
       else if (s.kind === 'timeline') this.enemyList.push(new Timeline(s.x, s.y, this.scene, mood));
       else if (s.kind === 'token' && s.token) this.tokens.push(new Token(s.token, s.x, s.y, this.scene));
       else if (s.kind === 'rewardOrb') this.trapList.push(new Trap('rewardOrb', s.x, s.y, this.scene));
@@ -294,6 +302,25 @@ export class Stage implements StageCtx {
       }
     }
 
+    this.puzzle = createPuzzle(spec.puzzle, {
+      grid: this.grid,
+      view: this.view,
+      scene: this.scene,
+      toast: (m, k) => this.hud.toast(m, k),
+      happen: (id) => this.happen(id),
+      players: () => this.players(),
+    });
+    this.rival = null;
+    if (this.storm?.race) {
+      const r = CHARACTERS[this.storm.race.rival];
+      const mesh = makeCharacter(r.color, r.accent);
+      const tag = labelSprite(this.storm.race.tag, '#ffffff', 'rgba(20,40,120,0.6)');
+      tag.scale.multiplyScalar(0.42);
+      tag.position.y = 1.5;
+      mesh.add(tag);
+      this.scene.add(mesh);
+      this.rival = { mesh, x: spawn.x - 1, done: false };
+    }
     if (this.storm?.fog) {
       this.fogX = this.storm.fog.start;
       this.fogWall = makeFogWall();
@@ -422,7 +449,10 @@ export class Stage implements StageCtx {
       if (ev) {
         const bumped = bumpedTile(p.body, ev.hits);
         if (bumped) this.hitBlock(bumped.tx, bumped.ty, p);
-        if (ev.landed) this.springOffPipe(p);
+        if (ev.landed) {
+          this.springOffPipe(p);
+          this.puzzle?.onLand(p, Math.floor(p.body.x + p.body.w / 2), Math.floor(p.body.y - 0.05));
+        }
         if (ev.jumped && !p.clone) this.dropEmDash(p);
       }
       if (p.dead) continue;
@@ -447,6 +477,8 @@ export class Stage implements StageCtx {
     this.updateSight();
     this.stepHype(dt);
     this.stepMoments(dt);
+    this.puzzle?.step(dt);
+    this.stepRival(dt);
 
     for (const e of this.enemyList) {
       if (!e.active && e.body.x < camRight + 2) e.active = true;
@@ -573,6 +605,16 @@ export class Stage implements StageCtx {
       sfx.bump();
       return;
     }
+    const sizes = p.ability?.sizes;
+    if (sizes && !p.power && !p.clone) {
+      const mode = (p.sizeMode + 1) % 3;
+      p.setSize(mode);
+      p.setForm(sizes[mode]);
+      p.cooldown = 0.3;
+      sfx.powerup();
+      this.once('sizes', `${sizes[mode]}! Small models are quick, large ones are strong (and break bricks).`, 'good');
+      return;
+    }
     if (p.power === 'tool') {
       if (this.shots.filter((s) => s.owner === p && s.shot.alive).length >= 2) return;
       const b = p.body;
@@ -597,6 +639,7 @@ export class Stage implements StageCtx {
   }
 
   private hitBlock(tx: number, ty: number, p: PlayerActor): void {
+    if (this.puzzle?.onBump(tx, ty)) return;
     const tile = this.grid.get(tx, ty);
     if (tile === T.QUESTION) {
       this.grid.set(tx, ty, T.USED);
@@ -606,7 +649,11 @@ export class Stage implements StageCtx {
       if (content === 'scale') this.items.push(new PowerItem('scale', tx, ty + 1, this.scene));
       else if (content === 'power') this.items.push(new PowerItem(this.powerItem(), tx, ty + 1, this.scene));
       else if (content === 'oneup') this.items.push(new PowerItem('oneup', tx, ty + 1, this.scene));
-      else if (content === 'hype' && spec.hype) this.items.push(new PowerItem('hype', tx, ty + 1, this.scene, spec.hype, HYPES[spec.hype].color));
+      else if (content === 'hype' && spec.hypes?.length) {
+        // Each $ block releases the next hype on the level's list.
+        const id = spec.hypes[Math.min(this.hypeBlocks++, spec.hypes.length - 1)];
+        this.items.push(new PowerItem('hype', tx, ty + 1, this.scene, id, HYPES[id].color));
+      }
       else if (content === 'moment' && spec.moment) this.items.push(new PowerItem('moment', tx, ty + 1, this.scene, spec.moment, 0xc0362c));
       else if (spec.oneUp === 'tibo' && tiboDue(this.deaths, this.tiboGiven)) {
         // Die a lot, and a Tibo Reset shows up.
@@ -1022,6 +1069,29 @@ export class Stage implements StageCtx {
     }
   }
 
+  /** The race rival runs at a steady pace, floating over gaps: efficient and cheap. */
+  private stepRival(dt: number): void {
+    const r = this.rival;
+    const race = this.storm?.race;
+    if (!r || !race || r.done || this.state !== 'playing') return;
+    const goal = this.flag ? this.flag.x - 0.6 : this.grid.width;
+    r.x = Math.min(goal, r.x + race.speed * dt);
+    let ground = 0;
+    const tx = Math.floor(r.x);
+    for (let y = this.grid.height - 1; y >= 0; y--) {
+      if (this.grid.isSolid(tx, y)) {
+        ground = y + 1;
+        break;
+      }
+    }
+    r.mesh.position.set(r.x, Math.max(2, ground) + Math.abs(Math.sin(this.time * 12)) * 0.15, -0.6);
+    r.mesh.rotation.y = 0.55;
+    if (r.x >= goal) {
+      r.done = true;
+      this.hud.toast(race.lose, 'info', 3500);
+    }
+  }
+
   private animateParticles(t: number): void {
     const zone = this.spec.zones?.find((z) => z.moment === 'winterLaziness');
     if (this.snow && zone) {
@@ -1127,6 +1197,11 @@ export class Stage implements StageCtx {
     if (this.ghost && this.ghostKept) {
       this.lives++;
       this.hud.toast('You kept GPT-4o all the way! +1 life.', 'good', 3500);
+    }
+    if (this.rival && this.storm?.race && !this.rival.done) {
+      this.rival.done = true;
+      this.lives++;
+      this.hud.toast(this.storm.race.win, 'good', 3500);
     }
     if (this.codeRed && this.flag) {
       const par = codeRedPar(this.grid.width);
@@ -1237,7 +1312,8 @@ export class Stage implements StageCtx {
     const bossFight = this.bosses.some((b) => b.awake && b.alive);
     if (!this.storm?.autoscroll && (alive.length || bossFight)) {
       const center = alive.reduce((s, p) => s + p.body.x + p.body.w / 2, 0) / Math.max(1, alive.length);
-      const target = THREE.MathUtils.clamp(bossFight ? this.grid.width : center + 1.5, this.halfW, this.grid.width - this.halfW);
+      let target = THREE.MathUtils.clamp(bossFight ? this.grid.width : center + 1.5, this.halfW, this.grid.width - this.halfW);
+      target = Math.min(target, this.cameraCap());
       if (target > this.camX) this.camX += (target - this.camX) * Math.min(1, dt * 6);
     }
     const shake = this.shakeTime;
@@ -1247,6 +1323,13 @@ export class Stage implements StageCtx {
     const dist = this.halfH / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
     this.camera.position.set(this.camX + shakeX, camY + shakeY, dist);
     this.camera.lookAt(this.camX + shakeX, camY + shakeY, 0);
+  }
+
+  /** An unsolved puzzle room holds the camera, so its pieces stay on screen while you go back and forth. */
+  private cameraCap(): number {
+    const room = this.puzzle && !this.puzzle.solved ? this.puzzle.region() : null;
+    const inside = room && this.heroes().some((p) => p.body.x > room.x0 - 2 && p.body.x < room.x1 + 1);
+    return room && inside ? Math.max(this.halfW, (room.x0 + room.x1) / 2 + 0.5) : Infinity;
   }
 
   resize(): void {
@@ -1307,7 +1390,9 @@ export class Stage implements StageCtx {
       bosses: this.bosses.filter((b) => b.awake).map((b) => ({ name: b.name, hp: b.hp, max: b.maxHp })),
       status: status.join(' · ') || null,
     });
-    this.input.setPowerLabel(hero?.power === 'tool' ? 'fn' : hero?.power === 'cape' ? '∴' : null);
+    const powerLabel =
+      hero?.power === 'tool' ? 'fn' : hero?.power === 'cape' ? '∴' : hero?.ability?.sizes ? '⇅' : this.hype?.spec.effect === 'build' ? '▭' : null;
+    this.input.setPowerLabel(powerLabel);
   }
 
   // ------------------------------------------------------------------- debug
@@ -1339,7 +1424,7 @@ export class Stage implements StageCtx {
         b.vx = 0;
         b.vy = 0;
         if (this.storm?.autoscroll) this.camX = THREE.MathUtils.clamp(x + 2, this.halfW, this.grid.width - this.halfW);
-        else this.camX = Math.max(this.camX, Math.min(x, this.grid.width - this.halfW));
+        else this.camX = Math.max(this.camX, Math.min(x, this.grid.width - this.halfW, this.cameraCap()));
       },
       invincible: () => (this.playersList[0].invulnerable = 999),
       give: (kind: ItemKind) => this.applyItem(kind, this.playersList[0]),
@@ -1361,6 +1446,16 @@ export class Stage implements StageCtx {
       moments: () => [...this.happened],
       clones: () => this.playersList.filter((p) => p.clone && !p.dead).length,
       bridges: () => this.bridges.filter((b) => b.alive).length,
+      puzzle: () => this.puzzle?.debug() ?? null,
+      gates: () => {
+        let n = 0;
+        for (let i = 0; i < this.grid.tiles.length; i++) if (this.grid.tiles[i] === T.GATE) n++;
+        return n;
+      },
+      size: () => this.playersList[0].sizeMode,
+      form: () => this.playersList[0].form,
+      thinking: () => this.playersList[0].thinking,
+      rival: () => (this.rival ? { x: this.rival.x, done: this.rival.done } : null),
       platforms: () => this.platforms.filter((p) => p.alive).map((p) => ({ x: p.body.x, y: p.body.y, w: p.body.w, top: p.top })),
       riding: () => this.riding.has(this.playersList[0]),
       phase: () => this.grid.solidity.phase,
