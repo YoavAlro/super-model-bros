@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { DATA_TYPES, type DataTypeId } from '../config/dataTypes';
+import { paintTexture } from './art';
+import { shared } from './shared';
+// Only called inside builders, never at module load (toonKit imports ./shared, not this module).
+import { basic, cachedGeo } from './toonKit';
 
 /** Mesh and texture builders. Every mesh's origin is at its feet, horizontally centered. */
 
@@ -64,21 +68,28 @@ export const plainTexture = () =>
     c.strokeRect(1, 1, s - 2, s - 2);
   });
 
-/** Conveyor belt: chevrons pointing the way it moves. The level view scrolls it. */
+/**
+ * Conveyor belt ("rubber tread"): cleated rubber with chevrons pointing the way it moves. Not cached:
+ * the level view scrolls it and flips repeat.x to mirror it.
+ */
 export function arrowTexture(dir: 1 | -1): THREE.CanvasTexture {
-  const tex = canvasTexture(32, (c, s) => {
-    c.fillStyle = '#ffffff';
-    c.fillRect(0, 0, s, s);
-    c.fillStyle = '#3a3f4a';
-    c.fillRect(0, 0, s, 4);
-    c.fillRect(0, s - 4, s, 4);
+  const tex = paintTexture(64, 64, (c) => {
+    c.fillStyle = '#2c2f38';
+    c.fillRect(0, 0, 64, 64);
+    c.fillStyle = '#1a1c22';
+    c.fillRect(0, 0, 64, 8);
+    c.fillRect(0, 56, 64, 8);
+    c.fillStyle = '#3c404a';
+    for (let x = 7; x < 64; x += 16) c.fillRect(x, 8, 2, 48);
     c.strokeStyle = '#ffcf3a';
-    c.lineWidth = 4;
-    for (const x0 of [6, 20]) {
+    c.lineWidth = 6;
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    for (const x0 of [16, 48]) {
       c.beginPath();
-      c.moveTo(x0 - 4 * dir, 9);
-      c.lineTo(x0 + 4 * dir, 16);
-      c.lineTo(x0 - 4 * dir, 23);
+      c.moveTo(x0 - 6 * dir, 18);
+      c.lineTo(x0 + 6 * dir, 32);
+      c.lineTo(x0 - 6 * dir, 46);
       c.stroke();
     }
   });
@@ -128,10 +139,32 @@ export function labelSprite(text: string, color = '#ffffff', background = 'rgba(
 export const lambert = (color: number, emissive = 0) =>
   new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: emissive ? 0.6 : 0 });
 
-/** Marks geometry/materials reused across levels, so level teardown leaves them alone. */
-export function shared<T extends THREE.Material | THREE.BufferGeometry>(thing: T): T {
-  thing.userData.shared = true;
-  return thing;
+export { shared } from './shared';
+
+/**
+ * Runs fn(t) (t = performance.now() in seconds) each time the mesh is drawn, then refreshes its world
+ * matrix: three computes matrixWorld before onBeforeRender, so a transform written here would
+ * otherwise show a frame late. Leaf meshes only; build the closure once, never per frame.
+ */
+export function onDraw(mesh: THREE.Object3D, fn: (t: number) => void): void {
+  mesh.onBeforeRender = () => {
+    fn(performance.now() / 1000);
+    mesh.updateMatrix();
+    if (mesh.parent) mesh.matrixWorld.multiplyMatrices(mesh.parent.matrixWorld, mesh.matrix);
+    else mesh.matrixWorld.copy(mesh.matrix);
+  };
+}
+
+let glintMat: THREE.MeshBasicMaterial | null = null;
+/**
+ * A flat white highlight w × h: place it upper left, just in front of the part it shines on (the sun
+ * is upper left). Geometry and material are cached and shared.
+ */
+export function glint(w: number, h: number): THREE.Mesh {
+  glintMat ??= shared(basic(0xffffff));
+  const m = new THREE.Mesh(cachedGeo('glint', () => new THREE.SphereGeometry(1, 8, 6)), glintMat);
+  m.scale.set(w, h, 0.01);
+  return m;
 }
 
 const tokenGeo = shared(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 20));

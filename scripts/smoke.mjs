@@ -56,6 +56,12 @@ async function playLevel(page, id, tag) {
   await waitFor(page, () => window.__smb.state() === 'playing');
   await sleep(600);
   await page.screenshot({ path: `${OUT}/${tag}-${id}-play.png` });
+  // Draw budget (whole frame, cast included): the phone must stay under 120 calls and 250k triangles.
+  const draws = await page.evaluate(() => window.__smb.draws());
+  if (draws) {
+    console.log(`${tag} ${id}: ${draws.calls} draw calls, ${draws.triangles} triangles`);
+    if (tag === 'phone' && (draws.calls > 120 || draws.triangles > 250000)) throw new Error(`${id}: over the phone draw budget (${draws.calls} calls, ${draws.triangles} triangles)`);
+  }
   await page.evaluate(() => window.__smb.invincible());
 
   const flag = await page.evaluate(() => window.__smb.flag());
