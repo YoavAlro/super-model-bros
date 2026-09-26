@@ -106,7 +106,13 @@ export function eye(r: number, opts: EyeOptions & { lidMaterial?: THREE.Material
   const e = makeEye(r, opts);
   const lid = e.children.find((c) => (c as THREE.Mesh).material instanceof THREE.MeshToonMaterial) as THREE.Mesh | undefined;
   if (lid && opts.lidMaterial) lid.material = opts.lidMaterial;
-  if (lid && opts.lidTilt !== undefined) lid.rotation.x = opts.lidTilt;
+  if (lid && opts.lidTilt !== undefined) {
+    lid.rotation.x = opts.lidTilt;
+    // The kit's cap is only just deeper than the sclera. Tilted back past the kit's shallowest lid
+    // (angry, 0.45) its upper face swings into the sclera, which then shows through its facets as a
+    // white sawtooth; a deeper cap keeps clear of it.
+    if (opts.lidTilt < 0.45) lid.scale.z = 0.85;
+  }
   return e;
 }
 
@@ -212,6 +218,9 @@ function signature(m: THREE.Material): string {
     m.opacity,
     m.depthWrite,
     m.depthTest,
+    m.polygonOffset,
+    m.polygonOffsetFactor,
+    m.polygonOffsetUnits,
     m.blending,
     a.wireframe,
     a.flatShading,

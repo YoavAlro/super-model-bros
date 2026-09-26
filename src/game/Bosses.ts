@@ -17,6 +17,8 @@ export abstract class Boss {
   readonly body: Body;
   abstract readonly mesh: THREE.Object3D;
   protected label!: THREE.Sprite;
+  /** How far above the body box the name label floats; raise it when a prop stands taller. */
+  protected labelLift = 0.9;
   abstract readonly name: string;
   /** Toast shown when it wakes up. */
   abstract readonly intro: string;
@@ -92,7 +94,7 @@ export abstract class Boss {
     this.mesh.rotation.y = this.dir * 0.4;
     this.mesh.rotation.z = this.alive ? Math.sin(t * 6) * 0.05 : t * 4;
     this.mesh.visible = this.invulnerable <= 0 || blinkVisible(t, 16);
-    this.label.position.set(b.x + b.w / 2, b.y + b.h + 0.9, 0);
+    this.label.position.set(b.x + b.w / 2, b.y + b.h + this.labelLift, 0);
     this.label.visible = this.alive;
   }
 
@@ -690,6 +692,8 @@ class PaperclipMaximizer extends Boss {
     return 'It resists being changed while it hovers. Stomp it when it lands!';
   }
   private phase: 'hover' | 'slam' | 'rest' | 'rise' = 'hover';
+  /** Above the paperclip idol spinning on its roof, which stands 1.9 over the body box. */
+  protected labelLift = 2.3;
   private t = 0;
   private drop = 1;
   /** A frontier-size player is nearby: big enough to change its goal at any time. */

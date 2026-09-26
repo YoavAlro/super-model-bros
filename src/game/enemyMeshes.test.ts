@@ -28,16 +28,17 @@ function meshCount(root: THREE.Object3D): number {
   return n;
 }
 
-/** Bounds of the visible meshes. Sprites, ink hulls and hidden parts (a lowered shield) are skipped. */
+/** Exact bounds of the visible meshes' vertices. Sprites, ink hulls and hidden parts (a lowered shield) are skipped. */
 function bounds(root: THREE.Object3D): THREE.Box3 {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3();
+  const v = new THREE.Vector3();
   const walk = (o: THREE.Object3D) => {
     if (!o.visible || o.name === 'outline') return;
     const mesh = o as THREE.Mesh;
     if (mesh.isMesh) {
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      box.union(mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld));
+      const p = mesh.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) box.expandByPoint(v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld));
     }
     o.children.forEach(walk);
   };
@@ -88,6 +89,49 @@ describe('enemy meshes', () => {
       const mesh = c.make();
       expect(meshCount(mesh), c.name).toBeLessThanOrEqual(c.budget);
       if (c.ground) expect(bounds(mesh).min.y, c.name).toBeCloseTo(0, 1);
+    }
+  });
+
+  it('stay within 15% of their body box height, so a stomp lands where the top looks to be', () => {
+    // Body box heights from Enemies.ts and Bosses.ts. Left out on purpose: the Timeline (a floating
+    // cloud), ghosts and the Hallucination King (see-through sheets, curl and crown), Sydney (its
+    // heart antenna), the Injection Piranha (its boss box is shorter than the 2.2x plant) and the
+    // Maximizer (smoke puffs and the idol clip above its roof).
+    const tops: [string, () => THREE.Object3D, number][] = [
+      ['spambot', () => M.makeSpambot(), 0.8],
+      ['hot take', () => M.makeHotTake('hype'), 0.8],
+      ['jailbreaker', () => M.makeJailbreaker(), 1.1],
+      ['piranha', () => M.makePiranha(), 1.2],
+      ['lawyer', () => M.makeLawyer(), 1.1],
+      ['crusher', () => M.makeCrusher(), 1.8],
+      ['agent', () => M.makeAgentDrone(), 0.7],
+      ['paperclip', () => M.makePaperclip(1.2), 0.9],
+      ['garbage in', () => M.makeSpambot(2.8, 0xa8473f), 2.2],
+      ['reward hacker', () => M.makeRewardHacker(), 2.3],
+      ['dan', () => M.makeDan(), 2.1],
+      ['orchestrator', () => M.makeOrchestrator(), 1.8],
+    ];
+    for (const [name, make, h] of tops) expect(bounds(make()).max.y, name).toBeLessThanOrEqual(1.15 * h);
+  });
+
+  it('keep Sydney inside the shield bubble the boss raises (radius 1.4 around y 0.8), at either facing', () => {
+    for (const yaw of [-0.4, 0.4]) {
+      const sydney = M.makeSydney();
+      sydney.rotation.y = yaw;
+      sydney.updateMatrixWorld(true);
+      // The farthest any vertex reaches from the bubble's centre, as the camera sees it.
+      let reach = 0;
+      const v = new THREE.Vector3();
+      sydney.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh || o.name === 'outline') return;
+        const p = mesh.geometry.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld);
+          reach = Math.max(reach, Math.hypot(v.x, v.y - 0.8));
+        }
+      });
+      expect(reach, `yaw ${yaw}`).toBeLessThan(1.4);
     }
   });
 

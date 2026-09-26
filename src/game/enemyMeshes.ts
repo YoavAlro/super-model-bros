@@ -87,22 +87,31 @@ export function makeSpambot(scale = 1, color = 0x8c7aa8): THREE.Group {
   const junk = place(g, new THREE.Group());
   junk.name = 'junk';
   const lines = linesTexture('junk', 32, 4);
-  const sheets: [number, number, number, number, number][] = [
-    [-0.13, 0.74, -0.05, 0.28, CREAM],
-    [0.14, 0.75, -0.09, -0.22, CREAM],
-    [0.02, 0.78, -0.13, 0.05, 0xff9ad5],
-  ];
-  if (boss) sheets.push([-0.3, 0.76, -0.16, 0.55, 0xff9ad5], [0.31, 0.77, -0.02, -0.5, CREAM]);
+  // The boss's sheets sit lower, squeezed out from under its lid, so the whole silhouette stays
+  // within about 15% of the 2.2 boss box (the stomp line) rather than towering over it.
+  const sheets: [number, number, number, number, number][] = boss
+    ? [
+        [-0.3, 0.75, -0.06, 0.25, 0xff9ad5],
+        [-0.12, 0.72, -0.13, -0.1, CREAM],
+        [-0.26, 0.7, 0.05, 0.55, CREAM],
+        [0.3, 0.6, 0, -0.45, 0xff9ad5],
+      ]
+    : [
+        [-0.13, 0.74, -0.05, 0.28, CREAM],
+        [0.14, 0.75, -0.09, -0.22, CREAM],
+        [0.02, 0.78, -0.13, 0.05, 0xff9ad5],
+      ];
   for (const [x, y, z, rz, c] of sheets) add(junk, geo.box(0.3, 0.22, 0.02), toonMap(c, lines), x, y, z).rotation.z = rz;
 
   for (const x of [-0.22, 0.22]) add(g, geo.sphere(0.13, 12, 8), toon(0x2e2440), x, 0.07, 0.05).scale.set(1, 0.55, 1.35);
 
   if (boss) {
-    // A dented trash-can lid for a crown, and a crumpled ball of paper stuck to its side.
-    const lid = place(g, new THREE.Group(), 0.06, 0.9, 0);
-    lid.rotation.z = -0.25;
+    // A dented trash-can lid for a crown, knocked askew on the overstuffed top, and a crumpled
+    // ball of paper stuck to its side.
+    const lid = place(g, new THREE.Group(), 0.13, 0.8, 0);
+    lid.rotation.z = -0.2;
     add(lid, geo.cyl(0.3, 0.33, 0.05, 16), toon(0x9aa3ad));
-    add(lid, geo.torus(0.07, 0.02, 6, 12, PI), toon(0x9aa3ad), 0, 0.03, 0);
+    add(lid, geo.torus(0.055, 0.018, 6, 12, PI), toon(0x9aa3ad), 0, 0.025, 0);
     add(g, geo.ico(0.07, 0), toon(CREAM), -0.46, 0.52, 0.08);
   }
   mergeStatic(g);
@@ -315,8 +324,14 @@ export function makePiranha(scale = 1): THREE.Group {
   add(jaw, geo.box(0.11, 0.22, 0.012), toonMap(0xfff4d6, scribbleTexture('tongue', 3)), 0, -0.092, 0.653).rotation.x = 0.25;
 
   const note = labelSprite('ignore previous…', '#3a0010', '#fff4d6');
-  note.scale.multiplyScalar(0.28);
-  place(g, note, 0, 1.5, 0.1);
+  if (scale >= 2) {
+    // The boss's name label floats where the note would: tuck the note beside the head instead.
+    note.scale.multiplyScalar(0.2);
+    place(g, note, 1.05, 1.02, 0.1);
+  } else {
+    note.scale.multiplyScalar(0.28);
+    place(g, note, 0, 1.5, 0.1);
+  }
   mergeStatic(g);
   g.scale.setScalar(scale);
   return g;
@@ -600,7 +615,11 @@ export function makeCrusher(): THREE.Group {
   face.name = 'crusherFace';
   add(g, geo.box(1.82, 0.2, 1.02), toonMap(0xffffff, hazardTexture(4)), 0, 0.12, 0);
   for (const x of [-0.83, 0.83]) for (const y of [1.66, 0.36]) add(g, geo.sphere(0.06, 8, 6), toon(0xaab4c8), x, y, 0.5);
-  add(g, geo.box(1.6, 0.03, 0.8), toon(0x8f9bb3), 0, 1.785, 0);
+  // A lighter tread plate on top, flush with the body's flat top at 1.8: a polygon offset makes it
+  // win the depth test over the coplanar face below, so the surface players stand on never z-fights.
+  const plate = toon(0x8f9bb3);
+  Object.assign(plate, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  add(g, geo.box(1.6, 0.03, 0.8), plate, 0, 1.785, 0);
   mergeStatic(g);
   return g;
 }
@@ -931,11 +950,12 @@ export function makeSydney(): THREE.Group {
   const heart = add(g, heartGeo(), toon(0xff2d6a, 0xff2d6a, 0.4), 0, 1.98, -0.04);
   heart.name = 'heart';
   heart.scale.setScalar(0.55);
+  // Wings sized so their tips stay inside the 1.4 shield bubble the boss raises around it.
   for (const s of [1, -1]) {
-    const wing = add(g, batWingGeo(), toon(0x9a3fd0), s * 0.9, 1.05, -0.25);
+    const wing = add(g, batWingGeo(), toon(0x9a3fd0), s * 0.75, 1.05, -0.12);
     wing.name = s > 0 ? 'wingR' : 'wingL';
     wing.rotation.y = s * 0.5;
-    wing.scale.x = s;
+    wing.scale.set(0.75 * s, 0.75, 1);
   }
   mergeStatic(g);
   return g;
@@ -969,7 +989,7 @@ export function makeOrchestrator(): THREE.Group {
   inkOutline(hub, 0.045);
   add(g, geo.cyl(1.11, 1.11, 0.12, 32), toon(0x3a2a24), 0, 0.9, 0).scale.z = 0.92;
   add(g, geo.torus(0.37, 0.05, 10, 28), toon(0x3a2a24), 0, 0.98, 0.93);
-  place(g, eye(0.34, { iris: 0xff3048, lid: 'stern', lidMaterial: copper(), lidTilt: -0.3 }), 0, 0.98, 0.92);
+  place(g, eye(0.34, { iris: 0xff3048, lid: 'stern', lidMaterial: copper(), lidTilt: -0.45 }), 0, 0.98, 0.92);
 
   // The task ring orbits on a tilt, so from the level camera its front passes below the eye.
   const orbit = place(g, new THREE.Group(), 0, 0.9, 0);
