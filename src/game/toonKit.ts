@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { shared } from './meshes';
+import { shared } from './shared';
 
 /**
  * The toon kit shared by the character and enemy meshes, so both casts are drawn in one style:

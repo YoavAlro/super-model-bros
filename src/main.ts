@@ -34,8 +34,8 @@ const level = params.get('level');
 const kart = params.get('kart');
 const gallery = params.get('gallery');
 if (params.has('debug') && gallery) {
-  // Every character or enemy mesh side by side: ?debug&gallery=characters (or enemies)
-  void import('./game/Gallery').then((m) => m.showGallery(root, gallery === 'enemies' ? 'enemies' : 'characters'));
+  // Every mesh of a kind side by side: ?debug&gallery=characters (or enemies, items, props)
+  void import('./game/Gallery').then((m) => m.showGallery(root, gallery === 'enemies' || gallery === 'items' || gallery === 'props' ? gallery : 'characters'));
 } else if (params.has('debug') && kart) {
   // A Benchmark Kart race on its own: ?debug&kart=kart-arc&char=mistral&players=2
   const char = params.get('char') as CharacterId | null;

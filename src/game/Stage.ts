@@ -3,7 +3,8 @@ import { CHARACTERS, type CharacterId } from '../config/characters';
 import { HYPES, MOMENTS, STORMS, type HypeSpec, type MomentId, type MomentSpec, type StormSpec } from '../config/events';
 import type { LevelSpec, PowerId } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
-import { THEME_TUNES, type TuneId } from '../config/music';
+import { DATA_TYPES } from '../config/dataTypes';
+import { THEME_TUNES, TUNES, type TuneId } from '../config/music';
 import { THEMES } from '../config/themes';
 import { tip } from '../config/types';
 import type { Settings } from '../save';
@@ -116,7 +117,8 @@ export class Stage implements StageCtx {
   /** The tune this stage last asked for (undefined: none yet). */
   private tune: TuneId | null | undefined;
   private helper: THREE.Group | null = null;
-  private flag: { group: THREE.Group; x: number; y: number; slide: number } | null = null;
+  /** The goal pennant; `stamp` is −1 until the RELEASED stamp lands, then its age in seconds. */
+  private flag: { group: THREE.Group; x: number; y: number; slide: number; stamp: number } | null = null;
   private crowd: THREE.Group | null = null;
   private readonly trail: { x: number; y: number }[] = [];
 
@@ -182,6 +184,13 @@ export class Stage implements StageCtx {
   /** Debug slow motion (`__smb.slowmo`), for frame-by-frame screenshots. */
   private timeScale = 1;
   private readonly seen = new Set<string>();
+  /**
+   * Draw calls and triangles of the last frame, and the most of each in any frame since the level
+   * was built (read by ?debug's draws(); the smoke sweeps a level and checks the maxima).
+   */
+  private readonly draws = { calls: 0, triangles: 0, maxCalls: 0, maxTriangles: 0 };
+  /** The level's shaders are compiled once, behind the intro card (so the first pickup never hitches). */
+  private prewarmed = false;
   private random: () => number;
   private resolve!: (r: StageResult) => void;
   readonly done: Promise<StageResult>;
@@ -250,14 +259,14 @@ export class Stage implements StageCtx {
     const spec = this.spec;
     const theme = THEMES[spec.theme];
     const light = theme.light ?? 1;
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2 * light));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6 * light);
+    this.scene.add(new THREE.HemisphereLight(theme.lights.sky, theme.lights.ground, 2.2 * light));
+    const sun = new THREE.DirectionalLight(theme.lights.sun, 1.6 * light);
     sun.position.set(-4, 10, 8);
     this.scene.add(sun);
 
     this.knocks = new KnockOffs(this.scene, this.isTouch);
     this.grid = new LevelGrid(spec.map);
-    this.view = new LevelView(this.grid, theme, this.scene);
+    this.view = new LevelView(this.grid, theme, this.scene, { bpm: TUNES[THEME_TUNES[spec.theme]].bpm, touch: this.isTouch });
     this.counts = emptyCounts();
     this.enemyList = [];
     this.tokens = [];
@@ -272,6 +281,8 @@ export class Stage implements StageCtx {
     this.helper = null;
     this.flag = null;
     this.accumulator = 0;
+    this.prewarmed = false;
+    this.draws.maxCalls = this.draws.maxTriangles = 0;
     this.shakeTime = 0;
     this.clearTimer = 0;
     this.respawnTimer = 0;
@@ -338,10 +349,16 @@ export class Stage implements StageCtx {
         this.helper.visible = false;
         this.scene.add(this.helper);
       } else if (s.kind === 'flag') {
-        const group = makeFlag(`${spec.toward.name} · ${spec.outro.date.split(' · ')[0]}`);
+        const label = `${spec.toward.name} · ${spec.outro.date.split(' · ')[0]}`;
+        let group = makeFlag(label);
+        // Where the level ends too soon after the goal, the pennant flies left, so its tag stays on screen.
+        if (s.x + 0.5 + group.userData.reach > this.grid.width - 0.3) {
+          disposeObject(group);
+          group = makeFlag(label, 9, -1);
+        }
         group.position.set(s.x + 0.5, s.y - 1, 0);
         this.scene.add(group);
-        this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0 };
+        this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0, stamp: -1 };
       }
     }
 
@@ -369,6 +386,8 @@ export class Stage implements StageCtx {
       this.fogWall = makeFogWall();
       this.scene.add(this.fogWall);
       this.scene.fog = new THREE.Fog(0xc8ccd8, 18, 42);
+      // The cardboard backdrop fogs out, so the sky goes the same grey (no dark gap between its layers).
+      this.scene.background = new THREE.Color(0xc8ccd8);
     }
     this.gates = this.storm?.gates ? gateGroups(this.grid) : [];
     this.crowd = makeCrowd(10);
@@ -444,7 +463,7 @@ export class Stage implements StageCtx {
       }
     }
 
-    this.view.update(dt);
+    this.view.update(dt, this.camX);
     // Players animate in simulation time, so star effects freeze and slow down with the game.
     for (const p of this.playersList) p.updateMesh(t, simDt);
     for (const e of this.enemyList) e.updateMesh(t);
@@ -462,8 +481,18 @@ export class Stage implements StageCtx {
     this.animateParticles(t);
     if (this.fogWall) this.fogWall.position.x = this.fogX;
     this.placeCamera(dt);
+    if (this.state === 'intro' && !this.prewarmed) {
+      this.prewarmed = true;
+      this.view.fx.showAll(true);
+      renderer.compile(this.scene, this.camera);
+      this.view.fx.showAll(false);
+    }
     renderer.render(this.scene, this.camera);
     this.syncMusic();
+    this.draws.calls = renderer.info.render.calls;
+    this.draws.triangles = renderer.info.render.triangles;
+    this.draws.maxCalls = Math.max(this.draws.maxCalls, this.draws.calls);
+    this.draws.maxTriangles = Math.max(this.draws.maxTriangles, this.draws.triangles);
 
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -790,15 +819,20 @@ export class Stage implements StageCtx {
         this.tiboGiven = true;
         this.items.push(new PowerItem('oneup', tx, ty + 1, this.scene));
       } else this.tokens.push(new Token(this.spec.blockToken, tx, ty + 1, this.scene, true));
+      // Felt crumbs off the top of the prompt.
+      this.view.fx.burst('puff', tx + 0.5, ty + 1, 4, 0xfff3d0, 2.5, 0.35, 0.18);
       sfx.bump();
     } else if (tile === T.BRICK) {
       if (p.big) {
         this.grid.set(tx, ty, T.EMPTY);
         this.view.removeTile(tx, ty);
         this.debris.push(new Debris(tx, ty, THEMES[this.spec.theme].brick, this.scene));
+        this.view.fx.burst('puff', tx + 0.5, ty + 0.5, 6, THEMES[this.spec.theme].brick, 4);
+        this.shake(0.06);
         sfx.stomp();
       } else {
         this.view.bumpTile(tx, ty);
+        this.view.fx.burst('puff', tx + 0.5, ty + 1, 2, 0xffffff, 1.5);
         sfx.bump();
       }
     }
@@ -842,6 +876,10 @@ export class Stage implements StageCtx {
       const collect = tok.pop ? tok.step(dt) : this.players().some((p) => overlaps(p.body, tok.body));
       if (collect) {
         tok.take();
+        const color = DATA_TYPES[tok.type].color;
+        const [cx, cy] = [tok.body.x + tok.body.w / 2, tok.body.y + tok.body.h / 2];
+        this.view.fx.burst('spark', cx, cy, 3, color, 3.5);
+        this.view.fx.ring(cx, cy, color, 0.3, 1.1, 0.3);
         this.counts[tok.type]++;
         if (tok.type === 'feedback' && this.alignment !== null) this.alignment = Math.min(100, this.alignment + 1);
         if (tok.type === 'shadow') this.newFlags.add('shadowBooks');
@@ -854,6 +892,7 @@ export class Stage implements StageCtx {
       const p = this.heroes().find((pl) => overlaps(pl.body, item.body));
       if (p) {
         item.take();
+        this.pickupFx(item);
         this.applyRefItem(item, p);
       }
     }
@@ -863,6 +902,10 @@ export class Stage implements StageCtx {
       const p = this.players().find((pl) => overlaps(pl.body, trap.body));
       if (!p) continue;
       trap.take();
+      // Grey falls: bad things fall.
+      const [tx, ty] = [trap.body.x + trap.body.w / 2, trap.body.y + trap.body.h / 2];
+      this.view.fx.burst('puff', tx, ty, 5, 0x8a7a9a, 2);
+      this.view.fx.burst('spark', tx, ty, 4, 0x8a8a9a, 2, 0.5, 0.2, 8);
       sfx.trap();
       if (trap.kind === 'rewardOrb') {
         if (this.alignment !== null) this.alignment = Math.max(0, this.alignment - 15);
@@ -875,6 +918,9 @@ export class Stage implements StageCtx {
     for (const heart of this.hearts) {
       if (heart.taken || !this.players().some((p) => overlaps(p.body, heart.body))) continue;
       heart.take();
+      const [hx, hy] = [heart.body.x + heart.body.w / 2, heart.body.y + heart.body.h / 2];
+      this.view.fx.ring(hx, hy, 0xff4d7a, 0.3, 1.2, 0.3);
+      this.view.fx.burst('heart', hx, hy, 3, 0xff4d7a, 3);
       this.heartCount++;
       sfx.token();
       const need = this.storm?.hearts;
@@ -885,6 +931,23 @@ export class Stage implements StageCtx {
         this.beginClear();
       }
     }
+  }
+
+  /** The generic pickup pop: a white ring, then a burst that says what the item was. */
+  private pickupFx(item: PowerItem): void {
+    const fx = this.view.fx;
+    const cx = item.body.x + item.body.w / 2;
+    const cy = item.body.y + item.body.h / 2;
+    fx.ring(cx, cy, 0xffffff, 0.3, 1.6, 0.3);
+    if (item.kind === 'hype' && item.ref) fx.burst('puff', cx, cy, 8, HYPES[item.ref as keyof typeof HYPES].color, 5);
+    else if (item.kind === 'oneup') {
+      fx.plusOne(cx, cy);
+      fx.ring(cx, cy, 0x46e07a, 0.3, 1.2, 0.35);
+    } else if (item.kind === 'scale') fx.burst('spark', cx, cy, 6, 0x3ff2d0, 3.5);
+    else if (item.kind === 'tool') fx.burst('spark', cx, cy, 6, 0x1fd1b0, 3.5);
+    else if (item.kind === 'cape') fx.burst('spark', cx, cy, 6, 0x6a3cff, 3.5);
+    else if (item.kind === 'fork') fx.burst('spark', cx, cy, 6, 0xd8283e, 3.5);
+    else if (item.kind === 'frozen') fx.burst('puff', cx, cy, 5, 0xcfefff, 2.5, 0.5, 0.3, 6);
   }
 
   private applyItem(kind: ItemKind, p: PlayerActor): void {
@@ -1065,7 +1128,13 @@ export class Stage implements StageCtx {
       }
     }
     this.shots = this.shots.filter((s) => {
-      if (!s.shot.alive) s.shot.dispose();
+      if (!s.shot.alive) {
+        const b = s.shot.body;
+        const [bx, by] = [b.x + b.w / 2, b.y + b.h / 2];
+        this.view.fx.ring(bx, by, 0x1fd1b0, 0.2, 0.9, 0.2);
+        this.view.fx.burst('spark', bx, by, 4, 0x1fd1b0, 3);
+        s.shot.dispose();
+      }
       return s.shot.alive;
     });
   }
@@ -1474,6 +1543,7 @@ export class Stage implements StageCtx {
     for (const t of group.tiles) {
       this.grid.set(t.x, t.y, T.EMPTY);
       this.view.removeTile(t.x, t.y);
+      this.view.fx.burst('puff', t.x + 0.5, t.y, 2, 0xd8c8b0, 2);
     }
     this.shake(0.2);
     sfx.flag();
@@ -1501,13 +1571,28 @@ export class Stage implements StageCtx {
       if (reached) {
         sfx.flag();
         for (const p of this.playersList) p.body.x = Math.min(p.body.x, flag.x - p.body.w);
+        // Two confetti poppers.
+        this.view.fx.burst('star', flag.x - 0.6, flag.y + 1.5, 10, 0xffd166, 6);
+        this.view.fx.burst('spark', flag.x + 0.6, flag.y + 1.5, 10, THEMES[this.spec.theme].grass, 6);
         this.beginClear();
       }
     }
     if (this.state === 'clear') {
       flag.slide = Math.min(1, flag.slide + dt * 1.2);
-      const sprite = flag.group.getObjectByName('flag');
-      if (sprite) sprite.position.y = 8.4 - flag.slide * 6.5;
+      const banner = flag.group.getObjectByName('flag');
+      if (banner) banner.position.y = 8.4 - flag.slide * 6.5;
+      // Once the banner is down, a RELEASED stamp slams onto it.
+      const stamp = banner?.getObjectByName('stamp');
+      if (stamp && flag.slide >= 1) {
+        if (flag.stamp < 0) {
+          flag.stamp = 0;
+          stamp.visible = true;
+          this.shake(0.1);
+        } else flag.stamp += dt;
+        const k = Math.min(1, flag.stamp / 0.12);
+        const s = 2.4 - 1.4 * k * k;
+        stamp.scale.set(2 * s, s, 1);
+      }
     }
   }
 
@@ -1776,6 +1861,10 @@ export class Stage implements StageCtx {
         return b ? { x: b.body.x, y: b.body.y, w: b.body.w, h: b.body.h } : null;
       },
       flag: () => (this.flag ? { x: this.flag.x, y: this.flag.y } : null),
+      width: () => this.grid.width,
+      draws: () => ({ ...this.draws }),
+      /** Hits the block at (tx, ty) from below, as the lead player would (block and pickup FX). */
+      hit: (tx: number, ty: number) => this.hitBlock(tx, ty, this.playersList[0]),
       autoscroll: () => !!this.storm?.autoscroll,
       player: () => {
         const b = this.playersList[0].body;
