@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, ROSTER } from '../config/characters';
-import { CAPE, IDLE, animateCharacter, makeCharacter, makeHelper, type CharacterMotion } from './characterMeshes';
+import { CAPE, IDLE, TROT, animateCharacter, makeCharacter, makeCrowd, makeHelper, makeLookalike, type CharacterMotion } from './characterMeshes';
 import { blinkScale, flick, hold, idleMoment, landingSquint, nextBlink, phaseOf, popIn, springWobble, strideRate } from './mascotMotion';
 import { prefs } from './prefs';
 
@@ -89,7 +89,8 @@ describe('mascot meshes', () => {
       });
 
       it('stays within the draw budget', () => {
-        expect(meshesOf(a).length).toBeLessThanOrEqual(36);
+        // Every mesh, hidden ones too; static parts are merged (staticMerge.ts), so this counts scopes and kinds.
+        expect(meshesOf(a).length).toBeLessThanOrEqual(28);
         const tris = meshesOf(a).reduce((n, m) => n + (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute('position').count) / 3, 0);
         expect(tris).toBeLessThan(7000);
       });
@@ -198,8 +199,38 @@ describe('mascot meshes', () => {
   it('builds the helper', () => {
     const h = makeHelper();
     expect(h.userData.plan).toBe('helper');
-    expect(meshesOf(h).length).toBeLessThanOrEqual(40);
+    expect(meshesOf(h).length).toBeLessThanOrEqual(16);
     animateCharacter(h, 1, IDLE);
+  });
+
+  it('makes cheap look-alikes of every mascot: the same silhouette, still trotting and blinking', () => {
+    const visible = (r: THREE.Object3D) => {
+      let n = 0;
+      r.traverseVisible((o) => (o as THREE.Mesh).isMesh && n++);
+      return n;
+    };
+    for (const c of ROSTER) {
+      const full = makeCharacter(c);
+      const copy = makeLookalike(c);
+      expect(visible(copy), c.name).toBeLessThanOrEqual(13);
+      expect(visible(copy), c.name).toBeLessThan(visible(full));
+      const box = (r: THREE.Object3D) => new THREE.Box3().setFromPoints(vertices(r, true));
+      expect(box(copy).min.distanceTo(box(full).min), c.name).toBeLessThan(1e-4);
+      expect(box(copy).max.distanceTo(box(full).max), c.name).toBeLessThan(1e-4);
+      for (const name of ['pose', 'legL', 'legR']) expect(copy.getObjectByName(name), `${c.name} ${name}`).toBeDefined();
+      const eyes: THREE.Object3D[] = [];
+      copy.traverse((o) => o.name === 'eye' && eyes.push(o));
+      expect(eyes, c.name).toHaveLength(2);
+      let t = 0;
+      for (let i = 0; i < 60; i++) animateCharacter(copy, (t += 1 / 30), TROT);
+      expect(copy.getObjectByName('legL')!.rotation.x, c.name).not.toBe(0);
+    }
+  });
+
+  it('draws each person of the viral crowd in one mesh', () => {
+    const crowd = makeCrowd(10);
+    expect(crowd.children).toHaveLength(10);
+    for (const person of crowd.children) expect(meshesOf(person)).toHaveLength(1);
   });
 
   it('ignores meshes that are not mascots', () => {

@@ -1,11 +1,10 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { INK, cachedGeo, makeEye, toon, type EyeOptions } from './toonKit';
 
 /**
  * Helpers for the enemy and boss meshes, on top of the shared toon kit: cached primitive
- * geometry, placement, cached canvas textures, a few 2D shapes, and a static-merge pass that
- * keeps the draw-call count of a detailed enemy low.
+ * geometry, placement, cached canvas textures and a few 2D shapes. The static-merge pass that keeps
+ * a detailed enemy's draw calls low lives in `staticMerge.ts`, shared with the mascots.
  */
 
 const TAU = Math.PI * 2;
@@ -191,132 +190,6 @@ export function linesTexture(key: string, size: number, lines: number, ink = 'rg
       c.fillRect(s * 0.12, i * step - s * 0.03, w, Math.max(2, s * 0.06));
     }
   });
-}
-
-/** Names the engine or an animation looks up. A named object keeps its own transform. */
-const isScope = (o: THREE.Object3D) => o.name !== '';
-
-type ToonLike = THREE.Material & {
-  color?: THREE.Color;
-  emissive?: THREE.Color;
-  emissiveIntensity?: number;
-  map?: THREE.Texture | null;
-  gradientMap?: THREE.Texture | null;
-  wireframe?: boolean;
-  flatShading?: boolean;
-};
-
-function signature(m: THREE.Material): string {
-  const a = m as ToonLike;
-  return [
-    m.type,
-    a.color?.getHex(),
-    a.emissive?.getHex(),
-    a.emissiveIntensity,
-    m.side,
-    m.transparent,
-    m.opacity,
-    m.depthWrite,
-    m.depthTest,
-    m.polygonOffset,
-    m.polygonOffsetFactor,
-    m.polygonOffsetUnits,
-    m.blending,
-    a.wireframe,
-    a.flatShading,
-    a.map?.uuid,
-    a.gradientMap?.uuid,
-  ].join('|');
-}
-
-const ATTRS = ['position', 'normal', 'uv'];
-
-/** One geometry from many parts, each moved into its scope's space by `rel`. */
-function bake(parts: { geometry: THREE.BufferGeometry; rel: THREE.Matrix4 }[]): THREE.BufferGeometry {
-  const ready = parts.map(({ geometry, rel }) => {
-    const g = geometry.clone();
-    g.clearGroups();
-    g.morphAttributes = {};
-    for (const name of Object.keys(g.attributes)) if (!ATTRS.includes(name)) g.deleteAttribute(name);
-    if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    g.applyMatrix4(rel);
-    if (!g.index) g.setIndex(Array.from({ length: g.attributes.position.count }, (_, i) => i));
-    if (rel.determinant() < 0) {
-      // A mirrored part: flip each triangle's winding so its faces still point out.
-      const idx = g.index!;
-      for (let i = 0; i < idx.count; i += 3) {
-        const b = idx.getX(i + 1);
-        idx.setX(i + 1, idx.getX(i + 2));
-        idx.setX(i + 2, b);
-      }
-    }
-    return g;
-  });
-  const merged = mergeGeometries(ready, false);
-  for (const g of ready) g.dispose();
-  if (!merged) throw new Error('mergeStatic: incompatible parts');
-  return merged;
-}
-
-/**
- * Merges the static parts of a mesh tree that look the same (same material settings) into one
- * mesh each, so a detailed enemy costs a handful of draw calls instead of dozens.
- *
- * Only unnamed, visible leaf meshes merge, and only within their nearest named ancestor (or the
- * root): named objects (`legs`, `jaw`, `hands`, `ring`, ...) keep their own transform and
- * contents, so the engine can still move or hide them. Meshes with children (the ink-outline
- * hosts) are kept as they are. The merged mesh takes the first part's material instance, so
- * materials stay per-instance; the merged geometry is cached when every part's geometry is. Run it
- * once a mesh is built and before it is rendered: the dropped parts were never uploaded.
- */
-export function mergeStatic(root: THREE.Object3D): void {
-  root.updateMatrixWorld(true);
-  const scopes = new Map<THREE.Object3D, THREE.Mesh[]>();
-  const visit = (o: THREE.Object3D, scope: THREE.Object3D) => {
-    for (const c of o.children) {
-      if (!c.visible) continue;
-      if (isScope(c)) {
-        visit(c, c);
-        continue;
-      }
-      const mesh = c as THREE.Mesh;
-      if (mesh.isMesh && c.children.length === 0 && !Array.isArray(mesh.material)) {
-        const list = scopes.get(scope) ?? [];
-        list.push(mesh);
-        scopes.set(scope, list);
-      } else visit(c, scope);
-    }
-  };
-  visit(root, root);
-
-  const inv = new THREE.Matrix4();
-  for (const [scope, meshes] of scopes) {
-    inv.copy(scope.matrixWorld).invert();
-    const buckets = new Map<string, THREE.Mesh[]>();
-    for (const m of meshes) {
-      const key = signature(m.material as THREE.Material);
-      buckets.set(key, [...(buckets.get(key) ?? []), m]);
-    }
-    for (const members of buckets.values()) {
-      if (members.length < 2) continue;
-      const parts = members.map((m) => ({ geometry: m.geometry, rel: new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld) }));
-      const cacheable = parts.every((p) => p.geometry.userData.shared);
-      const key = parts.map((p) => `${p.geometry.uuid}@${p.rel.elements.map((v) => Math.round(v * 1e4)).join(',')}`).join('|');
-      const geometry = cacheable ? cachedGeo(`merged:${key}`, () => bake(parts)) : bake(parts);
-      for (const m of members) m.removeFromParent();
-      scope.add(new THREE.Mesh(geometry, members[0].material));
-    }
-  }
-  prune(root);
-}
-
-/** Drops unnamed groups that merging left empty. */
-function prune(o: THREE.Object3D): void {
-  for (const c of [...o.children]) {
-    prune(c);
-    if (!c.name && c.children.length === 0 && c.type === 'Group') c.removeFromParent();
-  }
 }
 
 /** Inverted-hull outline on the sides only (x and z), for parts whose top and bottom must stay exact. */

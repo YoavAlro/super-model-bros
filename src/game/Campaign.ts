@@ -342,7 +342,7 @@ export class Campaign {
         const api = (this.stage?.debug() ?? this.kart?.debug()) as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival', 'forks', 'resets', 'mega', 'frozen', 'gateState', 'crushers', 'kartState', 'kartFinish', 'copies', 'trait', 'starLeft', 'starFx', 'knockOffs', 'tune', 'slowmo', 'draws', 'hit', 'width'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival', 'forks', 'resets', 'mega', 'frozen', 'gateState', 'crushers', 'kartState', 'kartFinish', 'copies', 'trait', 'starLeft', 'starFx', 'knockOffs', 'tune', 'slowmo', 'draws', 'hit', 'width', 'breakdown'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {

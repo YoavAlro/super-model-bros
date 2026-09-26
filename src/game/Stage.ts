@@ -22,7 +22,7 @@ import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } fr
 import { LevelGrid, T } from './level';
 import { LevelView } from './LevelView';
 import { HANGOVER_SPEED, bankReset, codeRedPar, judgeHype, tiboDue, type HypeCallValue } from './hype';
-import { IDLE, TROT, animateCharacter, makeCharacter, makeCrowd, makeGhost4o, makeHelper } from './characterMeshes';
+import { IDLE, TROT, animateCharacter, makeCharacter, makeCrowd, makeGhost4o, makeHelper, makeLookalike } from './characterMeshes';
 import { labelSprite, makeAura, makeBridge, makeBuiltBlock, makeEmDash, makeFlag, makeFogWall, makeParticles } from './meshes';
 import { createPuzzle, type Puzzle } from './Puzzles';
 import type { Pad } from './pad';
@@ -1359,7 +1359,8 @@ export class Stage implements StageCtx {
     this.happen('soraCameos');
     this.cameoTime = 14;
     for (let i = 0; i < 5; i++) {
-      const group = makeCharacter(hero.spec);
+      // Look-alikes, not full heroes: five full mascots at once would blow the phone's draw budget.
+      const group = makeLookalike(hero.spec);
       const tag = labelSprite(hero.form);
       tag.scale.multiplyScalar(0.42);
       tag.position.y = 1.5;
@@ -1863,6 +1864,24 @@ export class Stage implements StageCtx {
       flag: () => (this.flag ? { x: this.flag.x, y: this.flag.y } : null),
       width: () => this.grid.width,
       draws: () => ({ ...this.draws }),
+      breakdown: () => {
+        const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse));
+        const tag = new Map<THREE.Object3D, string>();
+        for (const e of this.enemyList) tag.set(e.mesh, 'enemy:' + e.kind);
+        for (const p of this.playersList) tag.set(p.mesh, 'player');
+        const out: Record<string, number> = {};
+        for (const top of this.scene.children) {
+          let n = 0;
+          top.traverseVisible((o) => {
+            const any = o as THREE.Mesh & { isPoints?: boolean; isSprite?: boolean; isLine?: boolean };
+            if ((any.isMesh || any.isPoints || any.isSprite || any.isLine) && (!o.frustumCulled || frustum.intersectsObject(o as THREE.Mesh))) n++;
+          });
+          if (!n) continue;
+          const k = tag.get(top) ?? (top.name || top.type);
+          out[k] = (out[k] ?? 0) + n;
+        }
+        return out;
+      },
       /** Hits the block at (tx, ty) from below, as the lead player would (block and pickup FX). */
       hit: (tx: number, ty: number) => this.hitBlock(tx, ty, this.playersList[0]),
       autoscroll: () => !!this.storm?.autoscroll,

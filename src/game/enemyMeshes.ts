@@ -9,7 +9,6 @@ import {
   geo,
   hazardTexture,
   linesTexture,
-  mergeStatic,
   place,
   polygon,
   radialPoints,
@@ -20,6 +19,7 @@ import {
   toon2,
   toonMap,
 } from './enemyKit';
+import { mergeStatic } from './staticMerge';
 
 /**
  * Meshes for enemies and bosses: the failure modes of AI, never companies or people.
@@ -27,7 +27,8 @@ import {
  * Every mesh is drawn with the shared toon kit: one saturated body with an ink outline, big glossy
  * eyes, and one hero prop that reads at phone size. Materials are new per call (the engine fades
  * and tints them per enemy); geometry and canvas textures are cached. Builders end with
- * mergeStatic(), which folds the static look-alike parts into a few draw calls. Named parts are
+ * mergeStatic() (`staticMerge.ts`), which folds the static parts of each material kind into one
+ * vertex-coloured draw call per scope. Named parts are
  * the engine's handles: legs, jaw, ghostBody, hands, crusherBody, crusherFace, ring, shield, clip;
  * the optional animation handles are wisp, feet, prop, heart, wingL, wingR, gearL, gearR, junk.
  */
@@ -547,6 +548,7 @@ export function makeBrief(): THREE.Group {
   add(g, extruded('brief-fold', () => polygon([[0, 0], [-0.08, 0], [0, -0.08]]), { depth: 0.005, bevelEnabled: false }), toon(0xd9d2bd), 0.21, 0.35, 0.026);
   add(g, geo.box(0.06, 0.36, 0.07), toon(0xc0362c), -0.12, 0.2, 0);
   add(g, geo.cyl(0.055, 0.055, 0.03, 12), toon(0x9a1f1a), -0.12, 0.12, 0.04).rotation.x = PI / 2;
+  mergeStatic(g);
   return g;
 }
 

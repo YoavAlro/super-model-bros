@@ -27,6 +27,7 @@ import {
 } from './mascotKit';
 import { blinkScale, ease, flick, hold, idleMoment, landingSquint, nextBlink, phaseOf, popIn, springWobble, strideRate } from './mascotMotion';
 import { prefs } from './prefs';
+import { mergeStatic } from './staticMerge';
 import { INK, basic, brow, cachedGeo, inkOutline, makeEye, roundedBox, toon } from './toonKit';
 
 /**
@@ -40,7 +41,9 @@ import { INK, basic, brow, cachedGeo, inkOutline, makeEye, roundedBox, toon } fr
  * turn see-through); geometry shared through `cachedGeo`; `userData.top` is the highest part; the
  * reasoning cape hangs from (0, 0.72, -0.3), so nothing pokes through the back there, at rest or in
  * motion. The root is the engine's (it sets its scale and turn every frame): a mascot's parts sit in
- * an inner group named `pose`, which `animateCharacter` breathes, bounces and leans.
+ * an inner group named `pose`, which `animateCharacter` breathes, bounces and leans. Every builder
+ * ends in `finish()`, which merges the static parts (`staticMerge.ts`): give a part a name to keep
+ * it moving on its own.
  */
 
 const PI = Math.PI;
@@ -79,14 +82,22 @@ function arm(s: Side, g: THREE.CapsuleGeometry, mat: THREE.Material, centre: V3,
 /** A leg (and whatever hangs off it) swinging from a hip pivot, named legL/legR. */
 const leg = (s: Side, hip: V3, ...kids: THREE.Object3D[]) => pivot(s < 0 ? 'legL' : 'legR', hip, ...kids);
 
+/** Groups whose children the idle life moves one by one (bouncing dots, chest lights, spout drops). */
+const EACH_CHILD = ['dots', 'lights', 'spout'];
+
+/** The mascots' merge scopes: every named part, and each child of a group animated child by child. */
+const ownScope = (o: THREE.Object3D) => o.name !== '' || EACH_CHILD.includes(o.parent?.name ?? '');
+
 /**
  * Tags a built mascot and moves its parts into an inner group named 'pose' (unless `pose` is false):
  * the engine owns the root's scale and turn, so breathing, bounces and leans move the pose instead.
+ * Then its static parts merge (`staticMerge.ts`): every named part keeps its own transform.
  */
 function finish(g: THREE.Group, plan: string, top: number, pose = true): THREE.Group {
   if (pose) g.add(group({ name: 'pose' }, ...g.children));
   g.userData.plan = plan;
   g.userData.top = top;
+  mergeStatic(g, { scope: ownScope });
   return g;
 }
 
@@ -743,6 +754,21 @@ export function makeCharacter(c: Mascot): THREE.Group {
   return build(c, c.look.colors, c.look.iris);
 }
 
+/** What a look-alike copy still moves: its pose (bounce and breath), its limbs (the trot) and its eyes (blinks). */
+const COPY_SCOPES = ['pose', 'legL', 'legR', 'armL', 'armR', 'eye'];
+
+/**
+ * A cheaper look-alike of a mascot, for crowds of copies that are never a player (Sora's cameos):
+ * the same parts and colours, but everything except its pose, limbs and eyes is merged into one mesh
+ * per material kind, outlines included, so a copy costs a handful of draw calls. Its tail, ears and
+ * props hold still; nothing on it is glowed or tinted by the engine.
+ */
+export function makeLookalike(c: Mascot): THREE.Group {
+  const g = makeCharacter(c);
+  mergeStatic(g, { copy: true, scope: (o) => COPY_SCOPES.includes(o.name) });
+  return g;
+}
+
 // ---------------------------------------------------------------- friends
 
 /**
@@ -843,7 +869,7 @@ export function makeCape(color: number): THREE.Group {
 /** The cape's cloth, hung from (0, 0.72, -0.3): half-widths at the clasp and the hem, and its length. */
 export const CAPE = { top: 0.28, hem: 0.4, length: 0.55 } as const;
 
-/** The crowd of new users that follows a viral star: little round figures. */
+/** The crowd of new users that follows a viral star: little round figures, one draw call each. */
 export function makeCrowd(n: number): THREE.Group {
   const g = new THREE.Group();
   const colors = [0xffd166, 0x06d6a0, 0x118ab2, 0xef476f, 0xf78c6b, 0xc3a6ff];
@@ -856,6 +882,7 @@ export function makeCrowd(n: number): THREE.Group {
     const head = new THREE.Mesh(headGeo, toon(0xffe0bd));
     head.position.y = 0.46;
     person.add(body, head);
+    mergeStatic(person);
     g.add(person);
   }
   return g;
@@ -950,7 +977,7 @@ function rigOf(root: THREE.Object3D): Rig {
       if (!r.parts[o.name]) r.parts[o.name] = o;
       r.rest.set(o, [o.position.x, o.position.y, o.position.z, o.rotation.x, o.rotation.y, o.rotation.z, o.scale.x, o.scale.y, o.scale.z]);
     });
-    for (const d of ['dots', 'lights', 'spout']) for (const k of r.parts[d]?.children ?? []) r.rest.set(k, [k.position.x, k.position.y, k.position.z, 0, 0, 0, k.scale.x, k.scale.y, k.scale.z]);
+    for (const d of EACH_CHILD) for (const k of r.parts[d]?.children ?? []) r.rest.set(k, [k.position.x, k.position.y, k.position.z, 0, 0, 0, k.scale.x, k.scale.y, k.scale.z]);
     rigs.set(root, r);
     rig = r;
   }

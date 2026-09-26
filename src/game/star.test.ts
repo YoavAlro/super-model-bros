@@ -20,7 +20,9 @@ import {
   starWeight,
   type StarKind,
 } from './starRules';
+import { mergeStatic } from './staticMerge';
 import { StarTint } from './starTint';
+import { INK, basic, toon } from './toonKit';
 
 const KINDS: StarKind[] = ['rlhf', 'viral', 'mega'];
 
@@ -267,5 +269,82 @@ describe('star tint', () => {
     c.body.emissive.setHex(0x402060);
     expect(tint.matchesOriginals()).toBe(false);
     expect(tint.matchesOriginals(c.body)).toBe(true);
+  });
+
+  describe('on merged meshes', () => {
+    /** A lit body the engine glows, and static parts of four colours that merge into two meshes. */
+    function doll() {
+      const root = new THREE.Group();
+      const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+      geo.userData.shared = true;
+      const body = new THREE.Mesh(geo, toon(0x3a7bd5));
+      body.name = 'body';
+      body.position.y = 0.5;
+      root.add(body);
+      for (const [mat, y] of [[toon(0xd04040), 0.05], [toon(0x40c060), 0.25], [basic(0xffffff), 0.9], [basic(INK), 1.0]] as const) {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(0.1, y, 0.1);
+        root.add(m);
+      }
+      return root;
+    }
+    /** The colour each visible vertex is drawn in (material colour times vertex colour), sorted. */
+    const drawn = (root: THREE.Object3D) => {
+      const out: string[] = [];
+      root.traverse((o) => {
+        const m = o as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+        if (!m.isMesh || m.name === 'body') return;
+        const col = m.material.vertexColors ? m.geometry.getAttribute('color') : null;
+        for (let i = 0; i < m.geometry.getAttribute('position').count; i++) {
+          const c = m.material.color.clone();
+          if (col) c.multiply(new THREE.Color(col.getX(i), col.getY(i), col.getZ(i)));
+          out.push(c.toArray().map((v) => v.toFixed(6)).join(','));
+        }
+      });
+      return out.sort();
+    };
+
+    it('tints each baked colour exactly as its own material would have been', () => {
+      const parts = doll();
+      const merged = doll();
+      mergeStatic(merged);
+      const meshes = merged.children.filter((o) => (o as THREE.Mesh).material && o.name !== 'body');
+      expect(meshes).toHaveLength(2);
+      expect(drawn(merged)).toEqual(drawn(parts));
+      const a = new StarTint(parts);
+      const b = new StarTint(merged);
+      for (const [kind, phase] of [['viral', 0.3], ['rlhf', 0.6], ['mega', 0.1]] as const) {
+        a.apply(kind, phase, 1);
+        b.apply(kind, phase, 1);
+        expect(drawn(merged), kind).toEqual(drawn(parts));
+        expect(drawn(merged), kind).not.toEqual(drawn(doll()));
+      }
+      expect(b.materials).toBe(a.materials);
+    });
+
+    it('tints its own copy of the colours and puts them back exactly', () => {
+      const root = doll();
+      mergeStatic(root);
+      const mesh = root.children.find((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData.baked) as THREE.Mesh;
+      const cached = mesh.geometry;
+      const own = drawn(root);
+      const cachedColors = Float32Array.from(cached.getAttribute('color').array as Float32Array);
+      const tint = new StarTint(root);
+      tint.apply('viral', 0.4, 1);
+      // The cached geometry (shared by every copy of the character) is never touched; the copy is freed with it.
+      expect(mesh.geometry).not.toBe(cached);
+      expect(mesh.geometry.userData.shared).toBeFalsy();
+      expect(cached.getAttribute('color').array).toEqual(cachedColors);
+      expect((mesh.material as THREE.MeshToonMaterial).color.getHex()).toBe(0xffffff);
+      expect(drawn(root)).not.toEqual(own);
+      expect(tint.matchesOriginals()).toBe(false);
+      tint.apply('rlhf', 0.2, 0);
+      expect(drawn(root)).toEqual(own);
+      tint.apply('mega', 0.7, 0.5);
+      tint.restore();
+      expect(drawn(root)).toEqual(own);
+      expect(mesh.geometry.getAttribute('color').array).toEqual(cachedColors);
+      expect(tint.matchesOriginals()).toBe(true);
+    });
   });
 });

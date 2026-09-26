@@ -57,30 +57,39 @@ function materials(root: THREE.Object3D): Set<THREE.Material> {
 
 const RESERVED = ['legs', 'jaw', 'ghostBody', 'hands', 'crusherBody', 'crusherFace', 'ring', 'shield', 'clip', 'body', 'eye', 'gear', 'pad', 'flag', 'alarm'];
 
+/**
+ * Per-mesh budgets (visible meshes, outline hulls left out). They leave the phone's 120 draw calls
+ * room for a screenful of enemies, a hero or two and the level: mergeStatic() draws each material
+ * kind once per scope, so a new part of a new colour costs nothing unless it needs its own scope.
+ */
+const ENEMY = 12;
+const BOSS = 16;
+const PROJECTILE = 4;
+
 type Case = { name: string; make: () => THREE.Object3D; budget: number; ground?: boolean };
 const cases = (): Case[] => [
-  { name: 'spambot', make: () => M.makeSpambot(), budget: 22, ground: true },
-  { name: 'hot take', make: () => M.makeHotTake('hype'), budget: 22, ground: true },
-  { name: 'backlash take', make: () => M.makeHotTake('backlash'), budget: 22, ground: true },
-  { name: 'timeline', make: () => M.makeTimeline('hype'), budget: 22 },
-  { name: 'backlash timeline', make: () => M.makeTimeline('backlash'), budget: 22 },
-  { name: 'jailbreaker', make: () => M.makeJailbreaker(), budget: 22, ground: true },
-  { name: 'piranha', make: () => M.makePiranha(), budget: 22, ground: true },
-  { name: 'ghost', make: () => M.makeGhost(), budget: 22 },
-  { name: 'lawyer', make: () => M.makeLawyer(), budget: 22, ground: true },
-  { name: 'brief', make: () => M.makeBrief(), budget: 8 },
-  { name: 'scroll', make: () => M.makeScroll(), budget: 8 },
-  { name: 'crusher', make: () => M.makeCrusher(), budget: 22, ground: true },
-  { name: 'agent', make: () => M.makeAgentDrone(), budget: 22, ground: true },
-  { name: 'paperclip', make: () => M.makePaperclip(1.2), budget: 22, ground: true },
-  { name: 'garbage in', make: () => M.makeSpambot(2.8, 0xa8473f), budget: 45, ground: true },
-  { name: 'reward hacker', make: () => M.makeRewardHacker(), budget: 45, ground: true },
-  { name: 'dan', make: () => M.makeDan(), budget: 45, ground: true },
-  { name: 'sydney', make: () => M.makeSydney(), budget: 45 },
-  { name: 'piranha boss', make: () => M.makePiranha(2.2), budget: 45, ground: true },
-  { name: 'hallucination king', make: () => M.makeGhostKing(), budget: 45 },
-  { name: 'orchestrator', make: () => M.makeOrchestrator(), budget: 45 },
-  { name: 'maximizer', make: () => M.makePaperclipMaximizer(), budget: 45, ground: true },
+  { name: 'spambot', make: () => M.makeSpambot(), budget: ENEMY, ground: true },
+  { name: 'hot take', make: () => M.makeHotTake('hype'), budget: ENEMY, ground: true },
+  { name: 'backlash take', make: () => M.makeHotTake('backlash'), budget: ENEMY, ground: true },
+  { name: 'timeline', make: () => M.makeTimeline('hype'), budget: ENEMY },
+  { name: 'backlash timeline', make: () => M.makeTimeline('backlash'), budget: ENEMY },
+  { name: 'jailbreaker', make: () => M.makeJailbreaker(), budget: ENEMY, ground: true },
+  { name: 'piranha', make: () => M.makePiranha(), budget: ENEMY, ground: true },
+  { name: 'ghost', make: () => M.makeGhost(), budget: ENEMY },
+  { name: 'lawyer', make: () => M.makeLawyer(), budget: ENEMY, ground: true },
+  { name: 'brief', make: () => M.makeBrief(), budget: PROJECTILE },
+  { name: 'scroll', make: () => M.makeScroll(), budget: PROJECTILE },
+  { name: 'crusher', make: () => M.makeCrusher(), budget: ENEMY, ground: true },
+  { name: 'agent', make: () => M.makeAgentDrone(), budget: ENEMY, ground: true },
+  { name: 'paperclip', make: () => M.makePaperclip(1.2), budget: ENEMY, ground: true },
+  { name: 'garbage in', make: () => M.makeSpambot(2.8, 0xa8473f), budget: BOSS, ground: true },
+  { name: 'reward hacker', make: () => M.makeRewardHacker(), budget: BOSS, ground: true },
+  { name: 'dan', make: () => M.makeDan(), budget: BOSS, ground: true },
+  { name: 'sydney', make: () => M.makeSydney(), budget: BOSS },
+  { name: 'piranha boss', make: () => M.makePiranha(2.2), budget: BOSS, ground: true },
+  { name: 'hallucination king', make: () => M.makeGhostKing(), budget: BOSS },
+  { name: 'orchestrator', make: () => M.makeOrchestrator(), budget: BOSS },
+  { name: 'maximizer', make: () => M.makePaperclipMaximizer(), budget: BOSS, ground: true },
 ];
 
 describe('enemy meshes', () => {
