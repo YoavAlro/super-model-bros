@@ -103,6 +103,11 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/config/karts.ts`, `src/game/kart.ts`, `src/game/KartRace.ts` | Benchmark Kart: race config, the pure fixed-step race sim (unit tested), and its view |
 | `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave, two-key plates |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
+| `src/game/toonKit.ts` | The toon style shared by the whole cast: three-band ramp, per-instance toon and unlit materials, cached geometry, glossy eyes, rounded boxes, ink outlines |
+| `src/game/characterMeshes.ts`, `mascotKit.ts`, `mascotMotion.ts` | The seven mascots (one builder per body plan, looks from `look` in `src/config/characters.ts`), the Helper, the GPT-4o ghost, cape and crowd, and their idle life (`animateCharacter`; timing curves unit tested); `portraits.ts` renders them for the title roster |
+| `src/game/enemyMeshes.ts`, `enemyKit.ts` | Every enemy, projectile and boss mesh, with the named parts the engine animates (contract unit tested in `enemyMeshes.test.ts`) |
+| `src/game/starRules.ts`, `starFx.ts`, `starTint.ts` | Star power: timing, colour, somersault, knock-off and combo rules (unit tested), the rainbow tint with exact restore, sparkles, and knocked-off enemies |
+| `src/ui/zoomLock.ts` | iOS Safari: cancels pinch and double-tap zoom at rest, and leaves a way back out if a zoom gets through |
 | `src/game/art.ts`, `tileArt.ts`, `palette.ts`, `edges.ts`, `shared.ts` | The toy-box art kit: cached soft canvas textures, the 2×2 tile atlas and its per-theme painters, colour and contrast maths, backdrop edge profiles (readability rules unit tested in `art.test.ts`) |
 | `src/game/fx.ts`, `fxPool.ts` | Pooled particle FX owned by the level view: bursts, rings, trails, "+1" (the pool is pure and unit tested) |
 | `src/game/backdrop.ts`, `itemMeshes.ts` | The cardboard backdrop dioramas (strips, set pieces, celestials, clouds, ambient life and each world's signature extras, built from the theme config) and the collectibles: board-game data chips, trap coins, power-up toys and their idles (`animateItem`) |
@@ -126,6 +131,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M6 ✅ | Worlds 6–7 | Swarm Factory (fork cherry = agent clones, two-key plates, rate-limit crushers, Rogue Swarm boss); storms for the Pentagon dispute, the export freeze and Astra's phased rollout; Frontier Castle (frontier mushroom, Paperclip Maximizer) → Astra / Opus 5.5 finales and the recap |
 | M7 ✅ | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits (Llama's open-weights copy, Grok's cloud); six Benchmark Kart races between worlds |
 | M8 ✅ | Polish | Original chiptune music from a config-driven WebAudio sequencer; settings on the title and pause menus (music, sound, reduce motion, assist, large text); freed meshes and memory checks over whole-path runs; a fact pass over every card (all 🔎 facts verified, reworded or re-sourced); the Sora cameo Moment |
+| M8b ✅ | Facelift | Toon mascots with idle life and title-screen portraits; the enemy and boss redesign; toy collectibles, era-craft tiles and cardboard backdrop dioramas for all 12 themes; star power (its own tune, rainbow, sparkles, somersault, knock-off combos); the story timeline screen; the human jump margin and camera-trap checks in the level tests; the iOS zoom lock |
 | M9 | Online multiplayer | Hosted rooms for online co-op/versus |
 
 ## Accessibility & performance

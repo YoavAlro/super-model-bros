@@ -19,6 +19,25 @@ Traits are affectionate nods to each model's real reputation, never digs. Unlock
 title screen and can play either path. Unlock rules: `unlockRule` in `src/config/characters.ts`, checked by
 `checkUnlocks` in `src/game/progress.ts` (unit tested on both real paths).
 
+### Looks
+
+Each mascot is an original toy-like design that evokes its lab through colour and a generic motif, never a logo
+(builders in `src/game/characterMeshes.ts`, palettes in `look` in `src/config/characters.ts`).
+
+| Character | Look |
+|---|---|
+| GPT | A green walking speech bubble with a cowlick; idle, his grin turns into "typing…" dots |
+| Claude | A tall clay block with an ink face page, a long cream scarf (long context) and a quill |
+| Gemini | Twin domes (the constellation's twins), blue and violet, each with its own face and mood |
+| Llama | An upright llama in purple wool, with a gold "open weights" dumbbell charm |
+| DeepSeek | A cobalt whale calf whose spout puffs faster as it runs (more with less) |
+| Mistral | A sunset-gradient cat with a gust tail and a neckerchief (the mistral wind; Le Chat) |
+| Grok | A space cadet in a bubble helmet with a wink and a towel (a Hitchhiker's nod) |
+
+Enemies and bosses are failure modes drawn as objects with faces: a furious junk-mail envelope (Spambot), a
+self-awarded trophy (Reward Hacker), a picked padlock (Jailbreaker), a 429 status slab (rate limit), a crowned
+bedsheet ghost (Hallucination King), a one-eyed clip factory (Paperclip Maximizer).
+
 ## Benchmark Kart
 
 Between worlds, a short, optional kart race on a track named after a real benchmark, against three rival

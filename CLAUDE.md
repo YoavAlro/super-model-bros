@@ -21,7 +21,9 @@ Before every commit, run `npm test && npm run build`.
   it fails on impossible jumps and soft-locks, and on jumps with no human margin: every level must still be
   finishable at `HUMAN_MARGIN` (90%) of the weakest jump, or 95% for a deliberate 4-tall climb named in
   `DELIBERATE_CLIMBS`. That checks height and distance to spare, not that the obvious route is safe: a block over
-  a pit can still knock a runner in, so play those spots.
+  a pit can still knock a runner in, so play those spots. The camera only scrolls forward, so the same tests fail
+  on camera traps: a spot whose only way on needs walking back more than `VIEW_BACK` tiles (a 4:3 desktop view),
+  checked with puzzle gates open too. Dead-end rooms behind a gate need a second exit.
 - Fact lines use `fact(text, ...sourceIds)`; gameplay advice uses `tip(text)`. Sources live in `src/config/sources.ts`.
 - Pure logic (`level.ts`, `physics.ts`, `diet.ts`, and any new rules) gets unit tests. Rendering doesn't.
 - Mario-inspired, not Mario: no Nintendo names, sprites, music, or layouts in the game.

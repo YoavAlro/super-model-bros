@@ -13,7 +13,9 @@ R's in strawberry?"); the Swarm Factory (fork cherry agents, rate limits, the Ro
 Castle (the frontier mushroom and the Paperclip Maximizer). Hype power-ups ask you to call them "passing hype"
 or "lasting shift", Benchmark Kart races run between worlds, five rival-lab friends unlock as playable characters,
 and the finale recap compares your run with real history. The story timeline (on the title screen and in the pause
-menu) lays out both brothers' stories by world and by date, with your best stars. Solo, or co-op on one keyboard.
+menu) lays out both brothers' stories by world and by date, with your best stars. Every star has its own tune,
+a rainbow glow and knock-off combos. The cast are toon mascots that nod to each lab without its logo, in toy-box
+worlds that change craft with the era. Solo, or co-op on one keyboard.
 
 - Design: [GAME_DESIGN.md](GAME_DESIGN.md)
 - Goal and done-conditions: [GOAL.md](GOAL.md)
