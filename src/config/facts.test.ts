@@ -10,7 +10,10 @@ import type { FactCard } from './types';
 export function allCards(): { where: string; card: FactCard }[] {
   const cards: { where: string; card: FactCard }[] = [];
   for (const l of ALL_LEVELS) cards.push({ where: `${l.id} intro`, card: l.intro }, { where: `${l.id} outro`, card: l.outro });
-  for (const p of Object.values(PATHS)) if (p.prologue) cards.push({ where: `${p.id} prologue`, card: p.prologue });
+  for (const p of Object.values(PATHS)) {
+    if (p.prologue) cards.push({ where: `${p.id} prologue`, card: p.prologue });
+    cards.push({ where: `${p.id} origin`, card: { title: p.origin.name, date: p.origin.date, lines: [p.origin.line] } });
+  }
   for (const h of Object.values(HYPES)) cards.push({ where: `hype ${h.id}`, card: { title: h.name, date: h.when, lines: h.lines } });
   for (const m of Object.values(MOMENTS)) cards.push({ where: `moment ${m.id}`, card: { title: m.name, date: '', lines: [m.fact] } });
   for (const k of KARTS) cards.push({ where: `${k.id} intro`, card: k.intro }, { where: `${k.id} results`, card: { title: k.name, date: '', lines: [k.spotlight] } });

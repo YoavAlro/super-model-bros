@@ -1,6 +1,6 @@
 import { DATA_TYPES, type DataTypeId } from '../config/dataTypes';
 import { SOURCES } from '../config/sources';
-import type { FactCard, Mix } from '../config/types';
+import type { FactCard, FactLine, Mix } from '../config/types';
 import { sfx, unlockAudio } from '../game/sfx';
 import { el, hex, pct } from './dom';
 
@@ -22,6 +22,61 @@ export interface FactCardOptions<T = void> {
   extra?: HTMLElement;
 }
 
+/** A link that opens a source in a new tab. */
+function sourceLink(id: string, className: string | undefined, text: string): HTMLAnchorElement {
+  const a = el('a', className, text);
+  a.href = SOURCES[id]?.url ?? '#';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  return a;
+}
+
+/**
+ * One fact card line as a list item: facts carry numbered source links (numbered by their place in
+ * `cited`, which this extends), tips are marked as tips.
+ */
+export function factLineItem(line: FactLine, cited: string[]): HTMLLIElement {
+  const li = el('li', line.tip ? 'tip' : undefined, line.text);
+  for (const id of line.src ?? []) {
+    if (!cited.includes(id)) cited.push(id);
+    const sup = el('sup');
+    const a = sourceLink(id, 'cite', `${cited.indexOf(id) + 1}`);
+    a.title = SOURCES[id] ? `${SOURCES[id].title} · ${SOURCES[id].publisher}` : id;
+    sup.append(a);
+    li.append(sup);
+  }
+  return li;
+}
+
+/** The collapsible, numbered source list for the ids `factLineItem` cited. */
+export function sourcesBox(cited: readonly string[]): HTMLDetailsElement {
+  const sources = el('ol', 'sources');
+  for (const id of cited) {
+    const s = SOURCES[id];
+    const li = el('li');
+    li.append(sourceLink(id, undefined, s ? s.title : id), document.createTextNode(s ? ` · ${s.publisher}` : ''));
+    sources.append(li);
+  }
+  const details = el('details', 'sources-box');
+  details.append(el('summary', undefined, `Sources (${cited.length})`), sources);
+  return details;
+}
+
+/**
+ * A key still held from gameplay (auto-repeat, or pressed as the modal opened) must not press anything
+ * in it: Enter and Space are swallowed while they repeat and for the first 400 ms.
+ */
+export function blockHeldKeys(backdrop: HTMLElement): void {
+  const opened = performance.now();
+  backdrop.addEventListener(
+    'keydown',
+    (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && (e.repeat || performance.now() - opened < 400)) e.preventDefault();
+    },
+    true,
+  );
+}
+
 /**
  * Modal history card. Fact lines carry numbered source links; tips are marked as tips.
  * Resolves with the chosen button's value when the player continues.
@@ -39,21 +94,7 @@ export function showFactCard<T = void>(parent: HTMLElement, opts: FactCardOption
     modal.setAttribute('aria-label', opts.card.title);
     const list = el('ul');
     const cited: string[] = [];
-    for (const line of opts.card.lines) {
-      const li = el('li', line.tip ? 'tip' : undefined, line.text);
-      for (const id of line.src ?? []) {
-        if (!cited.includes(id)) cited.push(id);
-        const sup = el('sup');
-        const a = el('a', 'cite', `${cited.indexOf(id) + 1}`);
-        a.href = SOURCES[id]?.url ?? '#';
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.title = SOURCES[id] ? `${SOURCES[id].title} · ${SOURCES[id].publisher}` : id;
-        sup.append(a);
-        li.append(sup);
-      }
-      list.append(li);
-    }
+    for (const line of opts.card.lines) list.append(factLineItem(line, cited));
     modal.append(el('div', 'modal-date', opts.card.date), title, list);
     if (opts.extra) modal.append(opts.extra);
 
@@ -69,22 +110,7 @@ export function showFactCard<T = void>(parent: HTMLElement, opts: FactCardOption
       modal.append(table);
     }
 
-    if (cited.length) {
-      const sources = el('ol', 'sources');
-      for (const id of cited) {
-        const s = SOURCES[id];
-        const li = el('li');
-        const a = el('a', undefined, s ? `${s.title}` : id);
-        a.href = s?.url ?? '#';
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        li.append(a, document.createTextNode(s ? ` · ${s.publisher}` : ''));
-        sources.append(li);
-      }
-      const details = el('details', 'sources-box');
-      details.append(el('summary', undefined, `Sources (${cited.length})`), sources);
-      modal.append(details);
-    }
+    if (cited.length) modal.append(sourcesBox(cited));
 
     const buttons: CardButton<T>[] = opts.buttons ?? [{ label: opts.button ?? 'Continue', value: undefined as T, primary: true }];
     const row = el('div', 'card-buttons');
@@ -103,15 +129,7 @@ export function showFactCard<T = void>(parent: HTMLElement, opts: FactCardOption
     backdrop.append(modal);
     parent.append(backdrop);
     sfx.card();
-    // A key still held from gameplay (auto-repeat, or pressed as the card opened) must not skip the card.
-    const opened = performance.now();
-    backdrop.addEventListener(
-      'keydown',
-      (e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && (e.repeat || performance.now() - opened < 400)) e.preventDefault();
-      },
-      true,
-    );
+    blockHeldKeys(backdrop);
     // Keyboard: arrows move between buttons; Enter/Space press the focused one.
     backdrop.addEventListener('keydown', (e) => {
       const i = nodes.indexOf(document.activeElement as HTMLButtonElement);

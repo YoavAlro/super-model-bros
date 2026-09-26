@@ -3,9 +3,11 @@ import { LEVELS } from '../config/levels';
 import { PATHS, type PathId } from '../config/paths';
 import { Input } from '../game/Input';
 import { isUnlocked } from '../game/progress';
+import { pathSpan } from '../game/storyTimeline';
 import { writeSave, type SaveData } from '../save';
 import { el, hex } from './dom';
 import { applySettings, settingsPanel } from './Settings';
+import { showStoryTimeline } from './StoryTimeline';
 
 export interface StartChoice {
   path: PathId;
@@ -38,7 +40,7 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
     const hero = CHARACTERS[path.hero];
     const head = el('div', 'path-head', path.name);
     head.style.color = hex(hero.color);
-    const sub = el('div', 'path-sub', id === 'gpt' ? 'Transformer (2017) → GPT-6 Astra (2026)' : 'Anthropic (2021) → Claude Opus 5.5 (2026)');
+    const sub = el('div', 'path-sub', pathSpan(path, LEVELS));
     col.append(head, sub);
     const run = save.runs[id];
     if (run && run.step > 0 && run.step < path.steps.length) {
@@ -55,6 +57,13 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
       duo.addEventListener('click', () => start({ path: id, players: 2, resume: false }));
       col.append(duo);
     }
+    const story = el('button', 'btn', 'Story timeline');
+    story.addEventListener('click', () => {
+      // Safari does not focus a clicked button; the timeline gives focus back to whatever had it.
+      story.focus({ preventScroll: true });
+      void showStoryTimeline(parent, { tab: id, progress: save.progress, runs: save.runs });
+    });
+    col.append(story);
     menu.append(col);
   }
   inner.append(menu);

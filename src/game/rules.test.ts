@@ -28,6 +28,7 @@ const PATH: PathSpec = {
   hero: 'gpt',
   partner: 'claude',
   startForm: 'Blank',
+  origin: { name: 'Blank', date: '2017', line: { text: 'Test origin', tip: true } },
   steps: [{ level: 'a' }, { level: 'b' }, { level: 'storm', when: 'shadowBooks' }, { level: 'c' }, { level: 'd' }],
 };
 

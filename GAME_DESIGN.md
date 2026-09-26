@@ -99,13 +99,14 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/Player.ts`, `Enemies.ts`, `Bosses.ts`, `Items.ts`, `Platforms.ts` | Actors (platforms are rideable actors: moving platforms, Timeline clouds) |
 | `src/game/storm.ts`, `puzzleRules.ts`, `gates.ts`, `forks.ts` | Pure storm, puzzle, gate-timeline and fork rules (unit tested) |
 | `src/game/recap.ts`, `src/config/recap.ts`, `src/ui/Recap.ts` | The finale recap: your stars and hype calls against the real timeline (rules unit tested) |
+| `src/game/storyTimeline.ts`, `src/ui/StoryTimeline.ts`, `src/config/worlds.ts` | Story timeline screen: both stories by world and by date, with your best stars (opened from the title and the pause menu; rules unit tested) |
 | `src/config/karts.ts`, `src/game/kart.ts`, `src/game/KartRace.ts` | Benchmark Kart: race config, the pure fixed-step race sim (unit tested), and its view |
 | `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave, two-key plates |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
 | `src/config/music.ts`, `src/game/music.ts`, `musicTheory.ts` | Original background tunes (scale degrees over chords), the lookahead WebAudio sequencer, and its pure note math (unit tested) |
 | `src/ui/Settings.ts`, `src/game/prefs.ts` | Settings toggles (title screen and pause menus) and the reduce-motion flag that rendering reads |
-| `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape |
+| `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape (`timeline` checks the story timeline) |
 
 `?debug` in the URL exposes `window.__smb` (teleport, state, bosses, stomp, give, next) for Playwright smoke tests;
 `?debug&level=claude-2-2` skips the title and starts that level (`&flags=shadowBooks`, `&perks=teamFork` set run state).

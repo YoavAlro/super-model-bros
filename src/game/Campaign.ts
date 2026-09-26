@@ -12,6 +12,7 @@ import { Hud } from '../ui/Hud';
 import { el } from '../ui/dom';
 import { recapTable } from '../ui/Recap';
 import { applySettings } from '../ui/Settings';
+import { showStoryTimeline } from '../ui/StoryTimeline';
 import type { StartChoice } from '../ui/TitleScreen';
 import { shares, total } from './diet';
 import { Input } from './Input';
@@ -78,6 +79,8 @@ export class Campaign {
     root.append(this.overlay);
     this.input = new Input(this.run.players, this.overlay, this.isTouch);
     this.hud = new Hud(this.overlay, this.isTouch, () => this.input.requestPause());
+    // The pause menu (in a level or a race) opens the story timeline; the game stays paused under it.
+    this.hud.onTimeline = () => showStoryTimeline(root, { tab: this.path.id, progress: save.progress, runs: save.runs });
     if (this.run.players === 2) {
       this.hud.setHint('P1: A/D move · W jump · L-Shift run · S power   |   P2: ←/→ move · ↑ jump · R-Shift run · ↓ power   |   Esc pause');
     }
