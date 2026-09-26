@@ -239,6 +239,25 @@ describe('reachability checker', () => {
     ]);
     expect(deep.deadEnds.length).toBeGreaterThan(0);
   });
+
+  it('stands a body that landed hanging off a ledge on the ledge, not in mid-air', () => {
+    // Spot (10, 2) is keyed by the pit column, but a body there still has its feet on the ledge
+    // and can walk back for a run-up. Started in mid-air it could only hop back into the block
+    // above the ledge and drop into the pit, so the spot used to read as a soft-lock.
+    const grid = new LevelGrid([
+      '                            ',
+      '                            ',
+      '         X                  ',
+      '                            ',
+      '                            ',
+      '                         F  ',
+      '##########        ##########',
+      '##########        ##########',
+    ]);
+    const r = analyzeReach(grid, { x: 10, y: 2 }, grid.spawnOf('flag')!.x, { stats: { ...GPT, jumpVelocity: 21 }, h: 1.75 });
+    expect(r.goalReachable).toBe(true);
+    expect(r.deadEnds).toEqual([]);
+  });
 });
 
 describe('storms', () => {

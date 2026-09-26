@@ -100,7 +100,7 @@ export interface LevelSpec {
    * Tokens: `o` Books, `w` Web, `k` Wikipedia, `c` Code, `f` Human Feedback, `n` Principles, `v` Images,
    * `t` Reasoning, `u` Tool use, `a` Agent tasks, `m` Audio, `s` Shadow library.
    * Digits are level-specific markers.
-   * Physics: a standing jump clears about 4 tiles, and a 4-tall wall needs a running jump.
+   * Physics (weakest character): a standing jump clears 3 tiles and a running jump 4; never ask for 5.
    */
   map: string[];
 }

@@ -265,8 +265,8 @@ export const WORLD_4: LevelSpec[] = [
       fill(START, { Q: 'c', V: 'v' }),
       [
         '                                ',
-        '          !                     ',
         '                                ',
+        '   !      X                     ',
         '   ccc          ccc      ff     ',
         '        e                 e     ',
         '#######      ######      #######',
