@@ -9,6 +9,10 @@ import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mo
 import type { Pad } from './pad';
 import type { Grid } from './physics';
 import { sfx } from './sfx';
+import { StarFx, rollAboutMiddle, type StarState } from './starFx';
+import { spinAngle, spinDuration, type StarKind } from './starRules';
+
+export type { StarKind } from './starRules';
 
 const SMALL_W = 0.8;
 const SMALL_H = 0.95;
@@ -19,7 +23,6 @@ const MEGA_H = 3;
 
 /** A power you keep until you get hit. */
 export type HeldPower = 'tool' | 'cape' | null;
-export type StarKind = 'rlhf' | 'viral' | 'mega';
 
 export class PlayerActor {
   readonly mover: Mover;
@@ -29,6 +32,10 @@ export class PlayerActor {
   /** Seconds of star invincibility left. */
   star = 0;
   starKind: StarKind | null = null;
+  /** The current star's full length, for the rainbow's timing. */
+  starTotal = 0;
+  /** Enemies this star has knocked off so far (the combo chain). */
+  starChain = 0;
   dead = false;
   finished = false;
   /** Blinking grace period after a hit. */
@@ -63,6 +70,12 @@ export class PlayerActor {
   private actionHeldPrev = false;
   private ghosted = false;
   private squash = 0;
+  private readonly fx: StarFx;
+  /** Reused every frame, so starred frames allocate nothing. */
+  private readonly starState: StarState = { kind: 'rlhf', left: 0, total: 0 };
+  /** Seconds into a starred jump's somersault (-1: none), and how long the rise lasts. */
+  private spin = -1;
+  private spinTime = 0.4;
 
   constructor(
     readonly spec: CharacterSpec,
@@ -85,6 +98,7 @@ export class PlayerActor {
     if (clone) this.mesh.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.setValues?.({ transparent: true, opacity: 0.55 }));
     this.tag = this.makeTag(clone ? cloneTag : form);
     scene.add(this.mesh, this.tag);
+    this.fx = new StarFx(this.mesh, scene);
   }
 
   get body() {
@@ -129,7 +143,17 @@ export class PlayerActor {
 
   giveStar(kind: StarKind, seconds: number): void {
     this.star = seconds;
+    this.starTotal = seconds;
     this.starKind = kind;
+    this.starChain = 0;
+  }
+
+  /** The star runs out (or the player dies or finishes): every colour goes back at once. */
+  endStar(): void {
+    this.star = 0;
+    this.starKind = null;
+    this.starChain = 0;
+    this.fx.restore();
   }
 
   /**
@@ -192,7 +216,7 @@ export class PlayerActor {
     if (this.dead) return;
     this.dead = true;
     this.power = null;
-    this.star = 0;
+    this.endStar();
     this.endMega();
     this.body.vx = 0;
     this.body.vy = 16;
@@ -245,7 +269,7 @@ export class PlayerActor {
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.star > 0) {
       this.star = Math.max(0, this.star - dt);
-      if (this.star === 0) this.starKind = null;
+      if (this.star === 0) this.endStar();
     }
     if (this.mega > 0) {
       this.mega = Math.max(0, this.mega - dt);
@@ -270,6 +294,11 @@ export class PlayerActor {
     if (ev.jumped || ev.airJumped) {
       this.squash = -0.2;
       if (!this.clone) sfx.jump();
+      // Starred jumps somersault through the rise (drawn in updateMesh).
+      if (this.star > 0) {
+        this.spin = 0;
+        this.spinTime = spinDuration(b.vy, this.stats().gravity);
+      }
     }
     if (ev.dashed) sfx.dash();
     if (ev.landed) this.squash = 0.25;
@@ -297,14 +326,22 @@ export class PlayerActor {
         if (m) m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
       });
     }
+    if (this.spin >= 0) {
+      this.spin += dt;
+      const angle = spinAngle(this.spin, this.spinTime);
+      if (angle === 0 || this.dead) this.spin = -1;
+      else if (!prefs.reduceMotion) rollAboutMiddle(this.mesh, -this.mover.facing * angle, b.h / 2);
+    }
+    const star = this.starState;
+    star.kind = this.starKind ?? 'rlhf';
+    star.left = this.star;
+    star.total = this.starTotal;
+    this.fx.update(dt, this.star > 0 && this.starKind ? star : null, b);
     this.cape.visible = this.power === 'cape';
     (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
-    if (this.bodyMat) {
-      if (this.star > 0) {
-        const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : this.starKind === 'mega' ? 0.12 + Math.sin(t * 3) * 0.04 : 0.13;
-        const pulse = 0.4 + 0.4 * Math.abs(Math.sin(t * 12));
-        this.bodyMat.emissive.setHSL(hue, 1, 0.5 * pulse);
-      } else if (this.power === 'tool') {
+    // A star's rainbow (starFx.ts) owns every colour while it lasts.
+    if (this.bodyMat && this.star <= 0) {
+      if (this.power === 'tool') {
         this.bodyMat.emissive.setHex(0x0d5c50);
       } else if (this.thinking) {
         this.bodyMat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
@@ -316,7 +353,13 @@ export class PlayerActor {
     this.tag.visible = !this.dead;
   }
 
+  /** For the debug hooks: the star effects' state. */
+  starDebug() {
+    return { ...this.fx.debug(), spinning: this.spin >= 0, left: this.star, kind: this.starKind, chain: this.starChain };
+  }
+
   dispose(): void {
+    this.fx.dispose();
     this.scene.remove(this.mesh, this.tag);
     disposeObject(this.mesh);
     disposeObject(this.tag);

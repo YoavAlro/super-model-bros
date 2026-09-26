@@ -3,7 +3,7 @@ import { CHARACTERS, type CharacterId } from '../config/characters';
 import { HYPES, MOMENTS, STORMS, type HypeSpec, type MomentId, type MomentSpec, type StormSpec } from '../config/events';
 import type { LevelSpec, PowerId } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
-import { THEME_TUNES } from '../config/music';
+import { THEME_TUNES, type TuneId } from '../config/music';
 import { THEMES } from '../config/themes';
 import { tip } from '../config/types';
 import type { Settings } from '../save';
@@ -34,6 +34,8 @@ import { prefs } from './prefs';
 import { music } from './music';
 import { mulberry32 } from './rng';
 import { sfx } from './sfx';
+import { KnockOffs } from './starFx';
+import { pickTune } from './starRules';
 import { stormDay } from './storm';
 
 export const STEP = 1 / 120;
@@ -109,6 +111,10 @@ export class Stage implements StageCtx {
   private shots: { shot: FunctionCall; owner: PlayerActor }[] = [];
   private debris: Debris[] = [];
   private bosses: Boss[] = [];
+  /** Enemies a star knocked off, flying off the screen. */
+  private knocks!: KnockOffs;
+  /** The tune this stage last asked for (undefined: none yet). */
+  private tune: TuneId | null | undefined;
   private helper: THREE.Group | null = null;
   private flag: { group: THREE.Group; x: number; y: number; slide: number } | null = null;
   private crowd: THREE.Group | null = null;
@@ -173,6 +179,8 @@ export class Stage implements StageCtx {
   private clearTimer = 0;
   private respawnTimer = 0;
   private hudTimer = 0;
+  /** Debug slow motion (`__smb.slowmo`), for frame-by-frame screenshots. */
+  private timeScale = 1;
   private readonly seen = new Set<string>();
   private random: () => number;
   private resolve!: (r: StageResult) => void;
@@ -247,6 +255,7 @@ export class Stage implements StageCtx {
     sun.position.set(-4, 10, 8);
     this.scene.add(sun);
 
+    this.knocks = new KnockOffs(this.scene);
     this.grid = new LevelGrid(spec.map);
     this.view = new LevelView(this.grid, theme, this.scene);
     this.counts = emptyCounts();
@@ -396,7 +405,7 @@ export class Stage implements StageCtx {
   /** Starts the simulation (the level is drawn behind its intro card until then). */
   begin(): void {
     if (this.state === 'intro') this.state = 'playing';
-    music.play(THEME_TUNES[this.spec.theme]);
+    this.syncMusic();
     this.input.clear();
     const moments = this.spec.moments ?? [];
     if (moments.includes('emDashFixed')) this.happen('emDashFixed');
@@ -419,6 +428,7 @@ export class Stage implements StageCtx {
 
   // -------------------------------------------------------------- frame loop
   frame(dt: number, t: number, renderer: THREE.WebGLRenderer): void {
+    dt *= this.timeScale;
     if (this.input.consumePause() && this.state !== 'intro') this.togglePause();
     // Portrait phones show a "rotate your phone" overlay; hold the game until it turns.
     const portraitTouch = this.isTouch && window.innerHeight > window.innerWidth;
@@ -435,6 +445,7 @@ export class Stage implements StageCtx {
     this.view.update(dt);
     for (const p of this.playersList) p.updateMesh(t, dt);
     for (const e of this.enemyList) e.updateMesh(t);
+    this.knocks.draw();
     for (const tok of this.tokens) tok.updateMesh(t);
     for (const item of this.items) item.updateMesh(t);
     for (const trap of this.trapList) trap.updateMesh(t);
@@ -448,6 +459,7 @@ export class Stage implements StageCtx {
     if (this.fogWall) this.fogWall.position.x = this.fogX;
     this.placeCamera(dt);
     renderer.render(this.scene, this.camera);
+    this.syncMusic();
 
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -531,6 +543,7 @@ export class Stage implements StageCtx {
       if (e.active) e.step(dt, this);
     }
     this.stepBosses(dt);
+    this.knocks.step(dt);
     this.stepPickups(dt);
     this.stepShots(dt);
     this.collidePlayers();
@@ -804,7 +817,6 @@ export class Stage implements StageCtx {
         if (boss === this.bosses[0]) {
           this.hud.toast(boss.intro, 'bad');
           sfx.boss();
-          music.play('boss');
         }
       }
       if (!boss.awake) continue;
@@ -881,12 +893,12 @@ export class Stage implements StageCtx {
       case 'rlhf':
         p.giveStar('rlhf', 8);
         if (this.alignment !== null) this.alignment = Math.min(100, this.alignment + 20);
-        sfx.star();
+        sfx.starGet();
         this.once('rlhf', 'RLHF star! Human feedback makes you invincible and raises Alignment.', 'good');
         break;
       case 'viral':
         p.giveStar('viral', 10);
-        sfx.star();
+        sfx.starGet();
         this.once('viral', 'Viral star! You are invincible, and a crowd of new users follows you.', 'good');
         break;
       case 'tool':
@@ -910,7 +922,7 @@ export class Stage implements StageCtx {
         break;
       case 'mega':
         p.giveMega(12, (x, w, h) => !this.overlapsSolid({ x, y: p.body.y, w, h, vx: 0, vy: 0, onGround: false }));
-        sfx.star();
+        sfx.starGet();
         this.once('mega', 'Frontier mushroom! You are a giant frontier model for a while: nothing can stop you.', 'good');
         break;
       case 'frozen':
@@ -1061,10 +1073,7 @@ export class Stage implements StageCtx {
       for (const e of this.enemyList) {
         if (!e.alive || !e.active || !overlaps(p.body, e.body)) continue;
         if (p.invincible) {
-          if (e.shootable) {
-            e.onShot(this);
-            sfx.stomp();
-          }
+          if (e.shootable) this.knockOff(e, p);
         } else if (e.stompable && isStomp(p, e.body)) {
           e.onStomp(this, p);
           p.bounce(pad.jump);
@@ -1092,6 +1101,18 @@ export class Stage implements StageCtx {
         }
       }
     }
+  }
+
+  /** A starred player runs into an enemy: it flips and flies off the screen, and the combo grows. */
+  private knockOff(e: Enemy, p: PlayerActor): void {
+    if (!e.knockOff(this)) {
+      sfx.stomp();
+      return;
+    }
+    p.starChain++;
+    const away = Math.sign(e.body.x + e.body.w / 2 - (p.body.x + p.body.w / 2)) || p.mover.facing;
+    this.knocks.add(e.mesh, e.body, away, p.starChain);
+    sfx.kick(p.starChain);
   }
 
   private onBossesDefeated(): void {
@@ -1504,11 +1525,29 @@ export class Stage implements StageCtx {
     }
     this.state = 'clear';
     this.clearTimer = 2.2;
-    music.stop();
     for (const p of this.playersList) {
       p.finished = true;
+      p.endStar();
       if (p.spec.id === this.opts.path.hero) p.setForm(this.spec.toward.name);
     }
+  }
+
+  /**
+   * Plays whatever should be playing (see `pickTune`): the star tune while anyone is starred, the
+   * boss tune while a boss is up, else the level's theme, and nothing once the level is over.
+   */
+  private syncMusic(): void {
+    if (this.state === 'intro' || this.state === 'done') return;
+    const want = pickTune({
+      level: THEME_TUNES[this.spec.theme],
+      over: this.state === 'clear',
+      starred: this.playersList.some((p) => p.star > 0),
+      bossAwake: this.bosses.some((b) => b.awake && b.alive),
+    });
+    if (want === this.tune) return;
+    this.tune = want;
+    if (want) music.play(want);
+    else music.stop();
   }
 
   private killPlayer(p: PlayerActor): void {
@@ -1757,6 +1796,16 @@ export class Stage implements StageCtx {
       traps: () => this.trapList.filter((t) => !t.taken).map((t) => ({ kind: t.kind, x: t.body.x, y: t.body.y })),
       enemies: () => this.enemyList.filter((e) => e.alive).map((e) => ({ kind: e.kind, x: e.body.x, y: e.body.y, w: e.body.w, h: e.body.h, active: e.active })),
       star: () => this.playersList[0].star,
+      /** Sets player 1's star to `left` seconds (to see the warning blink), if they have one. */
+      starLeft: (left: number) => {
+        const p = this.playersList[0];
+        if (p.star > 0) p.star = left;
+        return p.star;
+      },
+      starFx: () => this.playersList.filter((p) => !p.clone).map((p) => p.starDebug()),
+      knockOffs: () => this.knocks.count,
+      slowmo: (scale: number) => (this.timeScale = scale),
+      tune: () => this.tune ?? null,
       hype: () => (this.hype ? { id: this.hype.spec.id, left: this.hype.left } : null),
       endHype: () => {
         if (this.hype) this.hype.left = 0;

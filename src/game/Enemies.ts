@@ -22,6 +22,8 @@ export abstract class Enemy {
   harmful = true;
   /** Tool calls and invincible players defeat it. */
   shootable = true;
+  /** Knocked off by a star: out of play, while the stage's star effects fly its mesh off screen. */
+  knocked = false;
   /** Seconds of squashed animation left once defeated. */
   protected fade = 0;
   protected dir = -1;
@@ -49,6 +51,17 @@ export abstract class Enemy {
 
   onShot(_ctx: StageCtx): void {
     this.defeat(false);
+  }
+
+  /**
+   * A starred player ran into it. By default it is out of play at once and its mesh stays up for the
+   * knock-off flight (`KnockOffs` in starFx.ts hides it). Returns false when it reacts some other way.
+   */
+  knockOff(_ctx: StageCtx): boolean {
+    this.alive = false;
+    this.knocked = true;
+    this.fade = Infinity;
+    return true;
   }
 
   defeat(squash: boolean): void {
@@ -182,6 +195,12 @@ export class Timeline extends Enemy {
 
   onShot(ctx: StageCtx): void {
     this.beaten(ctx);
+  }
+
+  /** A star beats the Timeline too, and its cloud is still yours to ride. */
+  knockOff(ctx: StageCtx): boolean {
+    this.beaten(ctx);
+    return false;
   }
 
   defeat(squash: boolean): void {
@@ -372,7 +391,7 @@ export class HallucinationGhost extends Enemy {
     this.mesh.rotation.y = this.dir > 0 ? 0.5 : -0.5;
     const body = this.mesh.getObjectByName('ghostBody') as THREE.Mesh | undefined;
     const mat = body?.material as THREE.MeshLambertMaterial | undefined;
-    if (mat) mat.opacity = this.alive ? (this.shy ? 0.35 : 0.85) : 0.2;
+    if (mat) mat.opacity = this.alive ? (this.shy ? 0.35 : 0.85) : this.knocked ? 0.85 : 0.2;
     const hands = this.mesh.getObjectByName('hands');
     if (hands) hands.visible = this.shy;
   }

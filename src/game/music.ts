@@ -27,6 +27,7 @@ class MusicPlayer {
   private playing: Playing | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private master: GainNode | null = null;
+  private ducked = false;
 
   setEnabled(on: boolean): void {
     this.enabled = on;
@@ -42,7 +43,8 @@ class MusicPlayer {
     if (!ctx) return;
     this.halt();
     this.master = ctx.createGain();
-    this.master.gain.value = VOLUME;
+    // A tune that starts while paused (the star running out, music switched back on) starts ducked.
+    this.master.gain.value = this.ducked ? VOLUME * 0.3 : VOLUME;
     this.master.connect(ctx.destination);
     const tune = TUNES[id];
     const { notes, steps } = parseMelody(tune.melody);
@@ -53,11 +55,13 @@ class MusicPlayer {
 
   stop(): void {
     this.wanted = null;
+    this.ducked = false;
     this.halt();
   }
 
   /** Quieter while paused or while a card is up. */
   duck(on: boolean): void {
+    this.ducked = on;
     const ctx = audioContext();
     if (ctx && this.master) this.master.gain.setTargetAtTime(on ? VOLUME * 0.3 : VOLUME, ctx.currentTime, 0.1);
   }

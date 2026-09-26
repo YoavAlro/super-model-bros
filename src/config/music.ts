@@ -26,7 +26,7 @@ export interface Tune {
   arp?: boolean;
 }
 
-export type TuneId = 'overworld' | 'underground' | 'castle' | 'sky' | 'storm' | 'ghost' | 'factory' | 'frontier' | 'finale' | 'boss' | 'kart';
+export type TuneId = 'overworld' | 'underground' | 'castle' | 'sky' | 'storm' | 'ghost' | 'factory' | 'frontier' | 'finale' | 'boss' | 'kart' | 'star';
 
 export const TUNES: Record<TuneId, Tune> = {
   overworld: {
@@ -131,6 +131,17 @@ export const TUNES: Record<TuneId, Tune> = {
     melody: '4 5 7 ~ 4 5 7 ~ | 8 7 5 ~ 3 ~ . . | 4 5 7 ~ 9 ~ 7 5 | 4 ~ 2 ~ 0 ~ . .',
     lead: 'square',
     bass: 'walk',
+  },
+  /** Star power: a fast, bright arpeggio loop that takes over while anyone is invincible. */
+  star: {
+    bpm: 184,
+    key: 64,
+    mode: 'major',
+    chords: [0, 4, 3, 4, 0, 4, 3, 0],
+    melody: '7 ~ 4 7 9 ~ 7 . | 8 ~ 6 8 11 ~ 8 . | 10 ~ 9 7 8 ~ 7 5 | 6 ~ 4 ~ 6 7 8 ~ | 7 ~ 4 7 9 ~ 7 . | 8 ~ 6 8 11 ~ 10 ~ | 9 ~ 10 9 7 ~ 5 7 | 11 9 7 4 7 ~ . .',
+    lead: 'square',
+    bass: 'pulse',
+    arp: true,
   },
 };
 
