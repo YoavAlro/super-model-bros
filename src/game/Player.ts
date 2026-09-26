@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CharacterSpec } from '../config/characters';
 import type { FormAbility } from '../config/levelSpec';
 import { disposeObject } from './dispose';
+import { blinkVisible, prefs } from './prefs';
 import { labelSprite, makeCape, makeCharacter } from './meshes';
 import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
 import type { Pad } from './pad';
@@ -59,6 +60,7 @@ export class PlayerActor {
   private readonly cape: THREE.Object3D;
   private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
   private actionHeldPrev = false;
+  private ghosted = false;
   private squash = 0;
 
   constructor(
@@ -284,7 +286,16 @@ export class PlayerActor {
     this.mesh.rotation.z = this.dead ? t * 8 : 0;
     // Waddle while running on the ground.
     this.mesh.rotation.x = b.onGround && Math.abs(b.vx) > 1 ? Math.sin(t * 22) * 0.06 : 0;
-    this.mesh.visible = this.invulnerable <= 0 || Math.floor(t * 20) % 2 === 0;
+    this.mesh.visible = this.invulnerable <= 0 || blinkVisible(t, 20);
+    // Reduced motion: a hit shows as a steady see-through body instead of a strobe.
+    const ghosted = prefs.reduceMotion && this.invulnerable > 0;
+    if (!this.clone && ghosted !== this.ghosted) {
+      this.ghosted = ghosted;
+      this.mesh.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m) m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
+      });
+    }
     this.cape.visible = this.power === 'cape';
     (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
     if (this.bodyMat) {

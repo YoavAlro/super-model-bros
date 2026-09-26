@@ -6,6 +6,7 @@ import { T } from './level';
 import { Trap } from './Items';
 import { labelSprite, makeDan, makeGhostKing, makeOrchestrator, makePaperclipMaximizer, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
+import { blinkVisible } from './prefs';
 
 /**
  * A castle boss. The stage wakes it when a player gets close, routes stomps, tool calls and
@@ -89,7 +90,7 @@ export abstract class Boss {
     this.mesh.position.set(b.x + b.w / 2, b.y, 0);
     this.mesh.rotation.y = this.dir * 0.4;
     this.mesh.rotation.z = this.alive ? Math.sin(t * 6) * 0.05 : t * 4;
-    this.mesh.visible = this.invulnerable <= 0 || Math.floor(t * 16) % 2 === 0;
+    this.mesh.visible = this.invulnerable <= 0 || blinkVisible(t, 16);
     this.label.position.set(b.x + b.w / 2, b.y + b.h + 0.9, 0);
     this.label.visible = this.alive;
   }

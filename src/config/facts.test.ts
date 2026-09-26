@@ -32,6 +32,11 @@ describe('fact cards', () => {
     expect(problems).toEqual([]);
   });
 
+  it('cite every source at least once (no dead entries)', () => {
+    const cited = new Set(cards.flatMap(({ card }) => card.lines.flatMap((l) => l.src ?? [])));
+    expect(Object.keys(SOURCES).filter((id) => !cited.has(id))).toEqual([]);
+  });
+
   it('use https sources with a title and publisher', () => {
     for (const [id, s] of Object.entries(SOURCES)) {
       expect(s.url, id).toMatch(/^https:\/\//);

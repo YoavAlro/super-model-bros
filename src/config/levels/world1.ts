@@ -63,7 +63,8 @@ export const WORLD_1: LevelSpec[] = [
       date: '2019 · Training toward GPT-2',
       lines: [
         fact('Books alone are not enough. OpenAI builds WebText: about 8 million web pages linked from Reddit posts with 3+ karma.', 'gpt2'),
-        tip('Collect the green Web tokens. Reddit karma was a cheap quality filter: people had already upvoted the links.'),
+        fact('The karma threshold was a cheap quality filter: other people had already found the links worth upvoting.', 'gpt2'),
+        tip('Collect the green Web tokens.'),
       ],
     },
     outro: {

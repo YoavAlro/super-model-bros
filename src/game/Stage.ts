@@ -3,11 +3,13 @@ import { CHARACTERS, type CharacterId } from '../config/characters';
 import { HYPES, MOMENTS, STORMS, type HypeSpec, type MomentId, type MomentSpec, type StormSpec } from '../config/events';
 import type { LevelSpec, PowerId } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
+import { THEME_TUNES } from '../config/music';
 import { THEMES } from '../config/themes';
 import { tip } from '../config/types';
 import type { Settings } from '../save';
 import { showFactCard } from '../ui/FactCard';
 import type { Hud } from '../ui/Hud';
+import { settingsPanel } from '../ui/Settings';
 import { createBosses, type Boss } from './Bosses';
 import type { StageCtx } from './ctx';
 import { dietHint, dietMatch, emptyCounts, historyStars, total, type Counts } from './diet';
@@ -27,6 +29,8 @@ import { emptyPad } from './pad';
 import { CloudRide, HeadPlatform, MovingPlatform, StaticPlatform, type Platform } from './Platforms';
 import { PlayerActor } from './Player';
 import { disposeObject } from './dispose';
+import { prefs } from './prefs';
+import { music } from './music';
 import { mulberry32 } from './rng';
 import { sfx } from './sfx';
 import { stormDay } from './storm';
@@ -45,6 +49,8 @@ export interface StageOptions {
   perks: string[];
   flags: string[];
   settings: Settings;
+  /** Saves settings changed from the pause menu. */
+  onSettings?: () => void;
   /** Where mid-level cards (hype verdicts) are shown. */
   root: HTMLElement;
   /** Banked Tibo resets carried in from earlier levels. */
@@ -136,6 +142,9 @@ export class Stage implements StageCtx {
   private yawn = 0;
   private puzzle: Puzzle | null = null;
   private rival: { mesh: THREE.Group; x: number; done: boolean } | null = null;
+  /** The Cameo Flood: look-alikes that wander around you for a while (visual only). */
+  private cameos: { group: THREE.Group; x: number; y: number; dir: number; hop: number }[] = [];
+  private cameoTime = 0;
   /** Storm gates: the level's gate groups and how far their timeline has got. */
   private gates: GateGroup[] = [];
   private readonly gateState: GateState = { resolved: 0, waited: 0 };
@@ -274,6 +283,8 @@ export class Stage implements StageCtx {
     this.confetti = null;
     this.snow = null;
     this.yawn = 0;
+    this.cameos = [];
+    this.cameoTime = 0;
     this.random = mulberry32(hashString(spec.id) + this.deaths);
     if (this.alignment !== null) this.alignment = ALIGN_START;
     this.gateState.resolved = 0;
@@ -384,11 +395,13 @@ export class Stage implements StageCtx {
   /** Starts the simulation (the level is drawn behind its intro card until then). */
   begin(): void {
     if (this.state === 'intro') this.state = 'playing';
+    music.play(THEME_TUNES[this.spec.theme]);
     this.input.clear();
     const moments = this.spec.moments ?? [];
     if (moments.includes('emDashFixed')) this.happen('emDashFixed');
     if (moments.includes('keep4o')) this.happen('keep4o');
     if (moments.includes('codeRed')) this.happen('codeRed');
+    if (moments.includes('soraCameos')) this.startCameos();
   }
 
   /** A Moment happened: toast it once, and remember it for the outro card. */
@@ -790,6 +803,7 @@ export class Stage implements StageCtx {
         if (boss === this.bosses[0]) {
           this.hud.toast(boss.intro, 'bad');
           sfx.boss();
+          music.play('boss');
         }
       }
       if (!boss.awake) continue;
@@ -1243,7 +1257,46 @@ export class Stage implements StageCtx {
     }
   }
 
+  /** Sora 2's cameos: five look-alikes of the hero, wearing the same name tag, flood the screen for a while. */
+  private startCameos(): void {
+    const hero = this.heroes()[0];
+    if (!hero) return;
+    this.happen('soraCameos');
+    this.cameoTime = 14;
+    for (let i = 0; i < 5; i++) {
+      const group = makeCharacter(hero.spec.color, hero.spec.accent);
+      const tag = labelSprite(hero.form);
+      tag.scale.multiplyScalar(0.42);
+      tag.position.y = 1.5;
+      group.add(tag);
+      this.scene.add(group);
+      this.cameos.push({ group, x: hero.body.x + (i - 2) * 2.2, y: hero.body.y, dir: i % 2 ? 1 : -1, hop: this.rng() * 2 });
+    }
+  }
+
+  private stepCameos(dt: number): void {
+    if (this.cameoTime <= 0) return;
+    this.cameoTime -= dt;
+    const hero = this.heroes()[0];
+    for (const c of this.cameos) {
+      if (hero && Math.abs(c.x - hero.body.x) > 5) c.dir = Math.sign(hero.body.x - c.x);
+      c.x += c.dir * 4.5 * dt;
+      c.hop += dt * 3;
+      c.group.position.set(c.x, (hero?.body.y ?? c.y) + Math.abs(Math.sin(c.hop)) * 1.2, -0.3);
+      c.group.rotation.y = c.dir * 0.55;
+    }
+    if (this.cameoTime <= 0) {
+      for (const c of this.cameos) {
+        this.scene.remove(c.group);
+        disposeObject(c.group);
+      }
+      this.cameos = [];
+      this.hud.toast('The cameo trend moves on. Only the real you is left.', 'info');
+    }
+  }
+
   private stepMoments(dt: number): void {
+    this.stepCameos(dt);
     if (this.goldenGate > 0) {
       this.goldenGate -= dt;
       if (this.goldenGate <= 0) {
@@ -1266,7 +1319,7 @@ export class Stage implements StageCtx {
       const alarm = this.scene.getObjectByName('alarm') as THREE.PointLight | undefined;
       if (alarm) {
         alarm.position.set(this.camX, 12, 6);
-        alarm.intensity = 20 + Math.sin(this.time * 6) * 18;
+        alarm.intensity = prefs.reduceMotion ? 20 : 20 + Math.sin(this.time * 6) * 18;
       }
     }
   }
@@ -1450,6 +1503,7 @@ export class Stage implements StageCtx {
     }
     this.state = 'clear';
     this.clearTimer = 2.2;
+    music.stop();
     for (const p of this.playersList) {
       p.finished = true;
       if (p.spec.id === this.opts.path.hero) p.setForm(this.spec.toward.name);
@@ -1500,6 +1554,7 @@ export class Stage implements StageCtx {
   private finish(outcome: StageResult['outcome']): void {
     if (this.state === 'done') return;
     this.state = 'done';
+    if (outcome !== 'clear') music.stop();
     const match = dietMatch(this.counts, this.spec.recipe);
     this.resolve({
       outcome,
@@ -1526,16 +1581,19 @@ export class Stage implements StageCtx {
   private togglePause(): void {
     if (this.state === 'playing') {
       this.state = 'paused';
+      music.duck(true);
       this.hud.showPause(
         () => this.togglePause(),
         () => {
           this.hud.hidePause();
           this.quit();
         },
+        settingsPanel(this.opts.settings, () => this.opts.onSettings?.()),
       );
     } else if (this.state === 'paused') {
       this.hud.hidePause();
       this.input.clear();
+      music.duck(false);
       this.state = 'playing';
     }
   }

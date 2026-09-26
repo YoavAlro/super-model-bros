@@ -396,3 +396,18 @@ body.large-text .toast { font-size: 17px; }
 @media (max-height: 500px) {
   .kart-hud { font-size: 12px; top: calc(max(8px, env(safe-area-inset-top)) + 30px); }
 }
+
+/* ---------- Settings ---------- */
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; width: 100%; }
+.btn.toggle { padding: 8px 12px; font-size: 14px; background: var(--panel); }
+.btn.toggle.on { background: #4a3a08; }
+.modal.pause .settings { grid-template-columns: 1fr 1fr; }
+.title-settings { width: 100%; max-width: 620px; }
+body.large-text .controls,
+body.large-text .disclaimer,
+body.large-text .roster-trait,
+body.large-text .roster-help { font-size: 15px; }
+body.large-text .btn { font-size: 17px; }
+body.large-text .hud-bar { font-size: 18px; }
+body.large-text .kart-hud { font-size: 17px; }
+body.large-text .recap { font-size: 15px; }

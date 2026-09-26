@@ -1,7 +1,7 @@
 import { DATA_TYPES, type DataTypeId } from '../config/dataTypes';
 import { SOURCES } from '../config/sources';
 import type { FactCard, Mix } from '../config/types';
-import { sfx } from '../game/sfx';
+import { sfx, unlockAudio } from '../game/sfx';
 import { el, hex, pct } from './dom';
 
 export interface CardButton<T> {
@@ -91,6 +91,8 @@ export function showFactCard<T = void>(parent: HTMLElement, opts: FactCardOption
     const nodes = buttons.map((b) => {
       const node = el('button', b.primary ? 'btn primary' : 'btn', b.label);
       node.addEventListener('click', () => {
+        // A tap or key press on a card is a user gesture: the moment browsers let audio start.
+        unlockAudio();
         backdrop.remove();
         resolve(b.value);
       });

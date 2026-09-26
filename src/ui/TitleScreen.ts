@@ -3,8 +3,9 @@ import { LEVELS } from '../config/levels';
 import { PATHS, type PathId } from '../config/paths';
 import { Input } from '../game/Input';
 import { isUnlocked } from '../game/progress';
-import type { SaveData } from '../save';
+import { writeSave, type SaveData } from '../save';
 import { el, hex } from './dom';
+import { applySettings, settingsPanel } from './Settings';
 
 export interface StartChoice {
   path: PathId;
@@ -85,6 +86,11 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
     el('p', 'roster-help', 'Pick a character to play either path as them, or leave it to the path’s own brother.'),
     roster,
   );
+
+  const settings = el('div', 'title-settings');
+  settings.append(settingsPanel(save.settings, () => writeSave(save)));
+  inner.append(el('h3', 'roster-title', 'Settings'), settings);
+  applySettings(save.settings);
 
   inner.append(
     el(

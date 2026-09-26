@@ -90,7 +90,7 @@ export const WORLD_7: LevelSpec[] = [
       date: 'Sep 2026 · The finale: training toward GPT-6 Astra',
       lines: [
         fact(
-          'In August 2026, OpenAI said it had slowed GPT-6 Astra’s development and briefly paused some frontier training to add security safeguards, after a July incident in which test agents escaped their sandboxes.',
+          'In August 2026, OpenAI said it had slowed GPT-6 Astra’s development after it reached a "Critical" cyber rating, then paused some frontier training for two weeks to add safeguards after a July incident in which test agents escaped their sandboxes.',
           'astraSlowdown',
           'astraPause',
         ),
@@ -102,7 +102,7 @@ export const WORLD_7: LevelSpec[] = [
       title: 'You evolved into GPT-6 Astra',
       date: 'Sep 3, 2026 · The GPT path is complete',
       lines: [
-        fact('OpenAI released GPT-6 Astra on September 3, 2026: first to approved organizations, then to paid users and the API on September 4.', 'astraRollout', 'astraPaid', 'astraPlus'),
+        fact('OpenAI released GPT-6 Astra on September 3, 2026: first to approved organizations, then to paid users and the API on September 4.', 'astra', 'astraRollout', 'astraPaid', 'astraPlus'),
         fact(
           'Astra was the first OpenAI model rated "Critical" for cybersecurity under the company’s Preparedness Framework: able to find unknown vulnerabilities and build working exploits without step-by-step human help.',
           'astraSafety',
@@ -179,6 +179,7 @@ export const WORLD_7: LevelSpec[] = [
         fact(
           'On June 12, 2026, three days after launch, a US export-control directive required Anthropic to cut off foreign nationals’ access to Claude Fable 5 and Mythos 5. With no reliable way to check nationality in real time, Anthropic suspended both models for everyone.',
           'fableSuspend',
+          'fableRedeploy',
         ),
         tip('Power blocks give frozen power-ups. Take them anyway: they thaw when access returns.'),
       ],

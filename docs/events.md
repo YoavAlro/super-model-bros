@@ -1,6 +1,6 @@
 # Events: hype power-ups, storm levels, and the Timeline
 
-Legend: ✅ well-established · 🔎 recent, verify before shipping. **G** = GPT path, **C** = Claude path, **B** = both.
+Legend: ✅ verified (🔎 marked a recent row still to verify; none are left). **G** = GPT path, **C** = Claude path, **B** = both.
 
 ## The Timeline (X/Twitter)
 

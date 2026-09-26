@@ -3,6 +3,7 @@ import type { StageCtx } from './ctx';
 import { makeCloud, makeMovingPlatform } from './meshes';
 import type { Pad } from './pad';
 import type { Body } from './physics';
+import { blinkVisible } from './prefs';
 
 /**
  * A platform that is an actor, not a tile: it moves, and players standing on it move with it.
@@ -92,7 +93,7 @@ export class CloudRide extends Platform {
 
   updateMesh(t: number): void {
     super.updateMesh(t);
-    this.mesh.visible = this.alive && (this.life > 2 || Math.floor(t * 10) % 2 === 0);
+    this.mesh.visible = this.alive && (this.life > 2 || blinkVisible(t, 10));
   }
 }
 
@@ -123,7 +124,7 @@ export class StaticPlatform extends Platform {
 
   updateMesh(t: number): void {
     super.updateMesh(t);
-    this.mesh.visible = this.alive && (this.life > 1 || Math.floor(t * 10) % 2 === 0);
+    this.mesh.visible = this.alive && (this.life > 1 || blinkVisible(t, 10));
   }
 }
 

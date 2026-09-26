@@ -1,7 +1,7 @@
 # Worlds: the timeline as levels
 
 Each world is an era; each level evolves you into a real model. Legend: ✅ well-established ·
-🔎 recent, verify against a primary source before shipping. Build status: **built** / planned.
+🔎 recent, to verify against a primary source before shipping (none are left). Build status: **built** / planned.
 
 | World | Theme | Era | Boss | Status |
 |---|---|---|---|---|

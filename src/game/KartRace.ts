@@ -4,9 +4,12 @@ import type { KartSpec } from '../config/karts';
 import type { Settings } from '../save';
 import type { Hud } from '../ui/Hud';
 import { el } from '../ui/dom';
+import { settingsPanel } from '../ui/Settings';
 import type { Input } from './Input';
 import { humansDone, KART, kartRivals, LANES, makeTrack, newRace, placeOf, stepRace, type Race } from './kart';
 import { canvasTexture, labelSprite, makeCharacter, makeToken } from './meshes';
+import { music } from './music';
+import { prefs } from './prefs';
 import { sfx } from './sfx';
 import { disposeObject } from './dispose';
 import { STEP } from './Stage';
@@ -55,6 +58,7 @@ export class KartRace {
     private readonly hud: Hud,
     private readonly overlay: HTMLElement,
     private readonly settings: Settings,
+    private readonly onSettings: () => void = () => {},
   ) {
     const seed = hashString(spec.id);
     const track = makeTrack(spec.length, { hurdles: spec.hurdles, pads: spec.pads, tokens: spec.tokens }, seed);
@@ -214,8 +218,8 @@ export class KartRace {
       const r = k.racer;
       const hop = r.hop > 0 ? Math.sin((1 - r.hop / KART.hop) * Math.PI) * 1.1 : 0;
       k.group.position.set(r.s, hop, this.laneZ(r.z));
-      k.group.rotation.z = r.stun > 0 ? Math.sin(t * 30) * 0.15 : 0;
-      k.group.rotation.x = r.boost > 0 ? Math.sin(t * 40) * 0.04 : 0;
+      k.group.rotation.z = r.stun > 0 && !prefs.reduceMotion ? Math.sin(t * 30) * 0.15 : 0;
+      k.group.rotation.x = r.boost > 0 && !prefs.reduceMotion ? Math.sin(t * 40) * 0.04 : 0;
     }
     const lead = this.karts.find((k) => k.racer.human);
     for (const th of this.things) {
@@ -236,6 +240,7 @@ export class KartRace {
       if (this.countdown <= 0) {
         this.state = 'racing';
         sfx.star();
+        music.play('kart');
         this.hud.toast('Go!', 'good', 1200);
       }
       return;
@@ -249,6 +254,7 @@ export class KartRace {
     if (this.state === 'racing' && humansDone(this.race)) {
       this.state = 'finish';
       this.finishTimer = 2;
+      music.stop();
       sfx.flag();
       const p = placeOf(this.race, this.chars[0]);
       this.hud.toast(p === 1 ? 'You won the race!' : `You finished ${ordinal(p)}. Good race!`, p === 1 ? 'good' : 'info', 2500);
@@ -283,6 +289,7 @@ export class KartRace {
 
   private togglePause(): void {
     this.paused = !this.paused;
+    music.duck(this.paused);
     if (this.paused) {
       this.hud.showPause(
         () => this.togglePause(),
@@ -291,6 +298,7 @@ export class KartRace {
           this.paused = false;
           this.quit();
         },
+        settingsPanel(this.settings, this.onSettings),
       );
     } else {
       this.hud.hidePause();
@@ -306,6 +314,7 @@ export class KartRace {
   private finish(outcome: KartResult['outcome']): void {
     if (this.state === 'done') return;
     this.state = 'done';
+    music.stop();
     const standings = [...this.race.order, ...this.race.racers.filter((r) => r.finished === null).sort((a, b) => b.s - a.s).map((r) => r.id)] as CharacterId[];
     this.resolve({ outcome, places: this.chars.map((id) => placeOf(this.race, id)), standings });
   }

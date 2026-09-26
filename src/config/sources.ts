@@ -175,6 +175,16 @@ export const SOURCES: Record<string, Source> = {
     url: 'https://techcrunch.com/2025/02/25/anthropics-claude-ai-is-playing-pokemon-on-twitch-slowly',
   },
   projectVend: { title: 'Project Vend: Can Claude run a small shop?', publisher: 'Anthropic', url: 'https://www.anthropic.com/research/project-vend-1' },
+  sora2: {
+    title: 'OpenAI is launching the Sora app, its own TikTok competitor, alongside the Sora 2 model',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2025/09/30/openai-is-launching-the-sora-app-its-own-tiktok-competitor-alongside-the-sora-2-model',
+  },
+  soraCameoFeed: {
+    title: 'OpenAI’s new social app is filled with terrifying Sam Altman deepfakes',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2025/10/01/openais-new-social-app-is-filled-with-terrifying-sam-altman-deepfakes',
+  },
 
   // World 4: tools
   plugins: { title: 'ChatGPT plugins', publisher: 'OpenAI', url: 'https://openai.com/index/chatgpt-plugins/' },
@@ -312,6 +322,13 @@ export const SOURCES: Record<string, Source> = {
     url: 'https://fortune.com/2026/08/18/openai-says-it-paused-ai-training-for-two-weeks-and-announces-new-security-protocols-following-hugging-face-hack/',
   },
   tiboAgain: { title: 'Oops... I did it again (post)', publisher: 'Thibault Sottiaux on X', url: 'https://x.com/thsottiaux/status/2078320950488297917' },
+  tiboIncidents: {
+    title: 'Limits reset after three separate small incidents that affected Codex reliability (post)',
+    publisher: 'Thibault Sottiaux on X',
+    url: 'https://x.com/thsottiaux/status/2062329981548802523',
+  },
+  wizMoltbook: { title: 'Hacking Moltbook: AI Social Network Reveals 1.5M API Keys', publisher: 'Wiz Blog', url: 'https://www.wiz.io/blog/exposed-moltbook-database-reveals-millions-of-api-keys' },
+  pokemonStuck: { title: 'Report on Claude getting stuck in Pokémon Red’s Mt. Moon', publisher: 'Futurism', url: 'https://futurism.com/advanced-ai-stuck-pokemon' },
   paperclip: { title: 'Ethical Issues in Advanced Artificial Intelligence', publisher: 'Nick Bostrom', url: 'https://nickbostrom.com/ethics/ai' },
 
   // Benchmark Kart: benchmarks and rival labs

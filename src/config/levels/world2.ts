@@ -19,7 +19,7 @@ export const WORLD_2: LevelSpec[] = [
     world: 2,
     name: 'GitHub Hills',
     theme: 'hills',
-    toward: { name: 'Codex', paramsLabel: '12B params' },
+    toward: { name: 'Codex' },
     recipeKind: 'published',
     recipe: { code: 1 },
     blockToken: 'code',
@@ -34,7 +34,7 @@ export const WORLD_2: LevelSpec[] = [
     },
     outro: {
       title: 'You evolved into Codex',
-      date: 'Aug 2021 · 12B parameters',
+      date: 'Aug 2021 · Codex in the API',
       lines: [
         fact('Codex powered GitHub Copilot, an AI pair programmer, from its preview in June 2021.', 'copilot'),
         fact('The Codex paper introduced HumanEval: 164 hand-written programming problems, each checked by unit tests.', 'codex'),
@@ -249,7 +249,8 @@ export const WORLD_2: LevelSpec[] = [
       lines: [
         fact('In 2021, a group of former OpenAI researchers founded Anthropic, an AI safety and research company. Claude, the brother, leaves home.', 'anthropicFounded'),
         fact("Anthropic's Constitutional AI method trains a model to critique and revise its own answers using a written list of principles: a constitution.", 'constitutionalAi'),
-        tip('Collect pink Principles and gold Human Feedback in equal measure: in the paper, helpfulness came from human feedback and harmlessness from principle-guided AI feedback.'),
+        fact('In the Constitutional AI paper, helpfulness came from human feedback, and harmlessness from AI feedback guided by the principles.', 'constitutionalAi'),
+        tip('Collect pink Principles and gold Human Feedback in equal measure.'),
         tip('Gold RLHF stars make you invincible and raise your Alignment. Reward orbs look like tokens, but they drain it.'),
         tip('Grey ☠ tokens are shadow-library books: free to grab, but not free of consequences.'),
       ],
@@ -357,7 +358,7 @@ export const WORLD_2: LevelSpec[] = [
       date: '2023 · Training toward Claude',
       lines: [
         fact('Anthropic tested its assistant, Claude, with partners such as Notion, Quora, and DuckDuckGo in a closed alpha before launch.', 'introducingClaude'),
-        tip('Anthropic has not published an exact data mix, so this level targets its key ingredients: a pre-trained base (Web), human feedback, and principles.'),
+        tip('This level targets the key ingredients of the step: a pre-trained base (Web), human feedback, and principles.'),
         tip('The Reward Hacker waits in the keep. It heals by eating fake reward orbs: stomp it three times.'),
       ],
     },

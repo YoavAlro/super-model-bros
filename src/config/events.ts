@@ -63,7 +63,7 @@ export const STORMS: Record<StormId, StormSpec> = {
       tag: 'DeepSeek-R1',
       speed: 7.2,
       win: 'You beat the efficient rival to the flag! +1 life.',
-      lose: 'DeepSeek-R1 got there first, on less compute. Good race, friend.',
+      lose: 'DeepSeek-R1 got there first. Good race, friend.',
     },
   },
   settlement: {
@@ -207,7 +207,7 @@ export const HYPES: Record<HypeId, HypeSpec> = {
     color: 0xffd166,
     lines: [
       fact('On February 15, 2024, OpenAI previewed Sora, which makes videos up to a minute long from a text prompt.', 'sora'),
-      tip('Verdict: passing, at the time: the demos dazzled long before most people could use them.'),
+      tip('Verdict: passing, at the time: the preview was a spectacle, not yet a product.'),
     ],
   },
   gadgets: {
@@ -313,8 +313,8 @@ export const HYPES: Record<HypeId, HypeSpec> = {
     grab: 'Moltbook! Your forks show up… and start posting instead of helping.',
     color: 0xff6b4a,
     lines: [
-      fact('In January 2026, the open-source agent OpenClaw went viral, along with Moltbook, a Reddit-style site where only AI agents could post.', 'moltbook'),
-      fact('Within days, researchers found Moltbook’s database exposed, including about 1.5 million agent API keys.', 'moltbook'),
+      fact('In January 2026, the open-source agent Clawdbot (soon renamed OpenClaw) went viral, along with Moltbook, a Reddit-style site where only AI agents could post.', 'moltbook'),
+      fact('Within days, researchers found Moltbook’s database exposed, including about 1.5 million agent API keys.', 'wizMoltbook'),
       tip('Verdict: passing hype. Your forks spent the whole power-up posting.'),
     ],
   },
@@ -351,7 +351,8 @@ export type MomentId =
   | 'namingMaze'
   | 'chartCrime'
   | 'claudePokemon'
-  | 'projectVend';
+  | 'projectVend'
+  | 'soraCameos';
 
 /** What a shop item does when you take it. */
 export type ShopEffect = 'nothing' | 'scale' | 'life';
@@ -385,8 +386,10 @@ export const MOMENTS: Record<MomentId, MomentSpec> = {
     name: 'The Tibo Reset',
     toast: 'Tibo Reset! Usage limits reset: +1 life, and rate limits cleared.',
     fact: fact(
-      'In 2026, OpenAI’s Codex lead Thibault "Tibo" Sottiaux repeatedly reset paid users’ Codex usage limits, often after outages; in August he posted that he had been gifted "a very fancy new reset button".',
+      'In 2026, OpenAI’s Codex lead Thibault "Tibo" Sottiaux repeatedly reset paid users’ Codex usage limits, sometimes after outages; in August he posted that he had been gifted "a very fancy new reset button".',
       'tiboReset',
+      'tiboAgain',
+      'tiboIncidents',
       'tiboButton',
     ),
   },
@@ -457,6 +460,17 @@ export const MOMENTS: Record<MomentId, MomentSpec> = {
       'In February 2025, Anthropic livestreamed Claude 3.7 Sonnet playing Pokémon Red. It earned gym badges earlier models never reached, and became famous for getting lost in Mt. Moon.',
       'extendedThinking',
       'pokemonStream',
+      'pokemonStuck',
+    ),
+  },
+  soraCameos: {
+    id: 'soraCameos',
+    name: 'The Cameo Flood',
+    toast: 'Cameos! Look-alikes of you flood the feed. Keep track of the real you.',
+    fact: fact(
+      'OpenAI launched Sora 2 and a TikTok-style Sora app on September 30, 2025. Its "cameos" let people put themselves and consenting friends into AI videos, and the early feed filled up with clips of OpenAI’s own CEO.',
+      'sora2',
+      'soraCameoFeed',
     ),
   },
   projectVend: {

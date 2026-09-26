@@ -11,13 +11,14 @@ import { showFactCard } from '../ui/FactCard';
 import { Hud } from '../ui/Hud';
 import { el } from '../ui/dom';
 import { recapTable } from '../ui/Recap';
+import { applySettings } from '../ui/Settings';
 import type { StartChoice } from '../ui/TitleScreen';
 import { shares, total } from './diet';
 import { Input } from './Input';
 import { KartRace, ordinal } from './KartRace';
 import { checkUnlocks, endsWorld, formBefore, nextStep, recordLevel } from './progress';
 import { buildRecap } from './recap';
-import { setMuted } from './sfx';
+import { music } from './music';
 import { Stage, type StageResult } from './Stage';
 
 const START_LIVES = 5;
@@ -67,7 +68,7 @@ export class Campaign {
     for (const p of opts.perks ?? []) if (!this.run.perks.includes(p)) this.run.perks.push(p);
     save.runs[choice.path] = this.run;
     this.lives = save.settings.assist ? ASSIST_LIVES : START_LIVES;
-    setMuted(!save.settings.sfx);
+    applySettings(save.settings);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.isTouch, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isTouch ? 1.5 : 2));
@@ -80,7 +81,6 @@ export class Campaign {
     if (this.run.players === 2) {
       this.hud.setHint('P1: A/D move · W jump · L-Shift run · S power   |   P2: ←/→ move · ↑ jump · R-Shift run · ↓ power   |   Esc pause');
     }
-    document.body.classList.toggle('large-text', save.settings.largeText);
     window.addEventListener('resize', this.resize);
     this.resize();
     this.exposeDebug();
@@ -117,6 +117,7 @@ export class Campaign {
         perks: this.run.perks,
         flags: this.run.flags,
         settings: save.settings,
+        onSettings: () => writeSave(save),
         root: this.root,
         resets: this.run.resets ?? 0,
       },
@@ -232,7 +233,7 @@ export class Campaign {
     this.input.clear();
     if (!go || !this.running) return;
     this.input.setPowerLabel(null);
-    const kart = new KartRace(spec, this.run.chars, this.input, this.hud, this.overlay, save.settings);
+    const kart = new KartRace(spec, this.run.chars, this.input, this.hud, this.overlay, save.settings, () => writeSave(save));
     this.kart = kart;
     kart.resize();
     const result = await kart.done;
@@ -284,12 +285,14 @@ export class Campaign {
     const raced = recap.karts.filter((k) => k.place !== null);
     if (raced.length) lines.push(tip(`Benchmark Kart: ${raced.filter((k) => k.place === 1).length} wins in ${raced.length} races with your friends.`));
     lines.push(tip(RECAP_CLOSING));
+    music.play('finale');
     await showFactCard(this.root, {
       card: { title: `${this.path.name} complete!`, date: `Recap · ${first.date} → ${last.date}`, lines },
       color: CHARACTERS[this.path.hero].color,
       extra: recapTable(recap),
       button: 'Back to title',
     });
+    music.stop();
     // The run is over: the title screen offers a fresh start instead of Continue.
     delete this.opts.save.runs[this.path.id];
     writeSave(this.opts.save);
@@ -315,6 +318,7 @@ export class Campaign {
 
   private exit(): void {
     this.running = false;
+    music.stop();
     this.renderer.setAnimationLoop(null);
     window.removeEventListener('resize', this.resize);
     this.stage?.dispose();
@@ -346,6 +350,11 @@ export class Campaign {
     api.run = () => JSON.parse(JSON.stringify(this.run));
     api.progress = () => JSON.parse(JSON.stringify(this.opts.save.progress));
     api.recap = () => buildRecap(this.run, this.path, LEVELS);
+    api.perf = () => {
+      const i = this.renderer.info;
+      return { calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? 0 };
+    };
+    api.music = () => music.current;
     window.__smb = api;
   }
 }

@@ -364,7 +364,7 @@ export const WORLD_5: LevelSpec[] = [
     outro: {
       title: 'You evolved into Claude 3.7 Sonnet',
       date: 'Feb 24, 2025 · extended thinking',
-      lines: [fact('Anthropic called Claude 3.7 Sonnet its best coding model to date.', 'claude37')],
+      lines: [fact('Anthropic called Claude 3.7 Sonnet its most intelligent model to date, with particularly strong gains in coding.', 'claude37')],
     },
     map: stitch(
       fill(START, { Q: 't', V: 'c' }),

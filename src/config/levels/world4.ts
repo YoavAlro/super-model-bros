@@ -301,7 +301,7 @@ export const WORLD_4: LevelSpec[] = [
       date: 'Oct–Nov 2024 · Training toward computer use',
       lines: [
         fact(
-          'October 2024: an upgraded Claude 3.5 Sonnet can use a computer: look at a screen, move a cursor, click and type. It was the first frontier model to offer this in public beta.',
+          'October 2024: an upgraded Claude 3.5 Sonnet can use a computer: look at a screen, move a cursor, click and type. Anthropic said it was the first frontier model to offer this in public beta.',
           'computerUse',
         ),
         tip('The hype block holds MCP: every pipe connects. The Injection Piranha waits in the keep: hit it when it pops out.'),

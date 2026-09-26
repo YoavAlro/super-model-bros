@@ -4,6 +4,7 @@
 //   npm run build && npx vite preview --port 4173 &
 //   node scripts/smoke.mjs gpt-2-1 claude-2-2        # or: node scripts/smoke.mjs all
 //   node scripts/smoke.mjs kart-arc char:llama       # a Benchmark Kart race; a level played as a character
+//   node scripts/smoke.mjs path:gpt path:claude      # a whole path in one session, start to recap
 //
 // Env: SMOKE_URL (default http://localhost:4173/), SMOKE_OUT (default ./smoke-shots),
 //      SMOKE_VIEWPORTS=desktop,phone
@@ -43,6 +44,11 @@ async function waitFor(page, fn, arg, timeout = 30000, every = 250) {
 /** Plays one level from its intro card to its outro card. */
 async function completeLevel(page, id, tag) {
   await page.goto(`${BASE}?debug&level=${id}&flags=shadowBooks`);
+  return playLevel(page, id, tag);
+}
+
+/** Plays the level whose intro card is up (or about to be). */
+async function playLevel(page, id, tag) {
   const intro = await waitFor(page, () => window.__smb?.card?.());
   if (!intro) throw new Error(`${id}: no intro card`);
   await page.screenshot({ path: `${OUT}/${tag}-${id}-intro.png` });
@@ -147,6 +153,50 @@ async function completeAsCharacter(page, char, tag) {
   return `${trait}, ${await page.evaluate(() => window.__smb.card())}`;
 }
 
+/**
+ * Plays a whole path in one session, from its first level to the recap: every level, every card
+ * between them (unlocks, world breaks) and every Benchmark Kart race. Logs renderer memory per level
+ * so a leak shows up as steady growth.
+ */
+async function completePath(page, path, tag) {
+  const ids = (await page.evaluate(() => window.__smbLevelIds?.())) ?? [];
+  const first = ids.find((id) => id.startsWith(`${path}-`));
+  await page.goto(`${BASE}?debug&path=${path}&level=${first}${path === 'claude' ? '&flags=shadowBooks' : ''}`);
+  const memory = [];
+  for (let guard = 0; guard < 400; guard++) {
+    const card = await waitFor(page, () => window.__smb?.card?.(), null, 30000);
+    if (!card) throw new Error(`${path}: stuck with no card (after ${memory.length} levels)`);
+    if (card.includes('path complete!')) {
+      await page.screenshot({ path: `${OUT}/${tag}-path-${path}-recap.png` });
+      const perf = memory.map((m) => `${m.geometries}/${m.textures}`).join(' ');
+      return `${memory.length} levels, recap "${card}"; geometries/textures per level: ${perf}`;
+    }
+    if (card.startsWith('Benchmark Kart')) {
+      await page.evaluate(() => window.__smb.next());
+      if (!(await waitFor(page, () => window.__smb.kartState?.()?.state === 'racing', null, 20000))) throw new Error(`${path}: race never started`);
+      await page.evaluate(() => window.__smb.kartFinish());
+      await waitFor(page, () => !window.__smb.kartState?.(), null, 20000);
+      continue;
+    }
+    const level = await page.evaluate(() => window.__smb.level());
+    const state = await page.evaluate(() => window.__smb.state());
+    if (level && state === 'intro') {
+      const outro = await playLevel(page, level, `${tag}-path`);
+      memory.push(await page.evaluate(() => window.__smb.perf()));
+      // The finale's outro already led to the recap.
+      if (outro.includes('path complete!')) {
+        await page.screenshot({ path: `${OUT}/${tag}-path-${path}-recap.png` });
+        const perf = memory.map((m) => `${m.geometries}/${m.textures}`).join(' ');
+        return `${memory.length} levels, ${outro}; geometries/textures after each level: ${perf}`;
+      }
+      continue;
+    }
+    await page.evaluate(() => window.__smb.next());
+    await sleep(400);
+  }
+  throw new Error(`${path}: too many cards`);
+}
+
 const browser = await chromium.launch();
 let failures = 0;
 for (const tag of wanted) {
@@ -170,7 +220,9 @@ for (const tag of wanted) {
 
   for (const id of ids) {
     try {
-      const outro = id.startsWith('kart-')
+      const outro = id.startsWith('path:')
+        ? await completePath(page, id.slice(5), tag)
+        : id.startsWith('kart-')
         ? await completeKart(page, id, tag)
         : id.startsWith('char:')
           ? await completeAsCharacter(page, id.slice(5), tag)

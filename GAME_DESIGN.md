@@ -103,6 +103,8 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave, two-key plates |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
+| `src/config/music.ts`, `src/game/music.ts`, `musicTheory.ts` | Original background tunes (scale degrees over chords), the lookahead WebAudio sequencer, and its pure note math (unit tested) |
+| `src/ui/Settings.ts`, `src/game/prefs.ts` | Settings toggles (title screen and pause menus) and the reduce-motion flag that rendering reads |
 | `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape |
 
 `?debug` in the URL exposes `window.__smb` (teleport, state, bosses, stomp, give, next) for Playwright smoke tests;
@@ -119,5 +121,17 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M5 ✅ | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
 | M6 ✅ | Worlds 6–7 | Swarm Factory (fork cherry = agent clones, two-key plates, rate-limit crushers, Rogue Swarm boss); storms for the Pentagon dispute, the export freeze and Astra's phased rollout; Frontier Castle (frontier mushroom, Paperclip Maximizer) → Astra / Opus 5.5 finales and the recap |
 | M7 ✅ | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits (Llama's open-weights copy, Grok's cloud); six Benchmark Kart races between worlds |
-| M8 | Polish | Music, accessibility, performance, a fact-verification pass over every 🔎 |
+| M8 ✅ | Polish | Original chiptune music from a config-driven WebAudio sequencer; settings on the title and pause menus (music, sound, reduce motion, assist, large text); freed meshes and memory checks over whole-path runs; a fact pass over every card (all 🔎 facts verified, reworded or re-sourced); the Sora cameo Moment |
 | M9 | Online multiplayer | Hosted rooms for online co-op/versus |
+
+## Accessibility & performance
+
+- **Settings** (title screen and pause menu, saved): music, sound effects, reduce motion (no screen shake,
+  no strobing blinks or pulsing lights; hits show as a steady see-through body), assist mode (a slower game
+  and 9 lives), large text. Every token type has a glyph as well as a color.
+- **Controls**: everything works on one keyboard (solo and co-op) and on touch in landscape; cards are
+  keyboard-navigable (arrows, Enter) and ignore held keys, so a jump never skips a fact card.
+- **Performance**: fixed-step 120 Hz simulation; instanced tiles; the pixel ratio is capped at 1.5 and
+  antialiasing is off on touch devices; every level, actor and race frees its geometry, materials and
+  textures. `npm run smoke -- path:gpt path:claude` plays both whole paths in one session and logs renderer
+  memory per level, so a leak shows up as growth.

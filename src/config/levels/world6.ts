@@ -119,10 +119,10 @@ export const WORLD_6: LevelSpec[] = [
     recipe: { code: 0.4, reasoning: 0.3, agentic: 0.3 },
     blockToken: 'code',
     power: 'fork',
-    moments: ['emDashFixed', 'codeRed'],
+    moments: ['emDashFixed', 'codeRed', 'soraCameos'],
     intro: {
       title: 'World 6-3 · Code Red',
-      date: 'Nov–Dec 2025 · Training toward GPT-5.2',
+      date: 'Oct–Dec 2025 · Training toward GPT-5.2',
       lines: [
         tip('Notice anything missing behind your jumps?'),
         tip('Code red: there are no bonus rooms today. Speed-run to the flag under par for an extra life.'),
@@ -209,7 +209,7 @@ export const WORLD_6: LevelSpec[] = [
       date: 'Nov 24, 2025',
       lines: [
         fact('Anthropic released Claude Opus 4.5 on November 24, 2025, calling it the best model in the world for coding, agents and computer use, at a new, lower price.', 'opus45'),
-        fact('Anthropic found Opus 4.5 very effective at managing a team of subagents: forks of the same task, working together.', 'opus45'),
+        fact('Anthropic found Opus 4.5 very effective at managing a team of subagents that work together as a well-coordinated multi-agent system.', 'opus45'),
       ],
     },
     map: stitch(
@@ -238,7 +238,7 @@ export const WORLD_6: LevelSpec[] = [
       title: 'World 6-2 · Agent Teams',
       date: 'Jan–Feb 2026 · Training toward Claude Opus 4.6',
       lines: [
-        fact('January 2026: an open-source agent, OpenClaw, goes viral, and so does Moltbook, a social network where only AI agents can post.', 'moltbook'),
+        fact('January 2026: an open-source agent, Clawdbot (soon renamed OpenClaw), goes viral, and so does Moltbook, a social network where only AI agents can post.', 'moltbook'),
         tip('Two hype blocks this time. When each power-up runs out, call it: passing hype, or lasting shift?'),
       ],
     },
@@ -283,7 +283,7 @@ export const WORLD_6: LevelSpec[] = [
       ],
     },
     outro: {
-      title: 'You kept your principles',
+      title: 'You weathered the storm',
       date: 'Sep 2026 · The dispute goes on',
       lines: [
         fact(
