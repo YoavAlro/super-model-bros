@@ -2,6 +2,7 @@ import { CHARACTERS, ROSTER, type CharacterId } from '../config/characters';
 import { LEVELS } from '../config/levels';
 import { PATHS, type PathId } from '../config/paths';
 import { Input } from '../game/Input';
+import { renderPortraits } from '../game/portraits';
 import { isUnlocked } from '../game/progress';
 import { pathSpan } from '../game/storyTimeline';
 import { writeSave, type SaveData } from '../save';
@@ -17,6 +18,9 @@ export interface StartChoice {
   /** Continue the saved run on this path instead of starting over. */
   resume: boolean;
 }
+
+/** CSS size of a roster card's mascot portrait (style.css .swatch.portrait matches it). */
+const PORTRAIT_PX = 64;
 
 /** Title, path choice, character roster, and the disclaimer. */
 export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (choice: StartChoice) => void): void {
@@ -70,6 +74,7 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
 
   const roster = el('div', 'roster');
   const cards = new Map<CharacterId, HTMLElement>();
+  const swatches = new Map<CharacterId, HTMLElement>();
   const refresh = () => {
     for (const [id, card] of cards) card.classList.toggle('selected', id === lead);
   };
@@ -79,6 +84,7 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
     card.disabled = !open;
     const swatch = el('div', 'swatch');
     swatch.style.background = hex(c.color);
+    swatches.set(c.id, swatch);
     card.append(swatch, el('strong', undefined, c.name), el('span', 'roster-lab', c.lab));
     card.append(el('span', 'roster-trait', open ? c.trait : `🔒 ${c.unlock}`));
     card.setAttribute('aria-pressed', 'false');
@@ -90,6 +96,16 @@ export function showTitleScreen(parent: HTMLElement, save: SaveData, onStart: (c
     cards.set(c.id, card);
     roster.append(card);
   }
+  // Each card shows its mascot, rendered once after the screen is up (locked ones as a silhouette).
+  requestAnimationFrame(() => {
+    if (!screen.isConnected) return;
+    for (const [id, url] of renderPortraits(ROSTER, PORTRAIT_PX)) {
+      const swatch = swatches.get(id as CharacterId);
+      if (!swatch) continue;
+      swatch.classList.add('portrait');
+      swatch.style.background = `center / contain no-repeat url(${url})`;
+    }
+  });
   inner.append(
     el('h3', 'roster-title', 'Characters'),
     el('p', 'roster-help', 'Pick a character to play either path as them, or leave it to the path’s own brother.'),

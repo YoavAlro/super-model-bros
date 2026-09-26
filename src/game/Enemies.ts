@@ -151,7 +151,11 @@ export class HotTake extends Enemy {
 
   updateMesh(t: number): void {
     super.updateMesh(t);
-    if (this.alive) this.mesh.rotation.y = t * 3;
+    if (!this.alive) return;
+    // It tumbles as it falls, then faces where it walks and waddles: spinning in place turned it
+    // edge-on to the camera, a sliver for part of every turn.
+    if (!this.landed) this.mesh.rotation.set(0, t * 3, 0);
+    else waddle(this.mesh, this.dir, t);
   }
 }
 
@@ -615,6 +619,11 @@ export class Paperclip extends Enemy {
 
   updateMesh(t: number): void {
     super.updateMesh(t);
-    if (this.alive) this.mesh.rotation.y = t * 3;
+    if (this.alive) waddle(this.mesh, this.dir, t);
   }
+}
+
+/** Turned three-quarters toward its walking direction, rocking from foot to foot. */
+function waddle(mesh: THREE.Object3D, dir: number, t: number): void {
+  mesh.rotation.set(0, dir > 0 ? 0.5 : -0.5, Math.sin(t * 9) * 0.12);
 }
