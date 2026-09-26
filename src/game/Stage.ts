@@ -36,7 +36,7 @@ import { music } from './music';
 import { mulberry32 } from './rng';
 import { sfx } from './sfx';
 import { KnockOffs } from './starFx';
-import { pickTune } from './starRules';
+import { pickTune, type TuneState } from './starRules';
 import { stormDay } from './storm';
 
 export const STEP = 1 / 120;
@@ -116,6 +116,8 @@ export class Stage implements StageCtx {
   private knocks!: KnockOffs;
   /** The tune this stage last asked for (undefined: none yet). */
   private tune: TuneId | null | undefined;
+  /** What `syncMusic` hands `pickTune`, reused so the frame loop allocates nothing for it. */
+  private readonly tuneState: TuneState = { level: 'overworld', over: false, starred: false, bossAwake: false, down: false };
   private helper: THREE.Group | null = null;
   /** The goal pennant; `stamp` is −1 until the RELEASED stamp lands, then its age in seconds. */
   private flag: { group: THREE.Group; x: number; y: number; slide: number; stamp: number } | null = null;
@@ -1627,16 +1629,23 @@ export class Stage implements StageCtx {
 
   /**
    * Plays whatever should be playing (see `pickTune`): the star tune while anyone is starred, the
-   * boss tune while a boss is up, else the level's theme, and nothing once the level is over.
+   * boss tune while a boss is up, else the level's theme, and nothing once the level is over or
+   * while every hero is down (the respawn then starts the tune from the top).
    */
   private syncMusic(): void {
     if (this.state === 'intro' || this.state === 'done') return;
-    const want = pickTune({
-      level: THEME_TUNES[this.spec.theme],
-      over: this.state === 'clear',
-      starred: this.playersList.some((p) => p.star > 0),
-      bossAwake: this.bosses.some((b) => b.awake && b.alive),
-    });
+    const s = this.tuneState;
+    s.level = THEME_TUNES[this.spec.theme];
+    s.over = this.state === 'clear';
+    s.starred = false;
+    s.down = true;
+    for (const p of this.playersList) {
+      if (p.star > 0) s.starred = true;
+      if (!p.dead && !p.clone) s.down = false;
+    }
+    s.bossAwake = false;
+    for (const b of this.bosses) if (b.awake && b.alive) s.bossAwake = true;
+    const want = pickTune(s);
     if (want === this.tune) return;
     this.tune = want;
     if (want) music.play(want);

@@ -19,11 +19,16 @@ export interface TuneState {
   starred: boolean;
   /** A boss is awake and still standing. */
   bossAwake: boolean;
+  /** Every hero is down, waiting to respawn: quiet under the die sound, and the tune starts fresh after. */
+  down: boolean;
 }
 
-/** The tune that should play now: nothing once the level is over, then star, then boss, then the theme. */
+/**
+ * The tune that should play now: nothing once the level is over or while every hero is down, then
+ * star, then boss, then the theme.
+ */
 export function pickTune(s: TuneState): TuneId | null {
-  if (s.over) return null;
+  if (s.over || s.down) return null;
   if (s.starred) return 'star';
   if (s.bossAwake) return 'boss';
   return s.level;
@@ -35,11 +40,13 @@ export function pickTune(s: TuneState): TuneId | null {
 export const STAR_WARN = 2;
 /** Warning blink rate in full on/off cycles per second. */
 export const STAR_BLINK_HZ = 2.5;
+/** Hue cycles per second during the warning: barely drifting, so the blink is the flash that counts. */
+export const STAR_WARN_DRIFT = 0.15;
 /**
- * The photosensitivity limit: no more than 3 flashes a second. The rainbow holds HSL lightness
- * steady, but a hue sweep still changes brightness (yellow is far brighter than blue), so each full
- * hue cycle can read as a flash. What keeps it safe is the rate: every cycle rate, and the warning
- * blink plus the hue drift under it, stay at or under this.
+ * The photosensitivity limit: no more than 3 flashes a second. `starLift` keeps dark hues from
+ * dipping below a grey of the part's lightness, but a hue sweep still brightens toward yellow, so each
+ * full hue cycle can read as a flash. What keeps it safe is the rate: every cycle rate, and the warning
+ * blink plus the drift under it, stay under this.
  */
 export const FLASH_LIMIT_HZ = 3;
 
@@ -63,12 +70,12 @@ export const starGlow = (kind: StarKind): number => LOOKS[kind].glow;
 
 /**
  * How fast the rainbow cycles (cycles per second): fast when the star is fresh, slowing as it runs
- * down, and slowest in the warning. Reduced motion: a steady glow (viral drifts very slowly).
+ * down, and barely drifting in the warning. Reduced motion: a steady glow (viral drifts very slowly).
  */
 export function starCycleRate(kind: StarKind, left: number, total: number, reduceMotion: boolean): number {
   if (reduceMotion) return kind === 'viral' ? 0.05 : 0;
   const { fast, slow } = LOOKS[kind];
-  if (left <= STAR_WARN) return slow;
+  if (left <= STAR_WARN) return Math.min(slow, STAR_WARN_DRIFT);
   const f = Math.min(1, Math.max(0, (left - STAR_WARN) / Math.max(0.001, total - STAR_WARN)));
   return slow + (fast - slow) * f;
 }
@@ -100,10 +107,49 @@ export function starHue(kind: StarKind, phase: number, offset: number): number {
 
 /**
  * HSL lightness of a part while starred: its own lightness pulled halfway to the middle. It depends
- * only on the part, never on time, so the cycle never pulses light and dark on its own; the brightness
- * change that hue brings is bounded by the cycle rate (see FLASH_LIMIT_HZ).
+ * only on the part, never on time, so the cycle never pulses light and dark on its own; `starLift`
+ * then raises it for the dark hues.
  */
 export const starLightness = (own: number): number => 0.5 + (own - 0.5) * 0.45;
+
+/** An sRGB channel (0..1) in linear light. */
+const toLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+
+/** One sRGB channel of an HSL colour (the same maths as three.js `Color.setHSL`). */
+function hslChannel(p: number, q: number, t: number): number {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
+  if (t < 1 / 2) return q;
+  if (t < 2 / 3) return p + (q - p) * 6 * (2 / 3 - t);
+  return p;
+}
+
+/** Relative luminance (0 black .. 1 white) of the sRGB colour with these HSL components. */
+export function hslLuminance(h: number, s: number, l: number): number {
+  h = ((h % 1) + 1) % 1;
+  const q = l <= 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return 0.2126 * toLinear(hslChannel(p, q, h + 1 / 3)) + 0.7152 * toLinear(hslChannel(p, q, h)) + 0.0722 * toLinear(hslChannel(p, q, h - 1 / 3));
+}
+
+/**
+ * The lightness to draw hue `h` at in place of `l`: `l` itself, or just enough more that the colour is
+ * no darker than a grey of lightness `l`. At the middle HSL lightness blue is under a tenth as bright as yellow, so
+ * without this the viral rainbow's blue phase is a dark blob on dark levels; gold never needs a lift.
+ */
+export function starLift(h: number, s: number, l: number): number {
+  const floor = toLinear(l);
+  if (hslLuminance(h, s, l) >= floor) return l;
+  let lo = l;
+  let hi = 1;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (hslLuminance(h, s, mid) >= floor) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
 
 /** How strongly a part takes the star colour: eyes, highlights and ink lines mostly keep theirs. */
 export const starWeight = (own: number): number => (own > 0.9 || own < 0.12 ? 0.35 : 1);
@@ -167,6 +213,38 @@ export function knockPose(age: number, dir: number, out: KnockPose = { dx: 0, dy
 
 // ------------------------------------------------------------------ combos
 
+/** A popup's box: its middle and its size. */
+export interface PopupBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The height for a new combo popup that would sit at `box.y`: raised above every live popup it would
+ * overlap, so a quick chain's popups stack instead of covering each other. Live popups ease to a stop
+ * while a new one starts rising, so a stack only spreads apart afterwards.
+ */
+export function stackPopup(box: PopupBox, live: readonly PopupBox[], gap = 0.08): number {
+  let y = box.y;
+  // Each pass that moves it clears at least one more popup, so live.length + 1 passes always settle.
+  for (let pass = 0; pass <= live.length; pass++) {
+    let moved = false;
+    for (const o of live) {
+      const clear = (o.h + box.h) / 2 + gap;
+      // `top` is compared as computed, so a popup just raised onto it never counts as overlapping again.
+      const top = o.y + clear;
+      if (Math.abs(o.x - box.x) < (o.w + box.w) / 2 + gap && y < top && y > o.y - clear) {
+        y = top;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return y;
+}
+
 /** Points for the n-th enemy knocked off by one star: doubling from 100, capped at 6400. */
 export const comboPoints = (n: number): number => 100 * 2 ** Math.min(Math.max(0, n - 1), 6);
 
@@ -175,5 +253,5 @@ const COMBO_COLORS = ['#ffffff', '#ffe066', '#ffb347', '#ff8fb8', '#d59bff', '#8
 /** The popup's text colour, warming up the chain. */
 export const comboColor = (n: number): string => COMBO_COLORS[Math.min(Math.max(0, n - 1), COMBO_COLORS.length - 1)];
 
-/** The popup's text: the points, and the chain length once it is a chain. */
-export const comboLabel = (n: number): string => (n >= 2 ? `${comboPoints(n)} ×${n}` : `${comboPoints(n)}`);
+/** The popup's text: just the points, which climb (with the colour) as the chain grows. */
+export const comboLabel = (n: number): string => `${comboPoints(n)}`;

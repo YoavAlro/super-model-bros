@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import type { TintGroup } from './staticMerge';
-import { starGlow, starHue, starLightness, starSaturation, starWeight, type StarKind } from './starRules';
+import { starGlow, starHue, starLift, starLightness, starSaturation, starWeight, type StarKind } from './starRules';
 
 /**
- * The star rainbow's material cache: finds every tintable material under a character's mesh, keeps
- * its own colour, emissive and emissive intensity in `material.userData.starOriginal`, tints it for
- * a frame, and puts it back exactly. No textures or DOM, so it is unit tested (`star.test.ts`).
+ * The star rainbow's material cache: finds every tintable material under a character's mesh the
+ * first time, keeps its own colour, emissive and emissive intensity in this object's part list, tints
+ * it for a frame, and puts it back exactly. No textures or DOM, so it is unit tested (`star.test.ts`).
  * Materials are per-instance (see `characterMeshes.ts` and `toonKit.ts`), so tinting one
- * character never tints another.
+ * character never tints another. The originals stay out of `material.userData`, which a material
+ * clone would copy, stale, into another mesh.
  *
  * Static parts merged by `staticMerge.ts` carry their colours in the vertices of one white material
  * (the geometry's `userData.tint` says which vertices had which colour): each of those colours is
@@ -81,7 +82,7 @@ export class StarTint {
     for (const p of parts) {
       const hue = starHue(kind, phase, p.offset);
       if (!p.glowOnly) {
-        vivid.setHSL(hue, sat, p.lightness, SRGB);
+        vivid.setHSL(hue, sat, starLift(hue, sat, p.lightness), SRGB);
         tinted.copy(p.orig.color).lerp(vivid, mix * p.weight);
         if (p.paint) paint(p.paint, tinted);
         else p.mat.color.copy(tinted);
@@ -89,7 +90,7 @@ export class StarTint {
       if (p.paint) continue;
       if (p.mat.emissive && p.orig.emissive) {
         // Blend from the part's own glow, so parts that glow anyway keep it on the off frames.
-        p.mat.emissive.copy(p.orig.emissive).lerp(glow.setHSL(hue, 1, lum, SRGB), mix);
+        p.mat.emissive.copy(p.orig.emissive).lerp(glow.setHSL(hue, 1, starLift(hue, 1, lum), SRGB), mix);
         p.mat.emissiveIntensity = THREE.MathUtils.lerp(p.orig.intensity, 1, mix);
       }
     }
@@ -187,7 +188,6 @@ export class StarTint {
     return [
       ...[...found].map(([mat, { y, glowOnly }]) => {
         const orig: Original = { color: mat.color.clone(), emissive: mat.emissive?.clone() ?? null, intensity: 1 };
-        mat.userData.starOriginal = orig;
         // capture() fills in the originals' values, lightness and weight.
         return { mat, orig, offset: offset(y), lightness: 0.5, weight: 1, glowOnly };
       }),

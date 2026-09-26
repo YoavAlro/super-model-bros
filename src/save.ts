@@ -49,7 +49,10 @@ export interface SaveData {
 const KEY = 'super-model-bros.save.v2';
 const OLD_KEY = 'super-model-bros.save.v1';
 
-export const defaultSettings = (): Settings => ({ music: true, sfx: true, reduceMotion: false, assist: false, largeText: false });
+/** Does the device ask for less motion? It seeds the default; a saved setting still wins. */
+const systemReducedMotion = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+export const defaultSettings = (): Settings => ({ music: true, sfx: true, reduceMotion: systemReducedMotion(), assist: false, largeText: false });
 
 export const newRun = (path: PathId, players: 1 | 2, chars: CharacterId[]): RunState => ({
   path,

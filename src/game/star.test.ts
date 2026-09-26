@@ -6,15 +6,19 @@ import {
   FLASH_LIMIT_HZ,
   STAR_BLINK_HZ,
   STAR_WARN,
+  STAR_WARN_DRIFT,
   comboColor,
   comboLabel,
   comboPoints,
+  hslLuminance,
   knockPose,
   pickTune,
   spinAngle,
   spinDuration,
+  stackPopup,
   starCycleRate,
   starHue,
+  starLift,
   starLightness,
   starMix,
   starWeight,
@@ -27,7 +31,7 @@ import { INK, basic, toon } from './toonKit';
 const KINDS: StarKind[] = ['rlhf', 'viral', 'mega'];
 
 describe('star music', () => {
-  const base = { level: 'overworld', over: false, starred: false, bossAwake: false } as const;
+  const base = { level: 'overworld', over: false, starred: false, bossAwake: false, down: false } as const;
 
   it('plays the level theme, the boss tune while a boss is up, and the star tune over both', () => {
     expect(pickTune(base)).toBe('overworld');
@@ -44,6 +48,13 @@ describe('star music', () => {
   it('goes quiet once the level is over, star or not', () => {
     expect(pickTune({ ...base, over: true })).toBeNull();
     expect(pickTune({ ...base, over: true, starred: true, bossAwake: true })).toBeNull();
+  });
+
+  it('goes quiet while every hero is down, and the respawn picks the tune again', () => {
+    // Dying ends the star at once: the theme must not start up under the die sound.
+    expect(pickTune({ ...base, down: true })).toBeNull();
+    expect(pickTune({ ...base, down: true, bossAwake: true })).toBeNull();
+    expect(pickTune({ ...base, down: false })).toBe('overworld');
   });
 
   it('ships a fast, original star loop that fills its bars', () => {
@@ -103,8 +114,36 @@ describe('star rainbow', () => {
           expect(starCycleRate(kind, left, total, reduce), kind).toBeLessThanOrEqual(FLASH_LIMIT_HZ);
         }
       }
-      expect(STAR_BLINK_HZ + starCycleRate(kind, STAR_WARN / 2, total, false), kind).toBeLessThanOrEqual(FLASH_LIMIT_HZ);
+      // The blink is the warning's flash; the hue under it barely drifts, leaving a tenth to spare.
+      const warn = starCycleRate(kind, STAR_WARN / 2, total, false);
+      expect(warn, kind).toBeLessThanOrEqual(STAR_WARN_DRIFT);
+      expect(STAR_BLINK_HZ + warn, kind).toBeLessThan(FLASH_LIMIT_HZ * 0.9);
     }
+  });
+
+  it('lifts dark hues to the brightness of a grey of the same lightness, and leaves gold alone', () => {
+    const grey = (l: number) => hslLuminance(0, 0, l);
+    for (const l of [0.28, 0.4, 0.5, 0.6, 0.72]) {
+      let lo = 1;
+      let hi = 0;
+      for (let h = 0; h < 1; h += 0.01) {
+        const lifted = starLift(h, 1, l);
+        expect(lifted, `hue ${h}`).toBeGreaterThanOrEqual(l);
+        const lum = hslLuminance(h, 1, lifted);
+        expect(lum, `hue ${h}`).toBeGreaterThanOrEqual(grey(l) - 0.002);
+        lo = Math.min(lo, lum);
+        hi = Math.max(hi, lum);
+      }
+      // With the lift the brightest hue is under 5x the darkest.
+      expect(hi / lo, `lightness ${l}`).toBeLessThan(5);
+      // Gold (the RLHF and frontier hues) is bright enough as it is.
+      for (let h = 0.06; h < 0.18; h += 0.01) expect(starLift(h, 0.95, l)).toBe(l);
+    }
+    // Without it, at the middle lightness, blue is under a tenth as bright as yellow.
+    expect(hslLuminance(0.667, 1, 0.5) / hslLuminance(0.167, 1, 0.5)).toBeLessThan(0.1);
+    // The same maths as three.js, so the lift holds on screen.
+    const c = new THREE.Color().setHSL(0.62, 0.9, 0.45, THREE.SRGBColorSpace);
+    expect(hslLuminance(0.62, 0.9, 0.45)).toBeCloseTo(0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b, 5);
   });
 
   it("holds each part's lightness steady whatever the hue, keeping dark parts darker", () => {
@@ -180,9 +219,29 @@ describe('star knock-offs', () => {
     expect([1, 2, 3, 4, 5, 6, 7].map(comboPoints)).toEqual([100, 200, 400, 800, 1600, 3200, 6400]);
     expect(comboPoints(20)).toBe(6400);
     expect(comboLabel(1)).toBe('100');
-    expect(comboLabel(3)).toBe('400 ×3');
+    expect(comboLabel(3)).toBe('400');
     expect(comboColor(1)).not.toBe(comboColor(4));
     expect(comboColor(99)).toBe(comboColor(7));
+  });
+
+  it("stacks a chain's popups instead of covering one another", () => {
+    const box = { x: 0, y: 3, w: 1.4, h: 0.75 };
+    // Nothing live, or a popup off to the side: it stays where it was going.
+    expect(stackPopup(box, [])).toBe(3);
+    expect(stackPopup(box, [{ ...box, x: 2 }])).toBe(3);
+    // One in the way: just above it.
+    const one = { ...box, x: 0.6, y: 3.2 };
+    const y1 = stackPopup(box, [one]);
+    expect(y1 - one.y).toBeCloseTo(0.75 + 0.08);
+    // Two stacked in the way, listed top first: above both, never between.
+    const two = { ...box, x: -0.3, y: y1 };
+    expect(stackPopup(box, [two, one])).toBeCloseTo(y1 + 0.83);
+    // Already clear above: untouched.
+    expect(stackPopup({ ...box, y: 5 }, [one])).toBe(5);
+    // Rounding can leave a raised popup a hair inside the one below ((0.29 + 0.58) - 0.29 < 0.58): it still settles.
+    const tight = { x: 0, y: 0.2, w: 1, h: 0.5 };
+    expect(Math.abs(0.29 - (0.29 + 0.58))).toBeLessThan(0.58);
+    expect(stackPopup(tight, [{ ...tight, y: 0.29 }])).toBeCloseTo(0.87);
   });
 });
 
