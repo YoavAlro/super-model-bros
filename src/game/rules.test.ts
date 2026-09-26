@@ -222,3 +222,26 @@ describe('reachability checker', () => {
     expect(deep.deadEnds.length).toBeGreaterThan(0);
   });
 });
+
+describe('storms', () => {
+  it('counts storm days by how far the camera has scrolled', async () => {
+    const { stormDay } = await import('./storm');
+    expect(stormDay(0, 100, 5)).toBe(0);
+    expect(stormDay(19.9, 100, 5)).toBe(0);
+    expect(stormDay(20, 100, 5)).toBe(1);
+    expect(stormDay(99, 100, 5)).toBe(4);
+    expect(stormDay(250, 100, 5)).toBe(4);
+    expect(stormDay(-5, 100, 5)).toBe(0);
+    expect(stormDay(50, 0, 5)).toBe(0);
+  });
+
+  it('gives the board crisis five days and a heart goal it can meet', async () => {
+    const { STORMS } = await import('../config/events');
+    const { LEVELS } = await import('../config/levels');
+    const storm = STORMS.boardCrisis;
+    expect(storm.days).toHaveLength(5);
+    const grid = new LevelGrid(LEVELS['gpt-3-3'].map);
+    const hearts = grid.spawns.filter((s) => s.kind === 'heart').length;
+    expect(hearts).toBeGreaterThanOrEqual(storm.hearts!);
+  });
+});

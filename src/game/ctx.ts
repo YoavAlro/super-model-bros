@@ -2,6 +2,7 @@ import type * as THREE from 'three';
 import type { Enemy } from './Enemies';
 import type { Trap } from './Items';
 import type { LevelGrid } from './level';
+import type { Platform } from './Platforms';
 import type { PlayerActor } from './Player';
 
 /** What actors may read and do during a simulation step. Implemented by the Stage. */
@@ -21,6 +22,8 @@ export interface StageCtx {
   toast(message: string, kind?: 'info' | 'good' | 'bad'): void;
   shake(amount: number): void;
   addEnemy(e: Enemy): void;
+  enemies(): Enemy[];
+  addPlatform(p: Platform): void;
   addTrap(t: Trap): void;
   traps(): Trap[];
 }

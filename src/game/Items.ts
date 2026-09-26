@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { DataTypeId } from '../config/dataTypes';
-import { makeFunctionCall, makePowerItem, makeToken, makeTrap } from './meshes';
+import { makeFunctionCall, makeHeart, makePowerItem, makeToken, makeTrap } from './meshes';
 import { moveBody, type Body, type Grid } from './physics';
 
 /** A floating data token. `pop` tokens burst out of blocks and collect themselves. */
@@ -80,9 +80,12 @@ export class PowerItem {
     /** For hype and moment items: which one. */
     readonly ref?: string,
     color?: number,
+    /** False for items that fall from the sky instead of rising out of a block. */
+    emerge = true,
   ) {
     this.body = { x: x + 0.1, y, w: 0.8, h: 0.8, vx: 0, vy: 0, onGround: false };
     this.mesh = makePowerItem(kind, color);
+    if (!emerge) this.rise = 0;
     scene.add(this.mesh);
   }
 
@@ -167,6 +170,34 @@ export class Trap {
     this.mesh.rotation.y = Math.sin(t * 2 + this.body.x) * 0.6;
     const s = 1 + Math.sin(t * 8 + this.body.x) * 0.06;
     this.mesh.scale.setScalar(s);
+  }
+
+  dispose(): void {
+    this.scene.remove(this.mesh);
+  }
+}
+
+/** A heart token: the people. Some storms end early when you gather enough of them. */
+export class Heart {
+  readonly body: Body;
+  readonly mesh: THREE.Group;
+  taken = false;
+
+  constructor(x: number, y: number, private readonly scene: THREE.Scene) {
+    this.body = { x: x + 0.2, y: y + 0.2, w: 0.6, h: 0.6, vx: 0, vy: 0, onGround: false };
+    this.mesh = makeHeart();
+    scene.add(this.mesh);
+  }
+
+  take(): void {
+    this.taken = true;
+    this.mesh.visible = false;
+  }
+
+  updateMesh(t: number): void {
+    if (this.taken) return;
+    this.mesh.position.set(this.body.x + 0.3, this.body.y - 0.2 + Math.sin(t * 4 + this.body.x) * 0.08, 0);
+    this.mesh.rotation.y = Math.sin(t * 2 + this.body.x);
   }
 
   dispose(): void {

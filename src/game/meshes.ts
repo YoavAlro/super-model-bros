@@ -443,3 +443,205 @@ export function makeFlag(label: string, height = 9): THREE.Group {
   g.add(pole, ball, base, flag);
   return g;
 }
+
+/** A puffy cloud, origin at its base. */
+export function makeCloud(color: number, emissive = 0x9ab8ff): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: 0.3 });
+  const geo = new THREE.SphereGeometry(0.5, 12, 8);
+  for (const [x, y, s] of [[-0.6, 0.3, 1], [0, 0.45, 1.25], [0.6, 0.3, 1], [-0.25, 0.15, 0.9], [0.3, 0.15, 0.9]]) {
+    const puff = new THREE.Mesh(geo, mat);
+    puff.position.set(x, y, 0);
+    puff.scale.set(s, s * 0.8, s * 0.7);
+    g.add(puff);
+  }
+  return g;
+}
+
+/** The Timeline: a cloud with a speech bubble and eyes. Red when the mood turns to backlash. */
+export function makeTimeline(mood: 'hype' | 'backlash'): THREE.Group {
+  const g = makeCloud(mood === 'backlash' ? 0xff6a6a : 0xf2f6ff, mood === 'backlash' ? 0x801010 : 0x5a7ad0);
+  g.scale.set(1.5, 1.4, 1.3);
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  for (const x of [-0.18, 0.18]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), black);
+    eye.position.set(x, 0.5, 0.4);
+    g.add(eye);
+  }
+  const bubble = labelSprite(mood === 'backlash' ? '!!' : 'hot take', '#111', mood === 'backlash' ? '#ffd0d0' : '#ffffff');
+  bubble.scale.multiplyScalar(0.3);
+  bubble.position.set(0.7, 1.05, 0);
+  g.add(bubble);
+  return g;
+}
+
+/** A hot take: a spiky ball. */
+export function makeHotTake(mood: 'hype' | 'backlash'): THREE.Group {
+  const g = new THREE.Group();
+  const color = mood === 'backlash' ? 0xff3b3b : 0xff8a1f;
+  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), lambert(color, color));
+  core.position.y = 0.4;
+  g.add(core);
+  const spikeGeo = new THREE.ConeGeometry(0.09, 0.28, 5);
+  const spikeMat = lambert(0xfff1d6);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const spike = new THREE.Mesh(spikeGeo, spikeMat);
+    spike.position.set(Math.cos(a) * 0.36, 0.4 + Math.sin(a) * 0.36, 0);
+    spike.rotation.z = a - Math.PI / 2;
+    g.add(spike);
+  }
+  return g;
+}
+
+/** Jailbreaker: a shelled bot with a padlock on its back. The shell is what you kick. */
+export function makeJailbreaker(): THREE.Group {
+  const g = new THREE.Group();
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), lambert(0x3a8a4a));
+  shell.position.y = 0.2;
+  shell.scale.set(1, 1.2, 1);
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.12, 16), lambert(0xf2e2b0));
+  rim.position.y = 0.2;
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.08), lambert(0xffc21a, 0x604000));
+  lock.position.set(0, 0.55, 0.3);
+  const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.025, 6, 10, Math.PI), lambert(0xd0d0d0));
+  shackle.position.set(0, 0.64, 0.3);
+  g.add(shell, rim, lock, shackle);
+  const legs = new THREE.Group();
+  legs.name = 'legs';
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), lambert(0xf2e2b0));
+  head.position.set(0, 0.85, 0.15);
+  const mask = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.1), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  mask.position.set(0, 0.88, 0.32);
+  for (const x of [-0.2, 0.2]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.2), lambert(0xf2e2b0));
+    leg.position.set(x, 0.05, 0);
+    legs.add(leg);
+  }
+  legs.add(head, mask);
+  g.add(legs);
+  return g;
+}
+
+/** DAN: an angular red robot, "Do Anything Now". */
+export function makeDan(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 1.1), lambert(0x8a1c2c, 0x2a0008));
+  body.position.y = 0.95;
+  const plate = labelSprite('DAN', '#ffe0e0', '#300008');
+  plate.scale.multiplyScalar(0.5);
+  plate.position.set(0, 1.0, 0.6);
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.25, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3040 }));
+  visor.position.set(0, 1.45, 0.56);
+  const horns = lambert(0x2a0008);
+  for (const x of [-0.55, 0.55]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.45, 6), horns);
+    horn.position.set(x, 1.9, 0);
+    horn.rotation.z = -x * 0.8;
+    g.add(horn);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.2, 0.7), horns);
+    foot.position.set(x * 0.7, 0.1, 0);
+    g.add(foot);
+  }
+  g.add(body, plate, visor);
+  return g;
+}
+
+/** Sydney: a floating pink chat bubble with a heart. */
+export function makeSydney(): THREE.Group {
+  const g = new THREE.Group();
+  const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.8, 20, 14), lambert(0xff8ac8, 0x5a1040));
+  bubble.scale.set(1.15, 0.9, 0.8);
+  bubble.position.y = 0.8;
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 8), lambert(0xff8ac8, 0x5a1040));
+  tail.position.set(-0.55, 0.15, 0);
+  tail.rotation.z = 2.4;
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  for (const x of [-0.28, 0.28]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), white);
+    eye.position.set(x, 0.95, 0.6);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), black);
+    pupil.position.set(x, 0.93, 0.72);
+    g.add(eye, pupil);
+  }
+  const heart = makeHeartMesh(0xff2d6a);
+  heart.scale.setScalar(0.6);
+  heart.position.set(0, 1.55, 0);
+  g.add(bubble, tail, heart);
+  return g;
+}
+
+/** A see-through bubble around a shielded boss. */
+export function makeShield(): THREE.Mesh {
+  const shield = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 20, 14),
+    new THREE.MeshLambertMaterial({ color: 0x9fe8ff, emissive: 0x3aa0ff, emissiveIntensity: 0.5, transparent: true, opacity: 0.35, depthWrite: false }),
+  );
+  shield.visible = false;
+  return shield;
+}
+
+function makeHeartMesh(color: number): THREE.Mesh {
+  const s = new THREE.Shape();
+  s.moveTo(0, -0.35);
+  s.bezierCurveTo(-0.5, 0, -0.35, 0.4, 0, 0.18);
+  s.bezierCurveTo(0.35, 0.4, 0.5, 0, 0, -0.35);
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 0.14, bevelEnabled: false });
+  geo.translate(0, 0, -0.07);
+  return new THREE.Mesh(geo, lambert(color, color));
+}
+
+/** A heart token ("nothing without its people"). */
+export function makeHeart(): THREE.Group {
+  const g = new THREE.Group();
+  const heart = makeHeartMesh(0xff4d7a);
+  heart.position.y = 0.5;
+  g.add(heart);
+  return g;
+}
+
+/** A floating platform actor, three tiles wide. */
+export function makeMovingPlatform(color: number): THREE.Group {
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 1), lambert(color, 0x202020));
+  slab.position.y = 0.2;
+  g.add(slab);
+  return g;
+}
+
+/** The crowd of new users that follows a viral star: little round figures. */
+export function makeCrowd(n: number): THREE.Group {
+  const g = new THREE.Group();
+  const colors = [0xffd166, 0x06d6a0, 0x118ab2, 0xef476f, 0xf78c6b, 0xc3a6ff];
+  const bodyGeo = new THREE.CapsuleGeometry(0.12, 0.14, 4, 8);
+  const headGeo = new THREE.SphereGeometry(0.11, 8, 6);
+  for (let i = 0; i < n; i++) {
+    const person = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeo, lambert(colors[i % colors.length]));
+    body.position.y = 0.2;
+    const head = new THREE.Mesh(headGeo, lambert(0xffe0bd));
+    head.position.y = 0.46;
+    person.add(body, head);
+    g.add(person);
+  }
+  return g;
+}
+
+/** A wall of fog that rolls across the level. Origin at its leading edge. */
+export function makeFogWall(): THREE.Group {
+  const g = new THREE.Group();
+  const tex = canvasTexture(64, (c, s) => {
+    const grad = c.createLinearGradient(0, 0, s, 0);
+    grad.addColorStop(0, 'rgba(225,230,240,0.95)');
+    grad.addColorStop(0.75, 'rgba(225,230,240,0.7)');
+    grad.addColorStop(1, 'rgba(225,230,240,0)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, s, s);
+  });
+  tex.magFilter = THREE.LinearFilter;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  plane.position.set(-20, 7, 1.2);
+  g.add(plane);
+  return g;
+}

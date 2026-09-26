@@ -83,6 +83,12 @@ export class LevelView {
     if (b) b.opacity = phase === 1 ? 1 : 0.18;
   }
 
+  /** Reverses the conveyor arrows (the belts themselves are reversed in the grid). Mirroring the
+   *  texture also reverses its scroll, so the offset animation stays as it is. */
+  setConveyorSign(sign: number): void {
+    for (const tex of this.conveyorTextures) tex.repeat.x = sign;
+  }
+
   update(dt: number): void {
     this.time += dt;
     for (let n = this.bumps.length - 1; n >= 0; n--) {

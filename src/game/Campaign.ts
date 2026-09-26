@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
 import { LEVELS } from '../config/levels';
 import { PATHS, type PathSpec } from '../config/paths';
-import { fact, tip, type FactCard, type FactLine } from '../config/types';
+import { tip, type FactCard, type FactLine } from '../config/types';
 import { newRun, writeSave, type RunState, type SaveData } from '../save';
 import { showFactCard } from '../ui/FactCard';
 import { Hud } from '../ui/Hud';
@@ -176,10 +176,7 @@ export class Campaign {
     const card: FactCard = {
       title: `${this.path.name}: to be continued`,
       date: 'More worlds are on the way',
-      lines: [
-        fact('Next up: ChatGPT launches on November 30, 2022, and AI goes viral.', 'chatgptBlog'),
-        tip('Your progress is saved. Try the other brother’s path from the title screen.'),
-      ],
+      lines: [tip('The next worlds are still being built. Your progress is saved: try the other brother’s path from the title screen.')],
     };
     await this.card(card, CHARACTERS[this.path.partner].color, 'Back to title');
   }
@@ -221,7 +218,7 @@ export class Campaign {
         const api = this.stage?.debug() as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {

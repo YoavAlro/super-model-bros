@@ -17,6 +17,8 @@ export interface HudState {
   /** 0–100, or null before World 2. */
   alignment: number | null;
   bosses: { name: string; hp: number; max: number }[];
+  /** A storm's status line: the day, hearts gathered. */
+  status: string | null;
 }
 
 /** Top bar (players, lives, tokens, world) + training panel + boss bar + toasts + pause menu. */
@@ -34,6 +36,7 @@ export class Hud {
   private readonly alignFill = el('div', 'align-fill');
   private readonly alignValue = el('span', 'align-value');
   private readonly bossBar = el('div', 'hud-boss');
+  private readonly status = el('div', 'hud-status');
   private readonly toasts = el('div', 'toasts');
   private readonly hint: HTMLDivElement | null = null;
   private pause: HTMLDivElement | null = null;
@@ -54,7 +57,7 @@ export class Hud {
     const track = el('div', 'align-track');
     track.append(this.alignFill);
     this.align.append(el('span', 'align-label', 'Alignment'), track, this.alignValue);
-    this.training.append(this.toward, this.bars, this.match, this.align);
+    this.training.append(this.toward, this.bars, this.match, this.align, this.status);
     this.root.append(bar, this.training, this.bossBar, this.toasts);
     if (isTouch) this.root.append(el('div', 'rotate-hint', 'Turn your phone sideways to play ↻'));
     else {
@@ -93,6 +96,9 @@ export class Hud {
       this.alignFill.classList.toggle('low', s.alignment < 40);
       this.alignValue.textContent = `${Math.round(s.alignment)}%`;
     }
+
+    this.status.style.display = s.status ? '' : 'none';
+    if (s.status) this.status.textContent = s.status;
 
     const key = s.bosses.map((b) => `${b.name}${b.hp}`).join('|');
     if (key !== this.bossKey) {

@@ -147,6 +147,8 @@ export class LevelGrid implements Grid {
   readonly spawns: Spawn[] = [];
   readonly marks: Mark[] = [];
   readonly solidity: Solidity = { hiddenSolid: false, phase: 0 };
+  /** Storms can reverse every conveyor at once. */
+  conveyorSign = 1;
 
   constructor(map: string[]) {
     this.height = map.length;
@@ -197,7 +199,7 @@ export class LevelGrid implements Grid {
 
   conveyor(tx: number, ty: number): number {
     const t = this.get(tx, ty);
-    return t === T.CONVEYOR_R ? 1 : t === T.CONVEYOR_L ? -1 : 0;
+    return (t === T.CONVEYOR_R ? 1 : t === T.CONVEYOR_L ? -1 : 0) * this.conveyorSign;
   }
 
   isHazard(tx: number, ty: number): boolean {

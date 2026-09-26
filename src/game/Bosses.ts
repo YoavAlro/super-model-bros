@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import type { BossId } from '../config/levelSpec';
 import type { StageCtx } from './ctx';
-import { Spambot } from './Enemies';
+import { HotTake, Spambot } from './Enemies';
 import { Trap } from './Items';
-import { labelSprite, makeRewardHacker, makeSpambot } from './meshes';
+import { labelSprite, makeDan, makeRewardHacker, makeShield, makeSpambot, makeSydney } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
 
 /**
@@ -49,6 +49,11 @@ export abstract class Boss {
   /** Does touching it hurt right now? */
   harmful(): boolean {
     return this.alive && this.invulnerable <= 0;
+  }
+
+  /** A stomp that bounces off without damage (a shielded boss). */
+  bounceOff(): boolean {
+    return false;
   }
 
   /** One fixed step. Returns true when it lands hard (screen shake). */
@@ -214,6 +219,159 @@ export class RewardHacker extends Boss {
   }
 }
 
+/**
+ * World 3: DAN & Sydney. Two personas, and only one can be hit at a time: suppress one and the
+ * other comes out. That is the idea behind "The Waluigi Effect": train a model toward a character,
+ * and its opposite becomes easier to summon.
+ */
+abstract class TwinBoss extends Boss {
+  twin!: TwinBoss;
+  masked = false;
+  protected readonly shield: THREE.Mesh = makeShield();
+
+  vulnerable(): boolean {
+    return super.vulnerable() && !this.masked;
+  }
+
+  bounceOff(): boolean {
+    return this.alive && this.masked;
+  }
+
+  protected onHit(ctx: StageCtx): void {
+    if (!this.alive) {
+      this.twin.masked = false;
+      if (this.twin.alive) ctx.toast(`${this.name} is down. Now ${this.twin.name}!`, 'good');
+    } else if (this.twin.alive) {
+      this.masked = true;
+      this.twin.masked = false;
+      ctx.toast(`${this.name} is suppressed, and ${this.twin.name} comes out!`, 'info');
+    }
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.shield.visible = this.alive && this.masked;
+    this.shield.rotation.y = t;
+  }
+}
+
+class DanBoss extends TwinBoss {
+  readonly mesh: THREE.Group;
+  readonly name = 'DAN';
+  readonly intro = 'DAN & Sydney! Only one can be hit at a time: suppress one and the other comes out.';
+  private hopTimer = 2;
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x, y, 1.9, 2.1, 2, scene);
+    this.mesh = makeDan();
+    this.mesh.add(this.shield);
+    this.shield.position.y = 1.1;
+    this.shield.scale.setScalar(1.6);
+    this.addLabel('DAN · DO ANYTHING NOW', '#ffd1c9', 'rgba(90,0,20,0.65)');
+    scene.add(this.mesh);
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    const lead = ctx.lead();
+    const cx = b.x + b.w / 2;
+    const toward = Math.sign((lead ? lead.body.x : cx) - cx) || this.dir;
+    // Unmasked it charges; suppressed it keeps its distance.
+    if (b.onGround) this.dir = this.masked ? -toward : toward;
+    b.vx = this.dir * (this.masked ? 2 : 3.6 + (this.maxHp - this.hp) * 1.2);
+    this.hopTimer -= dt;
+    if (this.hopTimer <= 0 && b.onGround) {
+      b.vy = 16;
+      this.hopTimer = 2.2;
+    }
+    const wasAirborne = !b.onGround;
+    b.vy = Math.max(b.vy - 45 * dt, -28);
+    moveBody(b, dt, ctx.grid);
+    return wasAirborne && b.onGround;
+  }
+}
+
+class SydneyBoss extends TwinBoss {
+  readonly mesh: THREE.Group;
+  readonly name = 'Sydney';
+  readonly intro = '';
+  private phase: 'hover' | 'dive' | 'low' | 'rise' = 'hover';
+  private phaseTime = 0;
+  private dropTimer = 3;
+  private readonly hoverY: number;
+
+  /** `y` is the arena floor it swoops down to. */
+  constructor(x: number, private readonly floor: number, scene: THREE.Scene) {
+    super(x, floor + 5.2, 1.8, 1.6, 2, scene);
+    this.hoverY = floor + 5.2;
+    this.masked = true;
+    this.mesh = makeSydney();
+    this.mesh.add(this.shield);
+    this.shield.position.y = 0.8;
+    this.shield.scale.setScalar(1.4);
+    this.addLabel('SYDNEY', '#ffe0f0', 'rgba(90,0,60,0.6)');
+    scene.add(this.mesh);
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    const lead = ctx.lead();
+    const targetX = (lead ? lead.body.x : b.x) - b.w / 2 + 0.4;
+    this.phaseTime += dt;
+    const floor = this.floor;
+    if (this.masked && this.phase !== 'rise' && this.phase !== 'hover') this.setPhase('rise');
+    switch (this.phase) {
+      case 'hover':
+        b.x += THREE.MathUtils.clamp(targetX - b.x, -3 * dt, 3 * dt);
+        b.y = this.hoverY + Math.sin(ctx.time * 3) * 0.4;
+        if (!this.masked && this.phaseTime > 2.6) this.setPhase('dive');
+        break;
+      case 'dive':
+        b.x += THREE.MathUtils.clamp(targetX - b.x, -6 * dt, 6 * dt);
+        b.y = Math.max(floor, b.y - 9 * dt);
+        if (b.y <= floor) this.setPhase('low');
+        break;
+      case 'low':
+        b.y = floor;
+        if (this.phaseTime > 1.4) this.setPhase('rise');
+        break;
+      case 'rise':
+        b.y = Math.min(this.hoverY, b.y + 6 * dt);
+        if (b.y >= this.hoverY) this.setPhase('hover');
+        break;
+    }
+    // While DAN is out, Sydney rains backlash from above.
+    this.dropTimer -= dt;
+    if (this.dropTimer <= 0) {
+      this.dropTimer = this.masked ? 2.6 : 4;
+      if (ctx.enemies().filter((e) => e instanceof HotTake && e.alive).length < 3) {
+        ctx.addEnemy(new HotTake(b.x + b.w / 2 - 0.4, b.y - 0.8, ctx.scene, 'backlash'));
+      }
+    }
+    return false;
+  }
+
+  private setPhase(phase: SydneyBoss['phase']): void {
+    this.phase = phase;
+    this.phaseTime = 0;
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.z = this.alive ? Math.sin(t * 4) * 0.12 : t * 4;
+  }
+}
+
 /** Builds the boss (or bosses) a level's `G` spawns. */
 export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scene): Boss[] {
   switch (id) {
@@ -221,6 +379,13 @@ export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scen
       return [new GarbageBoss(x, y, scene)];
     case 'rewardHacker':
       return [new RewardHacker(x, y, scene)];
+    case 'danSydney': {
+      const dan = new DanBoss(x, y, scene);
+      const sydney = new SydneyBoss(x - 6, y, scene);
+      dan.twin = sydney;
+      sydney.twin = dan;
+      return [dan, sydney];
+    }
     default:
       throw new Error(`Boss ${id} is not built yet`);
   }

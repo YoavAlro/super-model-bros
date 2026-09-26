@@ -46,10 +46,10 @@ Auto-scrolling or hazard levels pinned to real incidents. Surviving one earns a 
 
 | When | Storm | Level mechanic | | |
 |---|---|---|---|---|
-| Dec 2022–2023 | "At capacity" outages | Platforms freeze and unfreeze | G | ✅ |
+| Dec 2022–2023 | "At capacity" outages **built** (set piece in GPT 3-1) | Platforms freeze and unfreeze | G | ✅ |
 | Mar 31–Apr 28, 2023 | Italy temporarily bans ChatGPT | Part of the level closes; reroute | G | ✅ |
-| Mar 2023 | "Pause giant AI experiments" open letter | Slow fog | B | ✅ |
-| Nov 17–22, 2023 | OpenAI board crisis | Five auto-scrolling "days"; the ground shifts each day; heart tokens end it early | G | ✅ |
+| Mar 2023 | "Pause giant AI experiments" open letter **built** (Claude 3-1) | Slow fog | B | ✅ |
+| Nov 17–22, 2023 | OpenAI board crisis **built** (GPT 3-3) | Five auto-scrolling "days"; the ground shifts each day; heart tokens end it early | G | ✅ |
 | Dec 2023 | NYT copyright lawsuit | Copyright-lawyer gauntlet | G | ✅ |
 | Jan 2025 | DeepSeek R1 shock | Speed-run against a cheap rival | B | ✅ |
 | Sep 2025 | Authors' lawsuit settlement (~$1.5B) | Triggered if the Claude path grabbed "shadow library" books earlier | C | ✅ |

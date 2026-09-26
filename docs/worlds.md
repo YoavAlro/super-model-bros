@@ -7,7 +7,7 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 |---|---|---|---|---|
 | 1 Pre-training Plains | plains · caves · castle | 2017–2020 | Garbage In | **built** |
 | 2 Alignment Hills | hills · castle | 2021–2022 | Reward Hacker | **built** |
-| 3 Viral Skies | | Nov 2022–2023 | DAN & Sydney | planned |
+| 3 Viral Skies | skies · sky castle · storm | Nov 2022–2023 | DAN & Sydney | **built** |
 | 4 Tool Pipes | | 2023–2024 | Injection Piranha | planned |
 | 5 Reasoning Ghost House | | Sep 2024–2025 | The Hallucination King | planned |
 | 6 Swarm Factory | | 2025–mid 2026 | The Rogue Swarm | planned |
@@ -22,8 +22,9 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 | 1-3 Common Crawl Castle **built** | GPT-3 · 175B | May 2020 | Web 81% · Books 16% · Wiki 3%; boss | ✅ |
 | 2-1 GitHub Hills **built** | Codex | Aug 2021 | Code (GitHub) | ✅ |
 | 2-2 RLHF Keep **built** | InstructGPT | Jan 2022 | Human Feedback → RLHF star; boss | ✅ |
-| 3-1 | ChatGPT | Nov 30, 2022 | Viral star; the Timeline appears | ✅ |
-| 3-2 | GPT-4 | Mar 14, 2023 | Vision (see hidden blocks) | ✅ |
+| 3-1 Launch Day Skies **built** | ChatGPT | Nov 30, 2022 | Viral star; the Timeline appears | ✅ |
+| 3-2 Vision Keep **built** | GPT-4 | Mar 14, 2023 | Vision (see hidden blocks); boss | ✅ |
+| 3-3 Five Days in November **built** | (storm) | Nov 17–22, 2023 | Board-crisis storm: auto-scroll, shifting ground, hearts | ✅ |
 | 4-1 | Plugins & browsing · function calling | Mar–Jun 2023 | Tool flower | ✅ |
 | 4-2 | GPT-4 Turbo · GPTs | Nov 2023 | 128K context (longer jumps) | ✅ |
 | 4-3 | GPT-4o | May 2024 | Voice | ✅ |
@@ -44,8 +45,9 @@ Claude's solo path starts in World 2. In World 1 co-op, Claude "arrives early", 
 |---|---|---|---|---|
 | 2-1 Constitution Hills **built** | Research model → Constitutional AI | 2021 → Dec 2022 | Constitution principles (a new token) | ✅ |
 | 2-2 Helpful, Honest, Harmless Keep **built** | Claude 1 | Mar 2023 | boss | ✅ |
-| 3-1 | Claude 2 | Jul 2023 | 100K context (longer float) | ✅ |
-| 3-2 | Claude 2.1 | Nov 2023 | 200K context | ✅ |
+| 3-1 The Pause Letter **built** | (storm) | Mar 2023 | Fog storm | ✅ |
+| 3-2 100K Skies **built** | Claude 2 | Jul 2023 | 100K context (longer float) | ✅ |
+| 3-3 200K Keep **built** | Claude 2.1 | Nov 2023 | 200K context; boss | ✅ |
 | 4-1 | Claude 3 (Haiku / Sonnet / Opus) | Mar 2024 | Switch between three sizes | ✅ |
 | 4-2 | Claude 3.5 Sonnet · Artifacts | Jun 2024 | Build blocks | ✅ |
 | 4-3 | Computer use · MCP | Oct–Nov 2024 | Tool flower; universal pipe | ✅ |

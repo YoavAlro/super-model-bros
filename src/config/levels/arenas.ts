@@ -39,3 +39,39 @@ export const CASTLE_GATEHOUSE = [
   '########',
   '########',
 ];
+
+/** World 3: DAN & Sydney. Open sky above (Sydney flies), ledges to stomp her from, two viral star blocks. */
+export const TWIN_ARENA = [
+  '                          ',
+  '                          ',
+  '                          ',
+  '                          ',
+  '                          ',
+  '                          ',
+  '                          ',
+  '   =====          =====   ',
+  '                          ',
+  '     *              *     ',
+  '                          ',
+  '                G      H  ',
+  '##########################',
+  '##########################',
+];
+
+/** An open-air gate into a sky arena. */
+export const SKY_GATE = [
+  '   XX   ',
+  '   XX   ',
+  '   XX   ',
+  '   XX   ',
+  '   XX   ',
+  '   XX   ',
+  '        ',
+  '        ',
+  '        ',
+  '        ',
+  '        ',
+  '        ',
+  '########',
+  '########',
+];

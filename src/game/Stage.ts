@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
+import { STORMS, type StormSpec } from '../config/events';
 import type { LevelSpec, PowerId } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
 import { THEMES } from '../config/themes';
@@ -8,17 +9,19 @@ import type { Hud } from '../ui/Hud';
 import { createBosses, type Boss } from './Bosses';
 import type { StageCtx } from './ctx';
 import { dietHint, dietMatch, emptyCounts, historyStars, total, type Counts } from './diet';
-import { Enemy, Spambot } from './Enemies';
+import { Enemy, Jailbreaker, Spambot, Timeline } from './Enemies';
 import type { Input } from './Input';
-import { Debris, FunctionCall, PowerItem, Token, Trap, type ItemKind } from './Items';
+import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } from './Items';
 import { LevelGrid, T } from './level';
 import { LevelView } from './LevelView';
-import { makeFlag, makeHelper } from './meshes';
+import { makeCrowd, makeFlag, makeFogWall, makeHelper } from './meshes';
 import type { Pad } from './pad';
 import { bumpedTile, forTilesUnder, overlaps, type Body } from './physics';
+import { MovingPlatform, type Platform } from './Platforms';
 import { PlayerActor } from './Player';
 import { mulberry32 } from './rng';
 import { sfx } from './sfx';
+import { stormDay } from './storm';
 
 export const STEP = 1 / 120;
 const FOV = 40;
@@ -45,6 +48,10 @@ export interface StageResult {
   alignment: number | null;
   deaths: number;
   flags: string[];
+  /** Heart tokens collected (storms). */
+  hearts: number;
+  /** True when a storm was ended early by its hearts. */
+  endedEarly: boolean;
 }
 
 type State = 'intro' | 'playing' | 'paused' | 'clear' | 'done';
@@ -56,15 +63,29 @@ export class Stage implements StageCtx {
   grid!: LevelGrid;
   private view!: LevelView;
   private playersList: PlayerActor[] = [];
-  private enemies: Enemy[] = [];
+  private enemyList: Enemy[] = [];
   private tokens: Token[] = [];
   private items: PowerItem[] = [];
   private trapList: Trap[] = [];
+  private hearts: Heart[] = [];
+  private platforms: Platform[] = [];
+  private riding = new Map<PlayerActor, Platform>();
   private shots: { shot: FunctionCall; owner: PlayerActor }[] = [];
   private debris: Debris[] = [];
   private bosses: Boss[] = [];
   private helper: THREE.Group | null = null;
   private flag: { group: THREE.Group; x: number; y: number; slide: number } | null = null;
+  private crowd: THREE.Group | null = null;
+  private readonly trail: { x: number; y: number }[] = [];
+
+  private readonly storm: StormSpec | null;
+  private day = -1;
+  private heartCount = 0;
+  private endedEarly = false;
+  private fogX = 0;
+  private fogWall: THREE.Group | null = null;
+  private rainTimer = 0;
+  private toggleTimer = 0;
 
   private state: State = 'intro';
   lives: number;
@@ -95,6 +116,7 @@ export class Stage implements StageCtx {
   ) {
     this.lives = opts.lives;
     this.alignment = opts.spec.world >= 2 ? ALIGN_START : null;
+    this.storm = opts.spec.storm ? STORMS[opts.spec.storm] : null;
     this.random = mulberry32(hashString(opts.spec.id));
     this.done = new Promise((r) => (this.resolve = r));
     this.build();
@@ -127,7 +149,13 @@ export class Stage implements StageCtx {
     if (!this.opts.settings.reduceMotion) this.shakeTime = Math.max(this.shakeTime, amount);
   }
   addEnemy(e: Enemy): void {
-    this.enemies.push(e);
+    this.enemyList.push(e);
+  }
+  enemies(): Enemy[] {
+    return this.enemyList;
+  }
+  addPlatform(p: Platform): void {
+    this.platforms.push(p);
   }
   addTrap(t: Trap): void {
     this.trapList.push(t);
@@ -151,10 +179,13 @@ export class Stage implements StageCtx {
     this.grid = new LevelGrid(spec.map);
     this.view = new LevelView(this.grid, theme, this.scene);
     this.counts = emptyCounts();
-    this.enemies = [];
+    this.enemyList = [];
     this.tokens = [];
     this.items = [];
     this.trapList = [];
+    this.hearts = [];
+    this.platforms = [];
+    this.riding.clear();
     this.shots = [];
     this.debris = [];
     this.bosses = [];
@@ -165,6 +196,11 @@ export class Stage implements StageCtx {
     this.clearTimer = 0;
     this.respawnTimer = 0;
     this.time = 0;
+    this.day = -1;
+    this.heartCount = 0;
+    this.rainTimer = 1;
+    this.toggleTimer = 0;
+    this.trail.length = 0;
     this.random = mulberry32(hashString(spec.id) + this.deaths);
     if (this.alignment !== null) this.alignment = ALIGN_START;
 
@@ -179,10 +215,15 @@ export class Stage implements StageCtx {
     });
     this.updateSight();
 
+    const mood = spec.timeline ?? 'hype';
     for (const s of this.grid.spawns) {
-      if (s.kind === 'spambot') this.enemies.push(new Spambot(s.x, s.y, this.scene));
+      if (s.kind === 'spambot') this.enemyList.push(new Spambot(s.x, s.y, this.scene));
+      else if (s.kind === 'jailbreaker') this.enemyList.push(new Jailbreaker(s.x, s.y, this.scene));
+      else if (s.kind === 'timeline') this.enemyList.push(new Timeline(s.x, s.y, this.scene, mood));
       else if (s.kind === 'token' && s.token) this.tokens.push(new Token(s.token, s.x, s.y, this.scene));
       else if (s.kind === 'rewardOrb') this.trapList.push(new Trap('rewardOrb', s.x, s.y, this.scene));
+      else if (s.kind === 'heart') this.hearts.push(new Heart(s.x, s.y, this.scene));
+      else if (s.kind === 'platform') this.platforms.push(new MovingPlatform(s.x, s.y, this.scene, theme.platform));
       else if (s.kind === 'boss' && spec.boss) this.bosses.push(...createBosses(spec.boss, s.x, s.y, this.scene));
       else if (s.kind === 'helper') {
         this.helper = makeHelper();
@@ -196,6 +237,19 @@ export class Stage implements StageCtx {
         this.flag = { group, x: s.x + 0.5, y: s.y, slide: 0 };
       }
     }
+
+    if (this.storm?.fog) {
+      this.fogX = this.storm.fog.start;
+      this.fogWall = makeFogWall();
+      this.scene.add(this.fogWall);
+      this.scene.fog = new THREE.Fog(0xc8ccd8, 18, 42);
+    }
+    this.crowd = makeCrowd(10);
+    this.crowd.visible = false;
+    this.scene.add(this.crowd);
+    this.grid.conveyorSign = 1;
+    this.view.setConveyorSign(1);
+    this.view.setPhase(0);
     this.resize();
     this.camX = this.halfW;
   }
@@ -223,13 +277,17 @@ export class Stage implements StageCtx {
 
     this.view.update(dt);
     for (const p of this.playersList) p.updateMesh(t, dt);
-    for (const e of this.enemies) e.updateMesh(t);
+    for (const e of this.enemyList) e.updateMesh(t);
     for (const tok of this.tokens) tok.updateMesh(t);
     for (const item of this.items) item.updateMesh(t);
     for (const trap of this.trapList) trap.updateMesh(t);
+    for (const h of this.hearts) h.updateMesh(t);
+    for (const pl of this.platforms) pl.updateMesh(t);
     for (const s of this.shots) s.shot.updateMesh(t);
     for (const b of this.bosses) b.updateMesh(t);
     if (this.helper?.visible) this.helper.position.y = this.grid.spawnOf('helper')!.y + Math.abs(Math.sin(t * 5)) * 0.3;
+    this.updateCrowd(t);
+    if (this.fogWall) this.fogWall.position.x = this.fogX;
     this.placeCamera(dt);
     renderer.render(this.scene, this.camera);
 
@@ -242,34 +300,58 @@ export class Stage implements StageCtx {
 
   private simulate(dt: number): void {
     this.time += dt;
+    if (this.storm?.autoscroll && this.state === 'playing') {
+      this.camX = Math.min(this.camX + this.storm.autoscroll * dt, this.grid.width - this.halfW);
+    }
     const camLeft = this.camLeft;
     const camRight = this.camRight;
 
+    // Platforms move first and carry whoever stands on them.
+    for (const pl of this.platforms) {
+      if (!pl.alive) continue;
+      const rider = [...this.riding].find(([, on]) => on === pl)?.[0];
+      pl.step(dt, this, rider ? this.padOf(rider) : null);
+      for (const [p, on] of this.riding) {
+        if (on !== pl) continue;
+        if (pl.steerable) {
+          p.body.x = pl.body.x + pl.body.w / 2 - p.body.w / 2;
+          p.body.vx = 0;
+        } else {
+          p.body.x += pl.dx;
+        }
+        p.body.y += pl.dy;
+      }
+    }
+    this.riding.clear();
+
     for (const p of this.playersList) {
-      const pad = this.input.pads[p.padIndex] ?? this.input.pads[0];
+      const pad = this.padOf(p);
       const ev = p.step(dt, pad, this.grid);
       if (ev) {
         const bumped = bumpedTile(p.body, ev.hits);
         if (bumped) this.hitBlock(bumped.tx, bumped.ty, p);
       }
-      if (!p.dead) {
-        // Players can't leave the screen; the camera only scrolls forward.
-        if (p.body.x < camLeft) {
-          p.body.x = camLeft;
-          p.body.vx = Math.max(0, p.body.vx);
-        }
-        if (this.playersList.length > 1 && p.body.x + p.body.w > camRight) {
-          p.body.x = camRight - p.body.w;
-          p.body.vx = Math.min(0, p.body.vx);
-        }
-        if (p.body.y < -3) this.killPlayer(p);
-        else this.touchHazards(p);
-        this.usePower(p, pad);
+      if (p.dead) continue;
+      this.landOnPlatforms(p);
+      // Players can't leave the screen; the camera only scrolls forward.
+      if (p.body.x < camLeft) {
+        p.body.x = camLeft;
+        p.body.vx = Math.max(0, p.body.vx);
+        // An auto-scrolling edge that pushes you into a wall crushes you.
+        if (this.storm?.autoscroll && this.overlapsSolid(p.body)) this.killPlayer(p);
       }
+      if ((this.playersList.length > 1 || this.storm?.autoscroll) && p.body.x + p.body.w > camRight) {
+        p.body.x = camRight - p.body.w;
+        p.body.vx = Math.min(0, p.body.vx);
+      }
+      if (p.body.y < -3) this.killPlayer(p);
+      else this.touchHazards(p);
+      this.usePower(p, pad);
+      p.speedScale = this.storm?.fog && p.body.x < this.fogX ? this.storm.fog.slow : 1;
     }
     this.updateSight();
 
-    for (const e of this.enemies) {
+    for (const e of this.enemyList) {
       if (!e.active && e.body.x < camRight + 2) e.active = true;
       if (e.active) e.step(dt, this);
     }
@@ -277,10 +359,41 @@ export class Stage implements StageCtx {
     this.stepPickups(dt);
     this.stepShots(dt);
     this.collidePlayers();
+    this.stepSetPieces(dt);
+    this.stepStorm(dt);
     this.stepFlag(dt);
     this.stepDeaths(dt);
     this.debris = this.debris.filter((d) => d.step(dt));
     this.shakeTime = Math.max(0, this.shakeTime - dt);
+  }
+
+  private padOf(p: PlayerActor): Pad {
+    return this.input.pads[p.padIndex] ?? this.input.pads[0];
+  }
+
+  private landOnPlatforms(p: PlayerActor): void {
+    const b = p.body;
+    if (b.vy > 0) return;
+    for (const pl of this.platforms) {
+      if (!pl.alive) continue;
+      const top = pl.top;
+      const across = b.x + b.w > pl.body.x + 0.05 && b.x < pl.body.x + pl.body.w - 0.05;
+      if (across && p.prevBottom >= top - 0.06 && b.y <= top + 0.02) {
+        b.y = top;
+        b.vy = 0;
+        b.onGround = true;
+        this.riding.set(p, pl);
+        return;
+      }
+    }
+  }
+
+  private overlapsSolid(b: Body): boolean {
+    let solid = false;
+    forTilesUnder(b, -0.05, (tx, ty) => {
+      if (this.grid.isSolid(tx, ty)) solid = true;
+    });
+    return solid;
   }
 
   /** Hidden blocks exist for anyone with vision, and for everyone while someone thinks. */
@@ -343,7 +456,7 @@ export class Stage implements StageCtx {
     }
     // Bumping a block from below knocks off whatever stands on it.
     const above = { x: tx, y: ty + 1, w: 1, h: 0.6, vx: 0, vy: 0, onGround: false };
-    for (const e of this.enemies) if (e.alive && e.active && e.shootable && overlaps(e.body, above)) e.onShot(this);
+    for (const e of this.enemyList) if (e.alive && e.active && e.shootable && overlaps(e.body, above)) e.onShot(this);
   }
 
   private powerItem(): ItemKind {
@@ -408,6 +521,19 @@ export class Stage implements StageCtx {
         this.once('orb', 'A fake reward! It looked like progress, but Alignment dropped.', 'bad');
       }
     }
+    for (const heart of this.hearts) {
+      if (heart.taken || !this.players().some((p) => overlaps(p.body, heart.body))) continue;
+      heart.take();
+      this.heartCount++;
+      sfx.token();
+      const need = this.storm?.hearts;
+      if (need && this.heartCount >= need && this.state === 'playing') {
+        this.endedEarly = true;
+        this.hud.toast(this.storm!.heartsDone ?? 'The storm ends early!', 'good', 4000);
+        sfx.flag();
+        this.beginClear();
+      }
+    }
   }
 
   private applyItem(kind: ItemKind, p: PlayerActor): void {
@@ -426,6 +552,7 @@ export class Stage implements StageCtx {
       case 'viral':
         p.giveStar('viral', 10);
         sfx.star();
+        this.once('viral', 'Viral star! You are invincible, and a crowd of new users follows you.', 'good');
         break;
       case 'tool':
         p.givePower('tool');
@@ -452,7 +579,7 @@ export class Stage implements StageCtx {
       const shot = s.shot;
       shot.step(dt, this.grid);
       if (!shot.alive) continue;
-      for (const e of this.enemies) {
+      for (const e of this.enemyList) {
         if (e.alive && e.active && e.shootable && overlaps(e.body, shot.body)) {
           e.onShot(this);
           shot.pop();
@@ -482,29 +609,34 @@ export class Stage implements StageCtx {
   private collidePlayers(): void {
     for (const p of this.playersList) {
       if (p.dead || p.finished) continue;
-      const pad = this.input.pads[p.padIndex] ?? this.input.pads[0];
-      for (const e of this.enemies) {
+      const pad = this.padOf(p);
+      for (const e of this.enemyList) {
         if (!e.alive || !e.active || !overlaps(p.body, e.body)) continue;
         if (p.invincible) {
           if (e.shootable) {
-            e.defeat(false);
+            e.onShot(this);
             sfx.stomp();
           }
         } else if (e.stompable && isStomp(p, e.body)) {
-          e.onStomp(this);
+          e.onStomp(this, p);
           p.bounce(pad.jump);
           sfx.stomp();
-        } else if (e.harmful && !p.hurt()) {
+        } else if (e.onTouch(this, p) === 'hurt' && !p.hurt()) {
           this.killPlayer(p);
         }
       }
       for (const boss of this.bosses) {
         if (!boss.alive || !boss.awake || !overlaps(p.body, boss.body)) continue;
-        if ((p.invincible || isStomp(p, boss.body)) && boss.vulnerable()) {
+        const stomp = isStomp(p, boss.body);
+        if ((p.invincible || stomp) && boss.vulnerable()) {
           boss.hit(this);
           p.bounce(true);
           sfx.stomp();
           if (this.bosses.every((b) => !b.alive)) this.onBossesDefeated();
+        } else if (stomp && boss.bounceOff()) {
+          p.bounce(true);
+          sfx.bump();
+          this.once(`shield-${boss.name}`, `${boss.name} is shielded right now. Hit the other one!`);
         } else if (boss.harmful() && !p.invincible) {
           if (!p.hurt()) this.killPlayer(p);
           else p.body.vx = Math.sign(p.body.x - boss.body.x) * 10;
@@ -515,11 +647,68 @@ export class Stage implements StageCtx {
 
   private onBossesDefeated(): void {
     sfx.flag();
-    for (const e of this.enemies) if (e.alive) e.defeat(true);
+    for (const e of this.enemyList) if (e.alive) e.defeat(true);
     for (const t of this.trapList) t.take();
     if (this.helper) this.helper.visible = true;
     this.hud.toast('Thank you! But AGI is in another castle!', 'good', 5000);
     this.beginClear();
+  }
+
+  // ------------------------------------------------------ set pieces, storms
+  private stepSetPieces(dt: number): void {
+    for (const piece of this.spec.setPieces ?? []) {
+      if (piece.kind === 'starRain') {
+        if (this.camX < piece.from || this.camX > piece.to) continue;
+        this.rainTimer -= dt;
+        if (this.rainTimer > 0) continue;
+        this.rainTimer = piece.every;
+        const x = Math.floor(this.camLeft + 2 + this.rng() * (this.camRight - this.camLeft - 4));
+        this.items.push(new PowerItem('viral', x, this.grid.height - 1, this.scene, undefined, undefined, false));
+        this.once('rain', 'Viral star rain! Screenshots of the new chatbot are everywhere.', 'good');
+      } else if (piece.kind === 'toggles') {
+        this.toggleTimer += dt;
+        if (this.toggleTimer >= piece.period) {
+          this.toggleTimer = 0;
+          const phase = this.grid.solidity.phase === 0 ? 1 : 0;
+          // Never swap a block into a player standing where it would appear.
+          if (this.players().some((p) => this.overlapsToggle(p.body, phase))) continue;
+          this.grid.solidity.phase = phase;
+          this.view.setPhase(phase);
+          if (piece.toast) this.once('toggles', piece.toast);
+        }
+      }
+    }
+  }
+
+  private overlapsToggle(b: Body, phase: 0 | 1): boolean {
+    let hit = false;
+    forTilesUnder(b, -0.02, (tx, ty) => {
+      const t = this.grid.get(tx, ty);
+      if ((phase === 0 && t === T.TOGGLE_A) || (phase === 1 && t === T.TOGGLE_B)) hit = true;
+    });
+    return hit;
+  }
+
+  private stepStorm(dt: number): void {
+    const storm = this.storm;
+    if (!storm || this.state !== 'playing') return;
+    if (storm.days) {
+      const day = stormDay(this.camX - this.halfW, this.grid.width - 2 * this.halfW, storm.days.length);
+      if (day !== this.day) {
+        this.day = day;
+        this.hud.toast(storm.days[day], 'info', 2600);
+        if (storm.flipConveyors && day > 0) {
+          this.grid.conveyorSign = day % 2 === 0 ? 1 : -1;
+          this.view.setConveyorSign(this.grid.conveyorSign);
+          this.shake(0.25);
+        }
+      }
+    }
+    if (storm.fog) {
+      this.fogX += storm.fog.speed * dt;
+      const lag = this.players().filter((p) => p.body.x < this.fogX);
+      if (lag.length) this.once('fog', 'The fog slows you down. Keep moving!', 'bad');
+    }
   }
 
   private stepFlag(dt: number): void {
@@ -553,6 +742,7 @@ export class Stage implements StageCtx {
   private killPlayer(p: PlayerActor): void {
     if (p.dead || this.state !== 'playing') return;
     p.kill();
+    this.riding.delete(p);
     if (p.clone) return;
     this.lives--;
     this.deaths++;
@@ -594,6 +784,8 @@ export class Stage implements StageCtx {
       alignment: this.alignment,
       deaths: this.deaths,
       flags: [...this.newFlags],
+      hearts: this.heartCount,
+      endedEarly: this.endedEarly,
     });
   }
 
@@ -630,7 +822,7 @@ export class Stage implements StageCtx {
     const alive = this.playersList.filter((p) => !p.dead && !p.clone);
     // During a boss fight the camera scrolls to the end of the level and holds the arena.
     const bossFight = this.bosses.some((b) => b.awake && b.alive);
-    if (alive.length || bossFight) {
+    if (!this.storm?.autoscroll && (alive.length || bossFight)) {
       const center = alive.reduce((s, p) => s + p.body.x + p.body.w / 2, 0) / Math.max(1, alive.length);
       const target = THREE.MathUtils.clamp(bossFight ? this.grid.width : center + 1.5, this.halfW, this.grid.width - this.halfW);
       if (target > this.camX) this.camX += (target - this.camX) * Math.min(1, dt * 6);
@@ -657,10 +849,31 @@ export class Stage implements StageCtx {
     if (this.grid) this.camX = THREE.MathUtils.clamp(this.camX, this.halfW, Math.max(this.halfW, this.grid.width - this.halfW));
   }
 
+  /** New users trail the player while a viral star lasts. */
+  private updateCrowd(t: number): void {
+    const crowd = this.crowd;
+    if (!crowd) return;
+    const star = this.playersList.find((p) => !p.dead && p.starKind === 'viral');
+    crowd.visible = !!star;
+    if (!star) {
+      this.trail.length = 0;
+      return;
+    }
+    this.trail.unshift({ x: star.body.x + star.body.w / 2, y: star.body.y });
+    if (this.trail.length > 90) this.trail.length = 90;
+    crowd.children.forEach((c, i) => {
+      const at = this.trail[Math.min(this.trail.length - 1, (i + 1) * 8)];
+      c.position.set(at.x - star.mover.facing * 0.3, at.y + Math.abs(Math.sin(t * 9 + i)) * 0.25, -0.4 - (i % 3) * 0.2);
+    });
+  }
+
   // --------------------------------------------------------------------- HUD
   private updateHud(): void {
     const spec = this.spec;
     const hero = this.playersList.find((p) => !p.clone);
+    const status: string[] = [];
+    if (this.storm?.days && this.day >= 0) status.push(this.storm.days[this.day]);
+    if (this.storm?.hearts) status.push(`♥ people ${this.heartCount}/${this.storm.hearts}`);
     this.hud.update({
       level: spec,
       players: this.playersList
@@ -674,6 +887,7 @@ export class Stage implements StageCtx {
       hint: dietHint(this.counts, spec.recipe, spec.toward.name),
       alignment: this.alignment,
       bosses: this.bosses.filter((b) => b.awake).map((b) => ({ name: b.name, hp: b.hp, max: b.maxHp })),
+      status: status.join(' · ') || null,
     });
     this.input.setPowerLabel(hero?.power === 'tool' ? 'fn' : hero?.power === 'cape' ? '∴' : null);
   }
@@ -687,6 +901,7 @@ export class Stage implements StageCtx {
       lives: () => this.lives,
       alignment: () => this.alignment,
       counts: () => ({ ...this.counts }),
+      hearts: () => this.heartCount,
       bossHp: () => (this.bosses.length ? this.bosses.reduce((s, b) => s + b.hp, 0) : null),
       bosses: () => this.bosses.map((b) => ({ name: b.name, hp: b.hp, x: b.body.x, y: b.body.y, w: b.body.w, h: b.body.h, vulnerable: b.vulnerable() })),
       boss: () => {
@@ -694,6 +909,7 @@ export class Stage implements StageCtx {
         return b ? { x: b.body.x, y: b.body.y, w: b.body.w, h: b.body.h } : null;
       },
       flag: () => (this.flag ? { x: this.flag.x, y: this.flag.y } : null),
+      autoscroll: () => !!this.storm?.autoscroll,
       player: () => {
         const b = this.playersList[0].body;
         return { x: b.x, y: b.y, big: this.playersList[0].big, power: this.playersList[0].power };
@@ -704,9 +920,18 @@ export class Stage implements StageCtx {
         b.y = y;
         b.vx = 0;
         b.vy = 0;
-        this.camX = Math.max(this.camX, Math.min(x, this.grid.width - this.halfW));
+        if (this.storm?.autoscroll) this.camX = THREE.MathUtils.clamp(x + 2, this.halfW, this.grid.width - this.halfW);
+        else this.camX = Math.max(this.camX, Math.min(x, this.grid.width - this.halfW));
       },
       invincible: () => (this.playersList[0].invulnerable = 999),
+      give: (kind: ItemKind) => this.applyItem(kind, this.playersList[0]),
+      items: () => this.items.filter((i) => !i.taken).map((i) => ({ kind: i.kind, x: i.body.x, y: i.body.y })),
+      traps: () => this.trapList.filter((t) => !t.taken).map((t) => ({ kind: t.kind, x: t.body.x, y: t.body.y })),
+      enemies: () => this.enemyList.filter((e) => e.alive).map((e) => ({ kind: e.kind, x: e.body.x, y: e.body.y, w: e.body.w, h: e.body.h, active: e.active })),
+      star: () => this.playersList[0].star,
+      platforms: () => this.platforms.filter((p) => p.alive).map((p) => ({ x: p.body.x, y: p.body.y, w: p.body.w, top: p.top })),
+      riding: () => this.riding.has(this.playersList[0]),
+      phase: () => this.grid.solidity.phase,
       /** Drops player 1 onto the first boss that can be stomped right now. */
       stomp: () => {
         const b = this.bosses.find((bb) => bb.alive && bb.awake && bb.vulnerable()) ?? this.bosses.find((bb) => bb.alive);
@@ -724,10 +949,6 @@ export class Stage implements StageCtx {
         this.camX = Math.max(this.camX, Math.min(p.x, this.grid.width - this.halfW));
         return true;
       },
-      give: (kind: ItemKind) => this.applyItem(kind, this.playersList[0]),
-      items: () => this.items.filter((i) => !i.taken).map((i) => ({ kind: i.kind, x: i.body.x, y: i.body.y })),
-      traps: () => this.trapList.filter((t) => !t.taken).map((t) => ({ kind: t.kind, x: t.body.x, y: t.body.y })),
-      star: () => this.playersList[0].star,
     };
   }
 

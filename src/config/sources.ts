@@ -71,4 +71,41 @@ export const SOURCES: Record<string, Source> = {
 
   // World 3: viral
   chatgptBlog: { title: 'Introducing ChatGPT', publisher: 'OpenAI', url: 'https://openai.com/index/chatgpt/' },
+  chatgptMillion: { title: 'ChatGPT crossed 1 million users (post)', publisher: 'Sam Altman on X', url: 'https://x.com/sama/status/1599668808285028353' },
+  gpt4Paper: { title: 'GPT-4 Technical Report', publisher: 'arXiv (OpenAI)', url: 'https://arxiv.org/abs/2303.08774' },
+  gpt4v: { title: 'GPT-4V(ision) system card', publisher: 'OpenAI', url: 'https://openai.com/index/gpt-4v-system-card/' },
+  danJailbreak: {
+    title: "ChatGPT's 'jailbreak' tries to make the A.I. break its own rules, or die",
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2023/02/06/chatgpt-jailbreak-forces-it-to-break-its-own-rules.html',
+  },
+  bingLimits: {
+    title: 'The new Bing & Edge – Updates to Chat',
+    publisher: 'Microsoft Bing Blog',
+    url: 'https://blogs.bing.com/search/february-2023/The-new-Bing-Edge-Updates-to-Chat',
+  },
+  waluigi: {
+    title: 'The Waluigi Effect (mega-post)',
+    publisher: 'LessWrong (Cleo Nardo)',
+    url: 'https://www.lesswrong.com/posts/D7PumeYTDPfBTp3i7/the-waluigi-effect-mega-post',
+  },
+  boardTransition: { title: 'OpenAI announces leadership transition', publisher: 'OpenAI', url: 'https://openai.com/index/openai-announces-leadership-transition/' },
+  boardLetter: {
+    title: 'Hundreds of OpenAI employees threaten to follow Altman to Microsoft unless board resigns',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2023/11/20/hundreds-of-openai-employees-threaten-to-follow-altman-to-microsoft-unless-board-resigns-reports-say.html',
+  },
+  boardReturn: { title: 'Agreement in principle for Sam Altman to return (post)', publisher: 'OpenAI on X', url: 'https://x.com/OpenAI/status/1727206187077370115' },
+  pauseLetter: {
+    title: 'Pause Giant AI Experiments: An Open Letter',
+    publisher: 'Future of Life Institute',
+    url: 'https://futureoflife.org/open-letter/pause-giant-ai-experiments/',
+  },
+  pauseNews: {
+    title: 'Elon Musk and other tech leaders call for pause in training AI beyond GPT-4',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2023/03/29/elon-musk-other-tech-leaders-pause-training-ai-beyond-gpt-4.html',
+  },
+  claude2: { title: 'Claude 2', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-2' },
+  claude21: { title: 'Introducing Claude 2.1', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-2-1' },
 };

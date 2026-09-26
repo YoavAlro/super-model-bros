@@ -1,4 +1,4 @@
-export type ThemeId = 'plains' | 'caves' | 'castle' | 'hills' | 'skies' | 'storm' | 'pipes' | 'ghost' | 'factory' | 'frontier' | 'finale';
+export type ThemeId = 'plains' | 'caves' | 'castle' | 'hills' | 'skies' | 'skycastle' | 'storm' | 'pipes' | 'ghost' | 'factory' | 'frontier' | 'finale';
 
 export type Backdrop = 'hills' | 'crystals' | 'pillars' | 'cloudsea' | 'pipes' | 'ghost' | 'gears' | 'towers' | 'stars';
 
@@ -81,6 +81,18 @@ export const THEMES: Record<ThemeId, Theme> = {
     pipe: 0x3aa0e8,
     platform: 0xffffff,
     backdrop: 'cloudsea',
+    clouds: true,
+  },
+  skycastle: {
+    skyTop: '#3b2a6b',
+    skyBottom: '#f7a86b',
+    ground: 0xbdb6d6,
+    grass: 0xf0ecff,
+    brick: 0x8a7ab8,
+    hard: 0xc8c0e0,
+    pipe: 0x6a8ae0,
+    platform: 0xffffff,
+    backdrop: 'towers',
     clouds: true,
   },
   storm: {

@@ -31,7 +31,16 @@ export const PATHS: Record<PathId, PathSpec> = {
     hero: 'gpt',
     partner: 'claude',
     startForm: 'Transformer',
-    steps: [{ level: 'gpt-1-1' }, { level: 'gpt-1-2' }, { level: 'gpt-1-3' }, { level: 'gpt-2-1' }, { level: 'gpt-2-2' }],
+    steps: [
+      { level: 'gpt-1-1' },
+      { level: 'gpt-1-2' },
+      { level: 'gpt-1-3' },
+      { level: 'gpt-2-1' },
+      { level: 'gpt-2-2' },
+      { level: 'gpt-3-1' },
+      { level: 'gpt-3-2' },
+      { level: 'gpt-3-3' },
+    ],
   },
   claude: {
     id: 'claude',
@@ -39,7 +48,7 @@ export const PATHS: Record<PathId, PathSpec> = {
     hero: 'claude',
     partner: 'gpt',
     startForm: 'Research model',
-    steps: [{ level: 'claude-2-1' }, { level: 'claude-2-2' }],
+    steps: [{ level: 'claude-2-1' }, { level: 'claude-2-2' }, { level: 'claude-3-1' }, { level: 'claude-3-2' }, { level: 'claude-3-3' }],
     prologue: {
       title: 'The Claude path',
       date: '2021 · World 2 · Alignment Hills',

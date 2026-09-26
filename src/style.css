@@ -105,6 +105,7 @@ canvas { display: block; }
 .align-fill.low { background: linear-gradient(90deg, #ff5a7a, #ffb04d); }
 .align-value { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 
+.hud-status { margin-top: 6px; font-weight: 800; color: #ffd1dc; }
 .hud-boss {
   position: absolute;
   top: calc(max(10px, env(safe-area-inset-top)) + 40px);

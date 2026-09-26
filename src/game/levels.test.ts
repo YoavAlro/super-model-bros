@@ -60,7 +60,10 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
   ])('can be finished, with no soft-locks, by the weakest %s character', (_size, h) => {
     const spawn = grid.spawnOf('spawn')!;
     const goal = grid.spawnOf('flag') ?? grid.spawnOf('boss')!;
-    const r = analyzeReach(grid, spawn, goal.x, { stats: WEAKEST, h });
+    // The level's form ability (longer context = floatier jumps) applies to whoever plays it.
+    const a = spec.ability ?? {};
+    const stats = { ...WEAKEST, jumpVelocity: WEAKEST.jumpVelocity * (a.jump ?? 1), fallGravity: WEAKEST.fallGravity * (a.float ?? 1) };
+    const r = analyzeReach(grid, spawn, goal.x, { stats, h });
     expect(r.goalReachable, `stuck around x=${r.furthestX}`).toBe(true);
     expect(r.deadEnds, 'soft-lock spots').toEqual([]);
   });

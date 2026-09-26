@@ -1,4 +1,5 @@
 import type { DataTypeId } from './dataTypes';
+import type { StormId } from './events';
 import type { ThemeId } from './themes';
 import type { FactCard, Mix } from './types';
 
@@ -6,6 +7,13 @@ import type { FactCard, Mix } from './types';
 export type PowerId = 'rlhf' | 'viral' | 'tool' | 'cape' | 'fork' | 'mega';
 
 export type BossId = 'garbage' | 'rewardHacker' | 'danSydney' | 'injectionPiranha' | 'hallucinationKing' | 'rogueSwarm' | 'paperclip';
+
+/** Level-specific set pieces. */
+export type SetPiece =
+  /** Viral stars fall from the sky while the camera is between these columns. */
+  | { kind: 'starRain'; from: number; to: number; every: number }
+  /** Toggle blocks swap every `period` seconds ("at capacity": platforms freeze and unfreeze). */
+  | { kind: 'toggles'; period: number; toast?: string };
 
 /** Abilities that come with the model you are in this level (your "form"). */
 export interface FormAbility {
@@ -40,6 +48,11 @@ export interface LevelSpec {
   /** What `*` blocks release. */
   power?: PowerId;
   boss?: BossId;
+  /** A storm level: its timed danger comes from `STORMS`. */
+  storm?: StormId;
+  setPieces?: SetPiece[];
+  /** The Timeline's mood: hype (hot takes) or backlash (the red cloud). */
+  timeline?: 'hype' | 'backlash';
   ability?: FormAbility;
   /** Shown before the level starts. */
   intro: FactCard;
