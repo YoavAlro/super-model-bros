@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS } from '../config/characters';
+import { CHARACTERS, ROSTER } from '../config/characters';
+import { LEVELS } from '../config/levels';
 import type { LevelSpec } from '../config/levelSpec';
-import type { PathSpec } from '../config/paths';
+import { PATHS, type PathSpec } from '../config/paths';
 import { LevelGrid } from './level';
 import { newMover, stepMover, type MoveStats } from './movement';
 import { emptyPad, type Pad } from './pad';
@@ -76,6 +77,22 @@ describe('unlock rules', () => {
     p = recordLevel(p, LV.c, result(3), true);
     // The conditional storm level is not required.
     expect(checkUnlocks(p, [PATH], LV)).toEqual(['mistral']);
+  });
+
+  it('unlocks all five on either real path, in world order, with three stars everywhere', () => {
+    for (const path of Object.values(PATHS)) {
+      let p = emptyProgress();
+      const order: string[] = [];
+      for (let i = nextStep(path, 0, []); i < path.steps.length; i = nextStep(path, i + 1, [])) {
+        const spec = LEVELS[path.steps[i].level];
+        p = recordLevel(p, spec, result(3), endsWorld(path, i, [], LEVELS));
+        const got = checkUnlocks(p, [path], LEVELS);
+        p = { ...p, unlocked: [...p.unlocked, ...got] };
+        order.push(...got.map((id) => `${id}@${spec.world}`));
+      }
+      expect(p.unlocked.sort(), path.id).toEqual(ROSTER.filter((c) => c.unlockRule).map((c) => c.id).sort());
+      expect(order, path.id).toEqual(['mistral@2', 'gemini@3', 'llama@4', 'deepseek@5', 'grok@6']);
+    }
   });
 
   it('keeps the best stars and does not re-unlock', () => {

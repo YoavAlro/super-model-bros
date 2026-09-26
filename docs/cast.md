@@ -9,13 +9,34 @@
 |---|---|---|---|---|
 | **GPT** | OpenAI | Mario | The famous brother: balanced and fast | Start |
 | **Claude** | Anthropic | Luigi | Left home in 2021 (Anthropic's founders came from OpenAI). Jumps higher and floats longer: long context, long hang time | Start (co-op); solo path from World 2 |
-| **Gemini** | Google | Peach-style float | Multimodal eyes: sees hidden blocks | Beat World 3 |
-| **Llama** | Meta | Toad-style speed | Open weights: drops a copy of itself to help | Beat World 4 |
-| **DeepSeek** | DeepSeek | | Efficient: runs further on less compute | Beat World 5 |
-| **Mistral** | Mistral AI | | A strong wind: air dash | Every history star in World 2 |
-| **Grok** | xAI | | Rides the Timeline cloud | Beat World 6 |
+| **Gemini** ✅ | Google | Peach-style float | Multimodal eyes: sees hidden blocks | Beat World 3 |
+| **Llama** ✅ | Meta | Toad-style speed | Open weights: the power button drops a copy of itself for 12 s. It holds two-key plates, and you can stand on its head | Beat World 4 |
+| **DeepSeek** ✅ | DeepSeek | | Efficient: gets up to speed on less compute (faster acceleration and run) | Beat World 5 |
+| **Mistral** ✅ | Mistral AI | | A strong wind: run in mid-air to dash | Every history star in World 2 |
+| **Grok** ✅ | xAI | | The power button summons a steerable Timeline cloud (8 s, then a 14 s recharge) | Beat World 6 |
 
-Traits are affectionate nods to each model's real reputation, never digs.
+Traits are affectionate nods to each model's real reputation, never digs. Unlocked characters are picked on the
+title screen and can play either path. Unlock rules: `unlockRule` in `src/config/characters.ts`, checked by
+`checkUnlocks` in `src/game/progress.ts` (unit tested on both real paths).
+
+## Benchmark Kart
+
+Between worlds, a short, optional kart race on a track named after a real benchmark, against three rival
+labs (friends). Three lanes: switch lanes, hop the red hurdles, drive over boost pads, and spend three tokens
+on a boost. First place wins a life. Each race card teaches the benchmark (sourced) and the results card
+spotlights a rival lab's real story. Rival pace is seeded jitter, never real benchmark scores.
+
+| After world | Race | Benchmark |
+|---|---|---|
+| 1 (GPT only) | MMLU Motorway | MMLU (2020) |
+| 2 | HumanEval Circuit | HumanEval (2021) |
+| 3 | SWE-bench Rally | SWE-bench (2023) |
+| 4 | ARC Prize Canyon | ARC (2019) and the 2024 ARC Prize |
+| 5 | Last Exam Loop | Humanity's Last Exam (2025) |
+| 6 | Saturation Speedway | GLUE (2018) → SuperGLUE (2019) |
+
+Config: `KARTS` in `src/config/karts.ts`; the pure, fixed-step race sim is `src/game/kart.ts` (unit tested);
+the view is `src/game/KartRace.ts`. Co-op races both players. The finale recap lists your places.
 
 ## Supporting cast
 

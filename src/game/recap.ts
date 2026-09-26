@@ -1,4 +1,5 @@
 import { HYPES, type HypeId, type PerkId } from '../config/events';
+import { KARTS } from '../config/karts';
 import type { LevelSpec } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
 import { RECAP_RANKS, RECAP_WEIGHTS, type RecapRank } from '../config/recap';
@@ -30,8 +31,17 @@ export interface RecapHype {
   call: 'lasting' | 'passing' | null;
 }
 
+export interface RecapKart {
+  id: string;
+  name: string;
+  /** Your best place, or null if you skipped it. */
+  place: number | null;
+}
+
 export interface Recap {
   levels: RecapLevel[];
+  /** Benchmark Kart races between the worlds this path went through. */
+  karts: RecapKart[];
   stars: { got: number; max: number };
   hypes: RecapHype[];
   calls: { right: number; made: number; total: number };
@@ -48,6 +58,7 @@ export interface RecapRun {
   flags: string[];
   perks: string[];
   deaths: number;
+  karts?: Record<string, number>;
 }
 
 /** The levels this run actually went through, in order (conditional steps only with their flag). */
@@ -80,8 +91,16 @@ export function buildRecap(run: RecapRun, path: PathSpec, levels: Record<string,
   const starPart = max ? got / max : 1;
   const callPart = hypes.length ? right / hypes.length : 1;
   const score = RECAP_WEIGHTS.stars * starPart + RECAP_WEIGHTS.calls * callPart;
+  // A race runs after every world on the path except the last.
+  const worlds = [...new Set(ids.map((id) => levels[id].world))];
+  const karts: RecapKart[] = KARTS.filter((k) => worlds.slice(0, -1).includes(k.afterWorld)).map((k) => ({
+    id: k.id,
+    name: k.name,
+    place: run.karts?.[k.id] ?? null,
+  }));
   return {
     levels: recapLevels,
+    karts,
     stars: { got, max },
     hypes,
     calls: { right, made, total: hypes.length },

@@ -1,5 +1,6 @@
 import './style.css';
-import { CHARACTERS, type CharacterId } from './config/characters';
+import { CHARACTERS, ROSTER, type CharacterId } from './config/characters';
+import { KARTS } from './config/karts';
 import type { MomentId } from './config/events';
 import { LEVELS } from './config/levels';
 import { PATHS, type PathId } from './config/paths';
@@ -10,9 +11,9 @@ import { showTitleScreen, type StartChoice } from './ui/TitleScreen';
 
 const root = document.getElementById('app')!;
 
-function play(choice: StartChoice, startLevel?: string, flags?: string[], perks?: string[]): void {
+function play(choice: StartChoice, startLevel?: string, flags?: string[], perks?: string[], startKart?: string): void {
   unlockAudio();
-  void new Campaign(root, { save: loadSave(), choice, onExit: title, startLevel, flags, perks }).start();
+  void new Campaign(root, { save: loadSave(), choice, onExit: title, startLevel, flags, perks, startKart }).start();
 }
 
 function title(): void {
@@ -22,11 +23,19 @@ function title(): void {
 // Smoke tests can skip the title: ?debug&path=claude&level=claude-2-2&players=1&char=gemini&flags=shadowBooks&perks=teamFork
 const params = new URLSearchParams(location.search);
 if (params.has('debug')) {
-  (window as unknown as { __smbLevelIds: () => string[] }).__smbLevelIds = () =>
-    Object.values(PATHS).flatMap((p) => p.steps.map((s) => s.level));
+  const w = window as unknown as { __smbLevelIds: () => string[]; __smbKartIds: () => string[]; __smbUnlockables: () => string[] };
+  w.__smbLevelIds = () => Object.values(PATHS).flatMap((p) => p.steps.map((s) => s.level));
+  w.__smbKartIds = () => KARTS.map((k) => k.id);
+  w.__smbUnlockables = () => ROSTER.filter((c) => c.unlockRule).map((c) => c.id);
 }
 const level = params.get('level');
-if (params.has('debug') && level) {
+const kart = params.get('kart');
+if (params.has('debug') && kart) {
+  // A Benchmark Kart race on its own: ?debug&kart=kart-arc&char=mistral&players=2
+  const char = params.get('char') as CharacterId | null;
+  const lead = char && CHARACTERS[char] ? char : 'gpt';
+  play({ path: 'gpt', players: params.get('players') === '2' ? 2 : 1, lead, resume: false }, undefined, [], [], kart);
+} else if (params.has('debug') && level) {
   // Test-only overrides: &moments=keep4o,codeRed&zones=winterLaziness:20-60
   const spec = LEVELS[level];
   const moments = params.get('moments');

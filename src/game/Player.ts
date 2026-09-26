@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CharacterSpec } from '../config/characters';
 import type { FormAbility } from '../config/levelSpec';
+import { disposeObject } from './dispose';
 import { labelSprite, makeCape, makeCharacter } from './meshes';
 import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
 import type { Pad } from './pad';
@@ -305,6 +306,8 @@ export class PlayerActor {
 
   dispose(): void {
     this.scene.remove(this.mesh, this.tag);
+    disposeObject(this.mesh);
+    disposeObject(this.tag);
   }
 
   private makeTag(text: string): THREE.Sprite {

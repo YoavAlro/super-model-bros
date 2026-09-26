@@ -44,6 +44,9 @@ export class Hud {
   private bossKey = '';
   private rows: { id: DataTypeId; fill: HTMLDivElement; value: HTMLSpanElement }[] = [];
   private readonly recent = new Map<string, number>();
+  /** The training panel stays hidden until a level fills it in. */
+  private hasLevel = false;
+  private trainingShown = true;
 
   constructor(parent: HTMLElement, isTouch: boolean, onPause: () => void) {
     const bar = el('div', 'hud-bar');
@@ -58,6 +61,7 @@ export class Hud {
     track.append(this.alignFill);
     this.align.append(el('span', 'align-label', 'Alignment'), track, this.alignValue);
     this.training.append(this.toward, this.bars, this.match, this.align, this.status);
+    this.training.style.display = 'none';
     this.root.append(bar, this.training, this.bossBar, this.toasts);
     if (isTouch) this.root.append(el('div', 'rotate-hint', 'Turn your phone sideways to play ↻'));
     else {
@@ -67,12 +71,30 @@ export class Hud {
     parent.append(this.root);
   }
 
+  /** The level panels (training mix, boss bar) hide during a Benchmark Kart race. */
+  showTraining(visible: boolean): void {
+    this.trainingShown = visible;
+    this.training.style.display = visible && this.hasLevel ? '' : 'none';
+    this.bossBar.style.display = visible ? '' : 'none';
+  }
+
   /** Swaps the bottom controls hint (co-op uses different keys). */
   setHint(text: string): void {
     if (this.hint) this.hint.textContent = text;
   }
 
+  /** Shows a different controls hint for a while; returns a function that puts the old one back. */
+  pushHint(text: string): () => void {
+    const before = this.hint?.textContent ?? '';
+    this.setHint(text);
+    return () => this.setHint(before);
+  }
+
   update(s: HudState): void {
+    if (!this.hasLevel) {
+      this.hasLevel = true;
+      this.showTraining(this.trainingShown);
+    }
     this.players.replaceChildren(
       ...s.players.map((p) => {
         const chip = el('span', 'player-chip', p.name === p.form ? p.name : `${p.name} · ${p.form}`);

@@ -53,6 +53,15 @@ describe('finale recap', () => {
     expect(rankFor(0.5).title).toBe('Research intern');
   });
 
+  it('lists a Benchmark Kart race after every world but the last', () => {
+    const gpt = buildRecap({ ...emptyRun(), karts: { 'kart-mmlu': 1, 'kart-arc': 3 } }, PATHS.gpt, LEVELS);
+    expect(gpt.karts.map((k) => k.id)).toEqual(['kart-mmlu', 'kart-humaneval', 'kart-swebench', 'kart-arc', 'kart-hle', 'kart-glue']);
+    expect(gpt.karts.find((k) => k.id === 'kart-arc')?.place).toBe(3);
+    expect(gpt.karts.find((k) => k.id === 'kart-hle')?.place).toBeNull();
+    // The Claude path starts in World 2, so it skips the first race.
+    expect(buildRecap(emptyRun(), PATHS.claude, LEVELS).karts.map((k) => k.id)).not.toContain('kart-mmlu');
+  });
+
   it('ends both paths at a World 7 finale with a boss', () => {
     for (const path of Object.values(PATHS)) {
       const last = LEVELS[path.steps.at(-1)!.level];

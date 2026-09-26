@@ -375,3 +375,24 @@ body.large-text .toast { font-size: 17px; }
 @media (max-height: 500px) {
   .recap { font-size: 12px; gap: 4px; }
 }
+
+/* ---------- Benchmark Kart ---------- */
+.kart-hud {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top)) + 38px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.kart-standings { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
+.kart-standings .me { color: var(--accent); font-weight: 800; }
+@media (max-height: 500px) {
+  .kart-hud { font-size: 12px; top: calc(max(8px, env(safe-area-inset-top)) + 30px); }
+}

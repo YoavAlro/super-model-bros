@@ -3,6 +3,7 @@
 //
 //   npm run build && npx vite preview --port 4173 &
 //   node scripts/smoke.mjs gpt-2-1 claude-2-2        # or: node scripts/smoke.mjs all
+//   node scripts/smoke.mjs kart-arc char:llama       # a Benchmark Kart race; a level played as a character
 //
 // Env: SMOKE_URL (default http://localhost:4173/), SMOKE_OUT (default ./smoke-shots),
 //      SMOKE_VIEWPORTS=desktop,phone
@@ -94,6 +95,58 @@ async function completeLevel(page, id, tag) {
   return outro;
 }
 
+/** Plays a Benchmark Kart race from its intro card to its results card. */
+async function completeKart(page, id, tag) {
+  await page.goto(`${BASE}?debug&kart=${id}`);
+  const intro = await waitFor(page, () => window.__smb?.card?.());
+  if (!intro) throw new Error(`${id}: no race card`);
+  await page.evaluate(() => window.__smb.next());
+  const racing = await waitFor(page, () => window.__smb.kartState()?.state === 'racing', null, 20000);
+  if (!racing) throw new Error(`${id}: the race never started`);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Space');
+  await sleep(1500);
+  await page.screenshot({ path: `${OUT}/${tag}-${id}-race.png` });
+  await page.evaluate(() => window.__smb.kartFinish());
+  const result = await waitFor(page, () => window.__smb.card(), null, 20000);
+  if (!result) throw new Error(`${id}: no results card`);
+  await page.screenshot({ path: `${OUT}/${tag}-${id}-result.png` });
+  return result;
+}
+
+/** What each unlockable's trait does when you press the power button (or just by playing). */
+const TRAIT_CHECKS = {
+  seeHidden: null,
+  efficient: null,
+  airDash: null,
+  dropCopy: () => window.__smb.copies() > 0,
+  cloud: () => window.__smb.platforms().length > 0,
+};
+
+/** Plays World 2-1 as an unlockable character: its trait works, and the level can be finished. */
+async function completeAsCharacter(page, char, tag) {
+  await page.goto(`${BASE}?debug&level=gpt-2-1&char=${char}`);
+  if (!(await waitFor(page, () => window.__smb?.card?.()))) throw new Error(`${char}: no intro card`);
+  await page.evaluate(() => window.__smb.next());
+  await waitFor(page, () => window.__smb.state() === 'playing');
+  const trait = await page.evaluate(() => window.__smb.trait());
+  const check = TRAIT_CHECKS[trait];
+  if (check) {
+    await page.keyboard.press('KeyS');
+    await sleep(500);
+    if (!(await page.evaluate(check))) throw new Error(`${char}: the ${trait} trait did nothing`);
+  }
+  await page.screenshot({ path: `${OUT}/${tag}-char-${char}.png` });
+  await page.evaluate(() => window.__smb.invincible());
+  const flag = await page.evaluate(() => window.__smb.flag());
+  await page.evaluate((f) => window.__smb.teleport(f.x - 6, f.y + 3), flag);
+  await page.keyboard.down('ArrowRight');
+  const done = await waitFor(page, () => !!window.__smb.card() && window.__smb.state() !== 'playing', null, 20000);
+  await page.keyboard.up('ArrowRight');
+  if (!done) throw new Error(`${char}: never reached the flag`);
+  return `${trait}, ${await page.evaluate(() => window.__smb.card())}`;
+}
+
 const browser = await chromium.launch();
 let failures = 0;
 for (const tag of wanted) {
@@ -107,11 +160,21 @@ for (const tag of wanted) {
   await sleep(800);
   await page.screenshot({ path: `${OUT}/${tag}-title.png` });
   let ids = process.argv.slice(2);
-  if (ids[0] === 'all') ids = (await page.evaluate(() => window.__smbLevelIds?.())) ?? [];
+  if (ids[0] === 'all') {
+    ids = [
+      ...((await page.evaluate(() => window.__smbLevelIds?.())) ?? []),
+      ...((await page.evaluate(() => window.__smbKartIds?.())) ?? []),
+      ...((await page.evaluate(() => window.__smbUnlockables?.())) ?? []).map((c) => `char:${c}`),
+    ];
+  }
 
   for (const id of ids) {
     try {
-      const outro = await completeLevel(page, id, tag);
+      const outro = id.startsWith('kart-')
+        ? await completeKart(page, id, tag)
+        : id.startsWith('char:')
+          ? await completeAsCharacter(page, id.slice(5), tag)
+          : await completeLevel(page, id, tag);
       console.log(`${tag} ${id}: ok (${outro})`);
     } catch (e) {
       failures++;

@@ -22,5 +22,14 @@ export function recapTable(recap: Recap): HTMLElement {
     }
     box.append(hypes);
   }
+  if (recap.karts.length) {
+    box.append(el('div', 'diet-compare-title', 'Benchmark Kart'));
+    const karts = el('div', 'recap-grid');
+    for (const k of recap.karts) {
+      const place = k.place === null ? 'skipped' : ['1st', '2nd', '3rd', '4th'][k.place - 1] ?? `${k.place}th`;
+      karts.append(el('span', 'recap-label', k.place === 1 ? '🏁' : '·'), el('span', undefined, k.name), el('span', 'recap-date', ''), el('span', 'recap-stars', place));
+    }
+    box.append(karts);
+  }
   return box;
 }

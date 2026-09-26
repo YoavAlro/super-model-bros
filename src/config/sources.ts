@@ -313,4 +313,20 @@ export const SOURCES: Record<string, Source> = {
   },
   tiboAgain: { title: 'Oops... I did it again (post)', publisher: 'Thibault Sottiaux on X', url: 'https://x.com/thsottiaux/status/2078320950488297917' },
   paperclip: { title: 'Ethical Issues in Advanced Artificial Intelligence', publisher: 'Nick Bostrom', url: 'https://nickbostrom.com/ethics/ai' },
+
+  // Benchmark Kart: benchmarks and rival labs
+  mmlu: { title: 'Measuring Massive Multitask Language Understanding', publisher: 'arXiv (Hendrycks et al.)', url: 'https://arxiv.org/abs/2009.03300' },
+  swebench: { title: 'SWE-bench: Can Language Models Resolve Real-World GitHub Issues?', publisher: 'arXiv (Jimenez et al.)', url: 'https://arxiv.org/abs/2310.06770' },
+  arc: { title: 'On the Measure of Intelligence', publisher: 'arXiv (Chollet)', url: 'https://arxiv.org/abs/1911.01547' },
+  arcPrize: { title: 'ARC Prize 2024: Technical Report', publisher: 'ARC Prize', url: 'https://arcprize.org/blog/arc-prize-2024-winners-technical-report' },
+  hle: { title: 'Humanity’s Last Exam', publisher: 'arXiv (Phan et al.)', url: 'https://arxiv.org/abs/2501.14249' },
+  glue: { title: 'GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding', publisher: 'arXiv (Wang et al.)', url: 'https://arxiv.org/abs/1804.07461' },
+  superglue: { title: 'SuperGLUE: A Stickier Benchmark for General-Purpose Language Understanding Systems', publisher: 'arXiv (Wang et al.)', url: 'https://arxiv.org/abs/1905.00537' },
+  llama1: { title: 'Introducing LLaMA: A foundational, 65-billion-parameter large language model', publisher: 'Meta AI', url: 'https://ai.meta.com/blog/large-language-model-llama-meta-ai/' },
+  llama2: { title: 'Meta and Microsoft Introduce the Next Generation of Llama', publisher: 'Meta', url: 'https://about.fb.com/news/2023/07/llama-2/' },
+  mistralFounded: { title: 'Mistral AI raises a record seed round (Jun 15, 2023)', publisher: 'The Register', url: 'https://www.theregister.com/2023/06/15/mistral_ai/' },
+  mistral7b: { title: 'Mistral 7B', publisher: 'Mistral AI', url: 'https://mistral.ai/news/announcing-mistral-7b/' },
+  grok: { title: 'Announcing Grok', publisher: 'xAI', url: 'https://x.ai/news/grok' },
+  gemini: { title: 'Introducing Gemini: our largest and most capable AI model', publisher: 'Google', url: 'https://blog.google/innovation-and-ai/technology/ai/google-gemini-ai/' },
+  deepseekV3: { title: 'DeepSeek-V3 Technical Report', publisher: 'arXiv (DeepSeek-AI)', url: 'https://arxiv.org/abs/2412.19437' },
 };

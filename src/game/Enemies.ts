@@ -512,10 +512,10 @@ export class Crusher extends Enemy {
   onTouch(_ctx: StageCtx, p: PlayerActor): 'hurt' | 'none' {
     const b = this.body;
     const top = b.y + b.h;
-    // Its top is a floor.
-    if (p.prevBottom >= top - 0.2 && p.body.vy <= 0.5) {
+    // Its top is a floor, except while it grinds back up to the ceiling: then riders slide off.
+    if (this.state !== 'rise' && p.prevBottom >= top - 0.2 && p.body.vy <= 0.5) {
       p.body.y = top;
-      p.body.vy = this.state === 'rise' ? 0 : Math.min(0, p.body.vy);
+      p.body.vy = Math.min(0, p.body.vy);
       p.body.onGround = true;
       return 'none';
     }

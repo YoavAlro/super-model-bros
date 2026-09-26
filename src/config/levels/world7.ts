@@ -38,7 +38,7 @@ export const WORLD_7: LevelSpec[] = [
     recipeKind: 'focus',
     recipe: { agentic: 0.4, code: 0.3, reasoning: 0.3 },
     blockToken: 'agentic',
-    power: 'fork',
+    power: 'tool',
     oneUp: 'tibo',
     ability: { sizes: ['GPT-5.6 Luna', 'GPT-5.6 Terra', 'GPT-5.6 Sol'] },
     intro: {

@@ -92,7 +92,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     jumpVelocity: 23,
     gravity: 62,
     fallGravity: 62,
-    trait: 'Open weights: press the power button to drop a copy of itself that helps.',
+    trait: 'Open weights: press the power button to drop a copy of itself. It holds switches, and you can stand on its head.',
     unlock: 'Beat World 4',
     unlockRule: { kind: 'beatWorld', world: 4 },
   },

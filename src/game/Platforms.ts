@@ -126,3 +126,22 @@ export class StaticPlatform extends Platform {
     this.mesh.visible = this.alive && (this.life > 1 || Math.floor(t * 10) % 2 === 0);
   }
 }
+
+/** A platform riding on a body's head (Llama's open-weights copy): stand on it to climb higher. */
+export class HeadPlatform extends Platform {
+  readonly mesh = new THREE.Group();
+
+  constructor(private readonly target: Body, scene: THREE.Scene) {
+    super(target.x - 0.1, target.y + target.h - 0.15, target.w + 0.2, 0.15, scene);
+    scene.add(this.mesh);
+  }
+
+  step(): void {
+    const nx = this.target.x - 0.1;
+    const ny = this.target.y + this.target.h - 0.15;
+    this.dx = nx - this.body.x;
+    this.dy = ny - this.body.y;
+    this.body.x = nx;
+    this.body.y = ny;
+  }
+}

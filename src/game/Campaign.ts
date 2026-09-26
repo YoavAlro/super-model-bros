@@ -2,16 +2,19 @@ import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
 import { LEVELS } from '../config/levels';
 import { HYPES, MOMENTS } from '../config/events';
+import { KARTS, type KartSpec } from '../config/karts';
 import { RECAP_CLOSING } from '../config/recap';
 import { PATHS, type PathSpec } from '../config/paths';
 import { tip, type FactCard, type FactLine } from '../config/types';
 import { newRun, writeSave, type RunState, type SaveData } from '../save';
 import { showFactCard } from '../ui/FactCard';
 import { Hud } from '../ui/Hud';
+import { el } from '../ui/dom';
 import { recapTable } from '../ui/Recap';
 import type { StartChoice } from '../ui/TitleScreen';
 import { shares, total } from './diet';
 import { Input } from './Input';
+import { KartRace, ordinal } from './KartRace';
 import { checkUnlocks, endsWorld, formBefore, nextStep, recordLevel } from './progress';
 import { buildRecap } from './recap';
 import { setMuted } from './sfx';
@@ -30,6 +33,8 @@ export interface CampaignOptions {
   flags?: string[];
   /** Debug: lasting-hype perks to start with (e.g. teamFork). */
   perks?: string[];
+  /** Debug: play just this Benchmark Kart race, then return to the title. */
+  startKart?: string;
 }
 
 /** Plays a path: intro card, level, outro card, save, unlocks, world breaks, and the ending. */
@@ -43,6 +48,7 @@ export class Campaign {
   private readonly path: PathSpec;
   private readonly run: RunState;
   private stage: Stage | null = null;
+  private kart: KartRace | null = null;
   private lives: number;
   private running = true;
 
@@ -83,6 +89,12 @@ export class Campaign {
 
   async start(): Promise<void> {
     const { save } = this.opts;
+    const debugKart = KARTS.find((k) => k.id === this.opts.startKart);
+    if (debugKart) {
+      await this.runKart(debugKart);
+      if (this.running) this.exit();
+      return;
+    }
     if (this.run.step === 0 && this.path.prologue && !this.opts.startLevel) {
       await this.card(this.path.prologue, CHARACTERS[this.path.hero].color);
     }
@@ -192,12 +204,66 @@ export class Campaign {
       const next = nextStep(this.path, i + 1, this.run.flags);
       if (next < this.path.steps.length) {
         const nextSpec = LEVELS[this.path.steps[next].level];
+        const race = KARTS.find((k) => k.afterWorld === spec.world);
         await this.card(
-          { title: `World ${spec.world} complete!`, date: `Next: World ${nextSpec.world}`, lines: [tip(`Up next: ${nextSpec.name}.`)] },
+          {
+            title: `World ${spec.world} complete!`,
+            date: `Next: World ${nextSpec.world}`,
+            lines: [tip(race ? `Between worlds: a Benchmark Kart race, the ${race.name}. Then ${nextSpec.name}.` : `Up next: ${nextSpec.name}.`)],
+          },
           CHARACTERS[this.path.hero].color,
         );
+        if (race) await this.runKart(race);
       }
     }
+  }
+
+  /** A Benchmark Kart race between worlds: optional, and first place wins a life. */
+  private async runKart(spec: KartSpec): Promise<void> {
+    const { save } = this.opts;
+    const go = await showFactCard<boolean>(this.root, {
+      card: spec.intro,
+      color: 0xffd166,
+      buttons: [
+        { label: 'Race!', value: true, primary: true },
+        { label: 'Skip the race', value: false },
+      ],
+    });
+    this.input.clear();
+    if (!go || !this.running) return;
+    this.input.setPowerLabel(null);
+    const kart = new KartRace(spec, this.run.chars, this.input, this.hud, this.overlay, save.settings);
+    this.kart = kart;
+    kart.resize();
+    const result = await kart.done;
+    this.kart = null;
+    kart.dispose();
+    if (!this.running) return;
+    if (result.outcome === 'quit') {
+      writeSave(save);
+      this.exit();
+      return;
+    }
+    const place = result.places[0];
+    this.run.karts[spec.id] = Math.min(place, this.run.karts[spec.id] ?? Infinity);
+    if (place === 1) this.lives++;
+    writeSave(save);
+    const standings = el('ol', 'kart-standings');
+    for (const id of result.standings) {
+      const you = this.run.chars.includes(id);
+      standings.append(el('li', you ? 'me' : undefined, `${CHARACTERS[id].name}${you ? ' (you)' : ''}`));
+    }
+    await showFactCard(this.root, {
+      card: {
+        title: place === 1 ? 'You won the race!' : `You finished ${ordinal(place)}`,
+        date: `Benchmark Kart · ${spec.name}`,
+        lines: [tip(place === 1 ? 'First place: +1 life.' : 'Good race! Your rivals are friends, and they had fun too.'), spec.spotlight],
+      },
+      color: 0xffd166,
+      extra: standings,
+      button: 'Continue',
+    });
+    this.input.clear();
   }
 
   /** The end of the path: the finale recap compares your run with real history. */
@@ -215,6 +281,8 @@ export class Campaign {
       lines.push(tip(`Hype or shift? ${recap.calls.right} of ${recap.calls.total} calls matched history${missed ? ` (${missed} never grabbed)` : ''}.`));
     }
     if (perks.length) lines.push(tip(`Lasting shifts you carried to the end: ${perks.join(', ')}.`));
+    const raced = recap.karts.filter((k) => k.place !== null);
+    if (raced.length) lines.push(tip(`Benchmark Kart: ${raced.filter((k) => k.place === 1).length} wins in ${raced.length} races with your friends.`));
     lines.push(tip(RECAP_CLOSING));
     await showFactCard(this.root, {
       card: { title: `${this.path.name} complete!`, date: `Recap · ${first.date} → ${last.date}`, lines },
@@ -236,11 +304,13 @@ export class Campaign {
     this.timer.update(time);
     const dt = Math.min(this.timer.getDelta(), 0.1);
     this.stage?.frame(dt, this.timer.getElapsed(), this.renderer);
+    this.kart?.frame(dt, this.timer.getElapsed(), this.renderer);
   }
 
   private readonly resize = (): void => {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.stage?.resize();
+    this.kart?.resize();
   };
 
   private exit(): void {
@@ -248,6 +318,7 @@ export class Campaign {
     this.renderer.setAnimationLoop(null);
     window.removeEventListener('resize', this.resize);
     this.stage?.dispose();
+    this.kart?.dispose();
     this.input.dispose();
     this.renderer.dispose();
     this.root.replaceChildren();
@@ -261,10 +332,10 @@ export class Campaign {
     const stageFn =
       (name: string) =>
       (...args: unknown[]) => {
-        const api = this.stage?.debug() as Record<string, (...a: unknown[]) => unknown> | undefined;
+        const api = (this.stage?.debug() ?? this.kart?.debug()) as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival', 'forks', 'resets', 'mega', 'frozen', 'gateState', 'crushers'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival', 'forks', 'resets', 'mega', 'frozen', 'gateState', 'crushers', 'kartState', 'kartFinish', 'copies', 'trait'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {

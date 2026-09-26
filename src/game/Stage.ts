@@ -24,8 +24,9 @@ import { createPuzzle, type Puzzle } from './Puzzles';
 import type { Pad } from './pad';
 import { bumpedTile, forTilesUnder, overlaps, type Body } from './physics';
 import { emptyPad } from './pad';
-import { MovingPlatform, StaticPlatform, type Platform } from './Platforms';
+import { CloudRide, HeadPlatform, MovingPlatform, StaticPlatform, type Platform } from './Platforms';
 import { PlayerActor } from './Player';
+import { disposeObject } from './dispose';
 import { mulberry32 } from './rng';
 import { sfx } from './sfx';
 import { stormDay } from './storm';
@@ -141,6 +142,10 @@ export class Stage implements StageCtx {
   /** Export freeze: true until a player passes the thaw mark; who took frozen power-ups meanwhile. */
   private frozen = false;
   private owedPower: PlayerActor[] = [];
+  /** Llama's open-weights copies, by owner. */
+  private readonly copies = new Map<PlayerActor, { actor: PlayerActor; platform: Platform; life: number }>();
+  /** When each Grok's cloud is ready again (stage time). */
+  private readonly cloudReady = new Map<PlayerActor, number>();
 
   private state: State = 'intro';
   lives: number;
@@ -275,6 +280,8 @@ export class Stage implements StageCtx {
     this.gateState.waited = 0;
     this.frozen = !!this.storm?.freeze;
     this.owedPower = [];
+    this.copies.clear();
+    this.cloudReady.clear();
 
     const spawn = this.grid.spawnOf('spawn') ?? { x: 2, y: 2 };
     this.playersList = this.opts.chars.map((id, i) => {
@@ -285,8 +292,6 @@ export class Stage implements StageCtx {
       for (const perk of this.opts.perks) p.perks.add(perk);
       return p;
     });
-    // Agent teams: every level starts with a fork on your team.
-    for (const p of [...this.playersList]) if (p.perks.has('teamFork')) this.addFork(p);
     this.updateSight();
 
     const mood = spec.timeline ?? 'hype';
@@ -372,6 +377,8 @@ export class Stage implements StageCtx {
     this.view.setPhase(0);
     this.resize();
     this.camX = this.halfW;
+    // Agent teams: every level (and every retry) starts with a fork on your team, placed once the camera is home.
+    for (const p of [...this.playersList]) if (p.perks.has('teamFork')) this.addFork(p);
   }
 
   /** Starts the simulation (the level is drawn behind its intro card until then). */
@@ -492,7 +499,14 @@ export class Stage implements StageCtx {
       this.usePower(p, pad);
       p.speedScale = this.speedScaleFor(p, dt);
     }
+    // Clones that fell or were hit are gone once their fall leaves the screen.
+    for (const c of this.playersList.filter((p) => p.clone && p.dead && p.body.y < -8)) {
+      c.dispose();
+      this.riding.delete(c);
+    }
+    this.playersList = this.playersList.filter((p) => !(p.clone && p.dead && p.body.y < -8));
     this.updateSight();
+    this.stepCopies(dt);
     this.stepHype(dt);
     this.stepMoments(dt);
     this.puzzle?.step(dt);
@@ -645,7 +659,69 @@ export class Stage implements StageCtx {
       this.shots.push({ shot: new FunctionCall(b.x + (dir > 0 ? b.w : -0.4), b.y + b.h * 0.55, dir, this.scene), owner: p });
       p.cooldown = 0.22;
       sfx.shoot();
+      return;
     }
+    // Character traits use the power button when nothing else does.
+    if (p.clone || p.power) return;
+    if (p.spec.traitKind === 'dropCopy') this.dropCopy(p);
+    else if (p.spec.traitKind === 'cloud') this.summonCloud(p);
+  }
+
+  /** Llama's open weights: a copy of you stays where you drop it. It holds plates, and you can stand on its head. */
+  private dropCopy(owner: PlayerActor): void {
+    this.removeCopy(owner);
+    const b = owner.body;
+    // One step behind you, unless that is inside a wall.
+    const behind = Math.max(this.camLeft, b.x - owner.mover.facing * 1.1);
+    const x = this.overlapsSolid({ ...b, x: behind }) ? b.x : behind;
+    const copy = new PlayerActor(owner.spec, '', x, b.y, this.scene, owner.padIndex, true, 'open copy');
+    copy.brain = () => emptyPad();
+    copy.mover.facing = owner.mover.facing;
+    const platform = new HeadPlatform(copy.body, this.scene);
+    this.playersList.push(copy);
+    this.platforms.push(platform);
+    this.copies.set(owner, { actor: copy, platform, life: 12 });
+    owner.cooldown = 0.6;
+    sfx.powerup();
+    this.once('copy', 'Open weights! You dropped a copy of yourself. It holds switches, and you can stand on its head.', 'good');
+  }
+
+  private removeCopy(owner: PlayerActor): void {
+    const c = this.copies.get(owner);
+    if (!c) return;
+    this.copies.delete(owner);
+    c.platform.alive = false;
+    c.actor.dispose();
+    this.playersList = this.playersList.filter((p) => p !== c.actor);
+    this.riding.delete(c.actor);
+  }
+
+  private stepCopies(dt: number): void {
+    for (const [owner, c] of this.copies) {
+      c.life -= dt;
+      if (c.life <= 0 || c.actor.dead || owner.dead) this.removeCopy(owner);
+    }
+  }
+
+  /** Grok rides the Timeline: a steerable cloud appears under you, then recharges. */
+  private summonCloud(p: PlayerActor): void {
+    p.cooldown = 0.5;
+    const ready = this.cloudReady.get(p) ?? 0;
+    if (ready > this.time) {
+      this.hud.toast(`The Timeline cloud recharges in ${Math.ceil(ready - this.time)}s.`, 'info', 1500);
+      return;
+    }
+    const b = p.body;
+    // In the air it appears under your feet; on the ground it lifts you onto it.
+    const cloud = new CloudRide(b.x + b.w / 2 - 1, b.onGround ? b.y + 0.05 : b.y - 0.55, this.scene, 8);
+    this.platforms.push(cloud);
+    if (b.onGround && !this.overlapsSolid({ ...b, y: cloud.top })) {
+      b.y = cloud.top;
+      b.vy = 0;
+    }
+    this.cloudReady.set(p, this.time + 14);
+    sfx.powerup();
+    this.once('cloud', 'A Timeline cloud! Steer it left and right. It evaporates after a while, then recharges.', 'good');
   }
 
   private touchHazards(p: PlayerActor): void {
@@ -979,7 +1055,7 @@ export class Stage implements StageCtx {
           p.bounce(pad.jump);
           sfx.stomp();
         } else if (e.onTouch(this, p) === 'hurt') {
-          if (e instanceof Crusher && this.spendReset(p)) continue;
+          if (e instanceof Crusher && p.invulnerable <= 0 && this.spendReset(p)) continue;
           if (!p.hurt()) this.killPlayer(p);
         }
       }
@@ -1570,7 +1646,11 @@ export class Stage implements StageCtx {
               ? '▭'
               : hero && this.forksOf(hero).length
                 ? '⑂'
-                : null;
+                : hero?.spec.traitKind === 'dropCopy' && !hero.power
+                  ? '⧉'
+                  : hero?.spec.traitKind === 'cloud' && !hero.power
+                    ? '☁'
+                    : null;
     this.input.setPowerLabel(powerLabel);
   }
 
@@ -1598,6 +1678,7 @@ export class Stage implements StageCtx {
       },
       teleport: (x: number, y: number) => {
         const b = this.playersList[0].body;
+        this.riding.delete(this.playersList[0]);
         b.x = x;
         b.y = y;
         b.vx = 0;
@@ -1625,6 +1706,8 @@ export class Stage implements StageCtx {
       moments: () => [...this.happened],
       clones: () => this.playersList.filter((p) => p.clone && !p.dead).length,
       forks: () => (this.playersList[0] ? this.forksOf(this.playersList[0]).length : 0),
+      copies: () => this.copies.size,
+      trait: () => this.playersList[0].spec.traitKind,
       resets: () => this.resets,
       mega: () => this.playersList[0].mega,
       frozen: () => this.frozen,
@@ -1686,26 +1769,4 @@ function hashString(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
-}
-
-/** Frees every geometry, material and texture under a scene, except the ones shared across levels. */
-export function disposeObject(root: THREE.Object3D): void {
-  const seen = new Set<unknown>();
-  const free = (thing: { dispose(): void; userData?: Record<string, unknown> } | null | undefined) => {
-    if (!thing || seen.has(thing) || thing.userData?.shared) return;
-    seen.add(thing);
-    thing.dispose();
-  };
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (mesh.geometry) free(mesh.geometry);
-    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    for (const m of mats) {
-      if (m.userData.shared) continue;
-      for (const value of Object.values(m)) if (value instanceof THREE.Texture) free(value);
-      free(m);
-    }
-  });
-  const bg = (root as THREE.Scene).background;
-  if (bg instanceof THREE.Texture) free(bg);
 }

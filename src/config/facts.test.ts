@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HYPES, MOMENTS } from './events';
+import { KARTS } from './karts';
 import { ALL_LEVELS } from './levels';
 import { PATHS } from './paths';
 import { SOURCES } from './sources';
@@ -12,6 +13,7 @@ export function allCards(): { where: string; card: FactCard }[] {
   for (const p of Object.values(PATHS)) if (p.prologue) cards.push({ where: `${p.id} prologue`, card: p.prologue });
   for (const h of Object.values(HYPES)) cards.push({ where: `hype ${h.id}`, card: { title: h.name, date: h.when, lines: h.lines } });
   for (const m of Object.values(MOMENTS)) cards.push({ where: `moment ${m.id}`, card: { title: m.name, date: '', lines: [m.fact] } });
+  for (const k of KARTS) cards.push({ where: `${k.id} intro`, card: k.intro }, { where: `${k.id} results`, card: { title: k.name, date: '', lines: [k.spotlight] } });
   return cards;
 }
 

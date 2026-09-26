@@ -41,6 +41,8 @@ with a short, sourced fact card. The funny moments of AI history are power-ups, 
    ≥65% for 2). Harder routes hold the "wrong" tokens, so the stars reward knowing the history.
 5. **The world's castle** ends in a boss. When it falls, the open-source helper says
    *"Thank you! But AGI is in another castle!"*
+6. **Between worlds**, an optional **Benchmark Kart** race against rival labs (friends) on a track named after a
+   real benchmark. The finale recap compares your whole run with the real timeline.
 
 ## Controls
 
@@ -51,6 +53,8 @@ with a short, sourced fact card. The funny moments of AI history are power-ups, 
 | Run | Shift/X | Left Shift | Right Shift, / or Enter | B |
 | Power (tool calls, think, traits) | S/↓/C | S | ↓ | ✦ (shown when you have one) |
 | Pause | Esc/P | Esc/P | Esc/P | II button |
+
+In Benchmark Kart the same keys work: move switches lanes, jump hops over hurdles, and run spends tokens on a boost.
 
 Physics feel: acceleration and friction, a variable jump height (release early for a short hop),
 coyote time and jump buffering, and running jumps that go higher. Claude floats (lower fall gravity).
@@ -95,6 +99,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/Player.ts`, `Enemies.ts`, `Bosses.ts`, `Items.ts`, `Platforms.ts` | Actors (platforms are rideable actors: moving platforms, Timeline clouds) |
 | `src/game/storm.ts`, `puzzleRules.ts`, `gates.ts`, `forks.ts` | Pure storm, puzzle, gate-timeline and fork rules (unit tested) |
 | `src/game/recap.ts`, `src/config/recap.ts`, `src/ui/Recap.ts` | The finale recap: your stars and hype calls against the real timeline (rules unit tested) |
+| `src/config/karts.ts`, `src/game/kart.ts`, `src/game/KartRace.ts` | Benchmark Kart: race config, the pure fixed-step race sim (unit tested), and its view |
 | `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave, two-key plates |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
@@ -113,6 +118,6 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M4 ✅ | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
 | M5 ✅ | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
 | M6 ✅ | Worlds 6–7 | Swarm Factory (fork cherry = agent clones, two-key plates, rate-limit crushers, Rogue Swarm boss); storms for the Pentagon dispute, the export freeze and Astra's phased rollout; Frontier Castle (frontier mushroom, Paperclip Maximizer) → Astra / Opus 5.5 finales and the recap |
-| M7 | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits; kart races between worlds |
+| M7 ✅ | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits (Llama's open-weights copy, Grok's cloud); six Benchmark Kart races between worlds |
 | M8 | Polish | Music, accessibility, performance, a fact-verification pass over every 🔎 |
 | M9 | Online multiplayer | Hosted rooms for online co-op/versus |

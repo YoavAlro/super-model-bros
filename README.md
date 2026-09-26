@@ -11,7 +11,8 @@ DAN & Sydney, storm levels); Tool Pipes (tool flower, injection piranhas, Claude
 Reasoning Ghost House (reasoning cape, hallucination ghosts, the Hallucination King, and puzzles like "how many
 R's in strawberry?"); the Swarm Factory (fork cherry agents, rate limits, the Rogue Swarm); and the Frontier
 Castle (the frontier mushroom and the Paperclip Maximizer). Hype power-ups ask you to call them "passing hype"
-or "lasting shift", and the finale recap compares your run with real history. Solo, or co-op on one keyboard.
+or "lasting shift", Benchmark Kart races run between worlds, five rival-lab friends unlock as playable characters,
+and the finale recap compares your run with real history. Solo, or co-op on one keyboard.
 
 - Design: [GAME_DESIGN.md](GAME_DESIGN.md)
 - Goal and done-conditions: [GOAL.md](GOAL.md)

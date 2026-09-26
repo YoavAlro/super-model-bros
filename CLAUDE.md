@@ -26,6 +26,7 @@ Before every commit, run `npm test && npm run build`.
 - Every feature works on keyboard (solo and co-op) and touch (landscape).
 - Smoke test: `npm run build && npx vite preview --port 4173`, then `npm run smoke -- all` (or level ids). It drives
   Playwright at desktop size and in an iPhone landscape viewport and completes each level via `?debug`, which exposes
-  `window.__smb` (teleport, state, bosses, stomp, give, next); `?debug&level=<id>` skips the title. Headless
+  `window.__smb` (teleport, state, bosses, stomp, give, next); `?debug&level=<id>` skips the title, `?debug&kart=<id>`
+  runs one Benchmark Kart race, and smoke ids like `kart-arc` or `char:llama` test races and characters. Headless
   software rendering runs at ~12fps, so give timed inputs generous waits. Look at the screenshots in `smoke-shots/`.
 - When a milestone lands, tick it in `GAME_DESIGN.md` → Milestones.
