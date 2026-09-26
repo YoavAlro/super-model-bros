@@ -1,0 +1,65 @@
+# Events: hype power-ups, storm levels, and the Timeline
+
+Legend: ✅ well-established · 🔎 recent, verify before shipping. **G** = GPT path, **C** = Claude path, **B** = both.
+
+## The Timeline (X/Twitter)
+
+From World 3 on, the Timeline is a cloud enemy that drops spiky hot takes. Once you beat it, it's
+a cloud you can ride. Its big moments are set pieces where virality lit the fire:
+
+| When | Moment | Set piece | | |
+|---|---|---|---|---|
+| Dec 2022 | ChatGPT screenshots flood Twitter; 1M users in ~5 days | Viral star rain; a crowd of users follows you | B | ✅ |
+| Feb 2023 | Bing "Sydney" transcripts go viral | The cloud turns red and drops backlash | B | ✅ |
+| Nov 2023 | Grok launches inside X; the OpenAI board crisis plays out live on X | Grok cameo; board-crisis storm | B/G | ✅ |
+| Jan 2025 | DeepSeek R1 trends and tops the App Store | Rival rush | B | ✅ |
+| Feb 2025 | "Vibe coding" is coined on X | Hype power-up (lasting) | B | ✅ |
+| Dec 2025–Jan 2026 | Claude Code goes viral over the holidays | Viral star rain | C | 🔎 |
+| Jan 2026 | OpenClaw and Moltbook screenshots spread | Hype power-up (passing) | B | 🔎 |
+
+In-game posts paraphrase moments anonymously. Never fabricate a quote attributed to a real person.
+
+## Hype power-ups: lasting or passing?
+
+A glowing hype block releases a timed power-up. When it ends, a **"Hype or shift?"** card gives the verdict.
+**Lasting** hypes leave a permanent upgrade; **passing** ones evaporate and leave a short hangover
+(a slowdown). The world recap scores your judgment.
+
+| When | Hype | Verdict | Power while it lasts | | |
+|---|---|---|---|---|---|
+| Apr 2023 | AutoGPT / BabyAGI | Passing (it returned years later as a real shift) | Clones that run into walls | B | ✅ |
+| Nov 2023 | GPT Store / custom GPTs | Passing | Coin magnet | G | ✅ |
+| Nov 2023 | "Q*" rumors | Passing | Hype only | G | ✅ |
+| Feb 2024 | Sora demos | Passing at the time | Spectacle | G | ✅ |
+| Apr 2024 | AI gadgets (AI Pin, Rabbit R1) | Passing | Jetpack that runs out | B | ✅ |
+| Jun 2024 | Artifacts | Lasting | Build platforms | C | ✅ |
+| Sep 2024 | Reasoning models | Lasting | Early cape | B | ✅ |
+| Nov 2024 | MCP | Lasting | Every pipe connects | B | ✅ |
+| Feb 2025 | Vibe coding | Lasting | Code tokens become platforms | B | ✅ |
+| Mar 2025 | Ghibli-style images | Passing (the users stay) | User flood; the GPU mount overheats | G | ✅ |
+| Jan 2026 | Moltbook: a social network for AI agents | Passing | Your forks post instead of helping | B | 🔎 |
+| 2026 | Agent teams | Lasting | Forks coordinate | B | 🔎 |
+
+## Storm levels (short, timed danger)
+
+Auto-scrolling or hazard levels pinned to real incidents. Surviving one earns a fact card.
+
+| When | Storm | Level mechanic | | |
+|---|---|---|---|---|
+| Dec 2022–2023 | "At capacity" outages | Platforms freeze and unfreeze | G | ✅ |
+| Mar 31–Apr 28, 2023 | Italy temporarily bans ChatGPT | Part of the level closes; reroute | G | ✅ |
+| Mar 2023 | "Pause giant AI experiments" open letter | Slow fog | B | ✅ |
+| Nov 17–22, 2023 | OpenAI board crisis | Five auto-scrolling "days"; the ground shifts each day; heart tokens end it early | G | ✅ |
+| Dec 2023 | NYT copyright lawsuit | Copyright-lawyer gauntlet | G | ✅ |
+| Jan 2025 | DeepSeek R1 shock | Speed-run against a cheap rival | B | ✅ |
+| Sep 2025 | Authors' lawsuit settlement (~$1.5B) | Triggered if the Claude path grabbed "shadow library" books earlier | C | ✅ |
+| Jan–Feb 2026 | Agent security exposure (OpenClaw) | Your forks go rogue | B | 🔎 |
+| Feb–Aug 2026 | Pentagon "supply chain risk" dispute | A closed region; hold your red lines; a court later rules the label unlawful | C | 🔎 |
+| Jun 12–Jul 1, 2026 | Export-control suspension of Fable 5 / Mythos 5 | Your newest power-up is frozen | C | 🔎 |
+| Sep 2026 | Critical cyber capability threshold | Phased rollout: gates open one at a time | G | 🔎 |
+
+## Sources for the 🔎 rows
+
+- [TechPolicy.Press: Anthropic–Pentagon timeline](https://www.techpolicy.press/a-timeline-of-the-anthropic-pentagon-dispute/) · [CNN: ruling](https://www.cnn.com/2026/08/27/tech/anthropic-pentagon-supply-chain-risk-unlawful-hnk)
+- [Fortune: Moltbook / OpenClaw](https://fortune.com/2026/01/31/ai-agent-moltbot-clawdbot-openclaw-data-privacy-security-nightmare-moltbook-social-network/)
+- [CNBC: Astra rollout](https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html)

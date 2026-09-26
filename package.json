@@ -1,0 +1,23 @@
+{
+  "name": "super-model-bros",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A platformer about how AI evolved: GPT and Claude run through real AI history.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
