@@ -4,6 +4,7 @@
 //   npm run build && npx vite preview --port 4173 &
 //   node scripts/smoke.mjs gpt-2-1 claude-2-2        # or: node scripts/smoke.mjs all
 //   node scripts/smoke.mjs kart-arc char:llama       # a Benchmark Kart race; a level played as a character
+//   node scripts/smoke.mjs star:gpt-2-1               # star power: the rainbow, its music, and every colour coming back
 //   node scripts/smoke.mjs path:gpt path:claude      # a whole path in one session, start to recap
 //
 // Env: SMOKE_URL (default http://localhost:4173/), SMOKE_OUT (default ./smoke-shots),
@@ -154,6 +155,37 @@ async function completeAsCharacter(page, char, tag) {
 }
 
 /**
+ * Star power on one level: the star tints the whole character and takes over the music, and every
+ * material's own colour comes back when the star runs out and when the player dies while starred.
+ */
+async function checkStar(page, id, tag) {
+  await page.goto(`${BASE}?debug&level=${id}`);
+  if (!(await waitFor(page, () => window.__smb?.card?.()))) throw new Error(`${id}: no intro card`);
+  await page.evaluate(() => window.__smb.next());
+  await waitFor(page, () => window.__smb.state() === 'playing');
+  const level = await page.evaluate(() => window.__smb.tune());
+  const starred = () => {
+    const f = window.__smb.starFx()[0];
+    return f.tinted && window.__smb.tune() === 'star';
+  };
+  const restored = () => {
+    const f = window.__smb.starFx()[0];
+    return f.left === 0 && !f.tinted && f.restored && window.__smb.tune() !== 'star';
+  };
+  await page.evaluate(() => window.__smb.give('rlhf'));
+  if (!(await waitFor(page, starred, null, 8000))) throw new Error(`${id}: the star never tinted the character or started its tune`);
+  await page.screenshot({ path: `${OUT}/${tag}-star-${id}.png` });
+  await page.evaluate(() => window.__smb.starLeft(0.4));
+  if (!(await waitFor(page, restored, null, 8000))) throw new Error(`${id}: colours or music not restored when the star ran out`);
+  await page.evaluate(() => window.__smb.give('viral'));
+  if (!(await waitFor(page, starred, null, 8000))) throw new Error(`${id}: the second star never tinted the character`);
+  const p = await page.evaluate(() => window.__smb.player());
+  await page.evaluate((pl) => window.__smb.teleport(pl.x, -3.5), p);
+  if (!(await waitFor(page, restored, null, 8000))) throw new Error(`${id}: colours or music not restored after dying while starred`);
+  return `star tinted ${await page.evaluate(() => window.__smb.starFx()[0].materials)} materials, restored on timeout and death (${level} → star → ${await page.evaluate(() => window.__smb.tune())})`;
+}
+
+/**
  * Plays a whole path in one session, from its first level to the recap: every level, every card
  * between them (unlocks, world breaks) and every Benchmark Kart race. Logs renderer memory per level
  * so a leak shows up as steady growth.
@@ -215,6 +247,7 @@ for (const tag of wanted) {
       ...((await page.evaluate(() => window.__smbLevelIds?.())) ?? []),
       ...((await page.evaluate(() => window.__smbKartIds?.())) ?? []),
       ...((await page.evaluate(() => window.__smbUnlockables?.())) ?? []).map((c) => `char:${c}`),
+      'star:gpt-2-1',
     ];
   }
 
@@ -226,7 +259,9 @@ for (const tag of wanted) {
         ? await completeKart(page, id, tag)
         : id.startsWith('char:')
           ? await completeAsCharacter(page, id.slice(5), tag)
-          : await completeLevel(page, id, tag);
+          : id.startsWith('star:')
+            ? await checkStar(page, id.slice(5), tag)
+            : await completeLevel(page, id, tag);
       console.log(`${tag} ${id}: ok (${outro})`);
     } catch (e) {
       failures++;

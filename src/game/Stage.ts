@@ -255,7 +255,7 @@ export class Stage implements StageCtx {
     sun.position.set(-4, 10, 8);
     this.scene.add(sun);
 
-    this.knocks = new KnockOffs(this.scene);
+    this.knocks = new KnockOffs(this.scene, this.isTouch);
     this.grid = new LevelGrid(spec.map);
     this.view = new LevelView(this.grid, theme, this.scene);
     this.counts = emptyCounts();
@@ -432,10 +432,12 @@ export class Stage implements StageCtx {
     if (this.input.consumePause() && this.state !== 'intro') this.togglePause();
     // Portrait phones show a "rotate your phone" overlay; hold the game until it turns.
     const portraitTouch = this.isTouch && window.innerHeight > window.innerWidth;
-    if (!portraitTouch && (this.state === 'playing' || this.state === 'clear')) {
+    const running = !portraitTouch && (this.state === 'playing' || this.state === 'clear');
+    // Assist mode runs the whole simulation a little slower. Frozen (paused, a card up): no time passes.
+    const simDt = running ? dt * (this.opts.settings.assist ? 0.8 : 1) : 0;
+    if (running) {
       this.input.update();
-      // Assist mode runs the whole simulation a little slower.
-      this.accumulator += dt * (this.opts.settings.assist ? 0.8 : 1);
+      this.accumulator += simDt;
       while (this.accumulator >= STEP) {
         this.simulate(STEP);
         this.accumulator -= STEP;
@@ -443,7 +445,8 @@ export class Stage implements StageCtx {
     }
 
     this.view.update(dt);
-    for (const p of this.playersList) p.updateMesh(t, dt);
+    // Players animate in simulation time, so star effects freeze and slow down with the game.
+    for (const p of this.playersList) p.updateMesh(t, simDt);
     for (const e of this.enemyList) e.updateMesh(t);
     this.knocks.draw();
     for (const tok of this.tokens) tok.updateMesh(t);
@@ -1111,7 +1114,7 @@ export class Stage implements StageCtx {
     }
     p.starChain++;
     const away = Math.sign(e.body.x + e.body.w / 2 - (p.body.x + p.body.w / 2)) || p.mover.facing;
-    this.knocks.add(e.mesh, e.body, away, p.starChain);
+    this.knocks.add(e.mesh, e.body, away, p.starChain, p.tagTop());
     sfx.kick(p.starChain);
   }
 

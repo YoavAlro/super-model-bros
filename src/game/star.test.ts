@@ -1,7 +1,9 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { TUNES } from '../config/music';
 import { parseMelody } from './musicTheory';
 import {
+  FLASH_LIMIT_HZ,
   STAR_BLINK_HZ,
   STAR_WARN,
   comboColor,
@@ -18,6 +20,7 @@ import {
   starWeight,
   type StarKind,
 } from './starRules';
+import { StarTint } from './starTint';
 
 const KINDS: StarKind[] = ['rlhf', 'viral', 'mega'];
 
@@ -89,7 +92,20 @@ describe('star rainbow', () => {
     }
   });
 
-  it('keeps each part at one lightness, so the cycle never strobes', () => {
+  it('keeps every hue cycle, and the warning blink with the drift under it, within the flash limit', () => {
+    const totals: Record<StarKind, number> = { rlhf: 8, viral: 10, mega: 12 };
+    for (const kind of KINDS) {
+      const total = totals[kind];
+      for (const reduce of [false, true]) {
+        for (let left = total; left > 0; left -= 0.05) {
+          expect(starCycleRate(kind, left, total, reduce), kind).toBeLessThanOrEqual(FLASH_LIMIT_HZ);
+        }
+      }
+      expect(STAR_BLINK_HZ + starCycleRate(kind, STAR_WARN / 2, total, false), kind).toBeLessThanOrEqual(FLASH_LIMIT_HZ);
+    }
+  });
+
+  it("holds each part's lightness steady whatever the hue, keeping dark parts darker", () => {
     for (const own of [0, 0.1, 0.3, 0.5, 0.8, 1]) {
       const l = starLightness(own);
       expect(l).toBeGreaterThanOrEqual(0.25);
@@ -165,5 +181,91 @@ describe('star knock-offs', () => {
     expect(comboLabel(3)).toBe('400 ×3');
     expect(comboColor(1)).not.toBe(comboColor(4));
     expect(comboColor(99)).toBe(comboColor(7));
+  });
+});
+
+describe('star tint', () => {
+  /** A little character: a lit body with an engine-driven emissive, a glowing tip, unlit eyes, a toon part. */
+  function character() {
+    const root = new THREE.Group();
+    const body = new THREE.MeshLambertMaterial({ color: 0x3a7bd5, emissive: 0x000000, emissiveIntensity: 0 });
+    const tip = new THREE.MeshLambertMaterial({ color: 0xffb000, emissive: 0xffb000, emissiveIntensity: 0.6 });
+    const eye = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const hat = new THREE.MeshToonMaterial({ color: 0x8844aa, emissive: 0x110022, emissiveIntensity: 1 });
+    const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const add = (m: THREE.Material, y: number) => {
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.position.y = y;
+      root.add(mesh);
+    };
+    add(body, 0.4);
+    add(tip, 1.1);
+    add(eye, 0.7);
+    add(eye, 0.7);
+    add(hat, 0.95);
+    const mats = [body, tip, eye, hat];
+    const snapshot = () =>
+      mats.map((m) => ({
+        color: m.color.getHex(),
+        emissive: 'emissive' in m ? (m.emissive as THREE.Color).getHex() : null,
+        intensity: 'emissiveIntensity' in m ? m.emissiveIntensity : null,
+      }));
+    return { root, body, mats, snapshot };
+  }
+
+  it('finds every material once and tints them all', () => {
+    const c = character();
+    const own = c.snapshot();
+    const tint = new StarTint(c.root);
+    tint.apply('viral', 0.3, 1);
+    expect(tint.materials).toBe(4);
+    expect(tint.tinted).toBe(true);
+    const now = c.snapshot();
+    for (let i = 0; i < own.length; i++) expect(now[i].color, `material ${i}`).not.toBe(own[i].color);
+    expect(now[0].intensity).toBe(1);
+  });
+
+  it("shows each part's own colours and glow on a warning blink's off frames", () => {
+    const c = character();
+    const own = c.snapshot();
+    const tint = new StarTint(c.root);
+    tint.apply('rlhf', 0.2, 1);
+    tint.apply('rlhf', 0.4, 0);
+    expect(c.snapshot()).toEqual(own);
+    expect(tint.tinted).toBe(true);
+  });
+
+  it('puts every colour, emissive and intensity back exactly, across stars', () => {
+    const c = character();
+    const own = c.snapshot();
+    const tint = new StarTint(c.root);
+    // A star with its blink, a second star grabbed on top, then the end.
+    tint.apply('rlhf', 0.1, 1);
+    tint.apply('rlhf', 0.3, 0);
+    tint.apply('viral', 0.6, 1);
+    tint.apply('mega', 0.9, 0.5);
+    tint.restore();
+    expect(c.snapshot()).toEqual(own);
+    expect(tint.tinted).toBe(false);
+    expect(tint.matchesOriginals()).toBe(true);
+    tint.restore();
+    expect(c.snapshot()).toEqual(own);
+  });
+
+  it('brings back a glow the engine set between stars, and ignores the driven one when checking', () => {
+    const c = character();
+    const tint = new StarTint(c.root);
+    tint.apply('rlhf', 0.1, 1);
+    tint.restore();
+    // A tool glow set on the body between two stars comes back after the second.
+    c.body.emissive.setHex(0x0d5c50);
+    const withTool = c.snapshot();
+    tint.apply('viral', 0.5, 1);
+    tint.restore();
+    expect(c.snapshot()).toEqual(withTool);
+    // Outside a star the engine drives the body's emissive (a thinking pulse): that alone is not a leak.
+    c.body.emissive.setHex(0x402060);
+    expect(tint.matchesOriginals()).toBe(false);
+    expect(tint.matchesOriginals(c.body)).toBe(true);
   });
 });

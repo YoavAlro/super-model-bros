@@ -33,15 +33,22 @@ export function pickTune(s: TuneState): TuneId | null {
 
 /** The last seconds of a star, when it blinks (or fades, with reduced motion) to warn you. */
 export const STAR_WARN = 2;
-/** Warning blink rate in full on/off cycles per second: under the 3 Hz photosensitivity limit. */
+/** Warning blink rate in full on/off cycles per second. */
 export const STAR_BLINK_HZ = 2.5;
+/**
+ * The photosensitivity limit: no more than 3 flashes a second. The rainbow holds HSL lightness
+ * steady, but a hue sweep still changes brightness (yellow is far brighter than blue), so each full
+ * hue cycle can read as a flash. What keeps it safe is the rate: every cycle rate, and the warning
+ * blink plus the hue drift under it, stay at or under this.
+ */
+export const FLASH_LIMIT_HZ = 3;
 
 interface KindLook {
   /** Hue cycles per second when the star is fresh, and when it is about to run out. */
   fast: number;
   slow: number;
   sat: number;
-  /** Emissive lightness: the glow. Constant, so the cycle never flashes. */
+  /** Emissive HSL lightness: the glow. */
   glow: number;
 }
 
@@ -92,8 +99,9 @@ export function starHue(kind: StarKind, phase: number, offset: number): number {
 }
 
 /**
- * Lightness of a part while starred: its own lightness pulled halfway to the middle. It depends only
- * on the part, never on time, so the hue cycle runs at constant lightness (no strobing).
+ * HSL lightness of a part while starred: its own lightness pulled halfway to the middle. It depends
+ * only on the part, never on time, so the cycle never pulses light and dark on its own; the brightness
+ * change that hue brings is bounded by the cycle rate (see FLASH_LIMIT_HZ).
  */
 export const starLightness = (own: number): number => 0.5 + (own - 0.5) * 0.45;
 

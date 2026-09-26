@@ -20,6 +20,9 @@ const BIG_H = 1.75;
 /** Frontier size: the giant finale form. */
 const MEGA_W = 1.4;
 const MEGA_H = 3;
+/** The name tag: its centre this far above the head, and its height. */
+const TAG_ABOVE = 0.55;
+const TAG_SCALE = 0.42;
 
 /** A power you keep until you get hit. */
 export type HeldPower = 'tool' | 'cape' | null;
@@ -73,9 +76,10 @@ export class PlayerActor {
   private readonly fx: StarFx;
   /** Reused every frame, so starred frames allocate nothing. */
   private readonly starState: StarState = { kind: 'rlhf', left: 0, total: 0 };
-  /** Seconds into a starred jump's somersault (-1: none), and how long the rise lasts. */
+  /** Seconds into a starred jump's somersault (-1: none), how long the rise lasts, and which way it rolls. */
   private spin = -1;
   private spinTime = 0.4;
+  private spinDir = -1;
 
   constructor(
     readonly spec: CharacterSpec,
@@ -294,10 +298,12 @@ export class PlayerActor {
     if (ev.jumped || ev.airJumped) {
       this.squash = -0.2;
       if (!this.clone) sfx.jump();
-      // Starred jumps somersault through the rise (drawn in updateMesh).
-      if (this.star > 0) {
+      // Starred jumps somersault through the rise (drawn in updateMesh). The roll keeps the way it
+      // started even if you steer back, and an air jump mid-roll lets it finish instead of snapping.
+      if (this.star > 0 && this.spin < 0) {
         this.spin = 0;
         this.spinTime = spinDuration(b.vy, this.stats().gravity);
+        this.spinDir = -this.mover.facing;
       }
     }
     if (ev.dashed) sfx.dash();
@@ -305,6 +311,7 @@ export class PlayerActor {
     return ev;
   }
 
+  /** `dt` is simulation time: 0 while the game is frozen, so the star effects and the somersault hold still. */
   updateMesh(t: number, dt: number): void {
     const b = this.body;
     this.squash = approach(this.squash, 0, dt * 2.5);
@@ -330,7 +337,7 @@ export class PlayerActor {
       this.spin += dt;
       const angle = spinAngle(this.spin, this.spinTime);
       if (angle === 0 || this.dead) this.spin = -1;
-      else if (!prefs.reduceMotion) rollAboutMiddle(this.mesh, -this.mover.facing * angle, b.h / 2);
+      else if (!prefs.reduceMotion) rollAboutMiddle(this.mesh, this.spinDir * angle, b.h / 2);
     }
     const star = this.starState;
     star.kind = this.starKind ?? 'rlhf';
@@ -349,13 +356,18 @@ export class PlayerActor {
         this.bodyMat.emissive.setHex(0x000000);
       }
     }
-    this.tag.position.set(b.x + b.w / 2, b.y + b.h + 0.55, 0);
+    this.tag.position.set(b.x + b.w / 2, b.y + b.h + TAG_ABOVE, 0);
     this.tag.visible = !this.dead;
   }
 
-  /** For the debug hooks: the star effects' state. */
+  /** The top of the name tag, for popups that must stay clear of it. */
+  tagTop(): number {
+    return this.body.y + this.body.h + TAG_ABOVE + TAG_SCALE / 2;
+  }
+
+  /** For the debug hooks: the star effects' state. The power glows own the body's emissive outside a star. */
   starDebug() {
-    return { ...this.fx.debug(), spinning: this.spin >= 0, left: this.star, kind: this.starKind, chain: this.starChain };
+    return { ...this.fx.debug(this.bodyMat), spinning: this.spin >= 0, left: this.star, kind: this.starKind, chain: this.starChain };
   }
 
   dispose(): void {
@@ -367,7 +379,7 @@ export class PlayerActor {
 
   private makeTag(text: string): THREE.Sprite {
     const tag = labelSprite(text);
-    tag.scale.multiplyScalar(0.42);
+    tag.scale.multiplyScalar(TAG_SCALE);
     return tag;
   }
 }

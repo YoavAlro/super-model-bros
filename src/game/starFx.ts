@@ -1,43 +1,15 @@
 import * as THREE from 'three';
 import { canvasTexture, labelSprite } from './meshes';
 import { prefs } from './prefs';
-import {
-  comboColor,
-  comboLabel,
-  knockPose,
-  starCycleRate,
-  starGlow,
-  starHue,
-  starLightness,
-  starMix,
-  starSaturation,
-  starWeight,
-  type KnockPose,
-  type StarKind,
-} from './starRules';
+import { comboColor, comboLabel, knockPose, starCycleRate, starHue, starMix, type KnockPose, type StarKind } from './starRules';
+import { StarTint } from './starTint';
 
 /**
  * Star power visuals: the rainbow that cycles over a whole character, the sparkle trail, the jump
  * somersault pivot, and enemies knocked off the screen with a combo popup. The timing and colour
- * rules are pure and live in `starRules.ts`; this module only applies them to meshes.
+ * rules are pure and live in `starRules.ts`, the material cache in `starTint.ts`; this module only
+ * applies them to meshes.
  */
-
-type Tintable = THREE.Material & { color: THREE.Color; emissive?: THREE.Color; emissiveIntensity?: number };
-
-interface Original {
-  color: THREE.Color;
-  emissive: THREE.Color | null;
-  intensity: number;
-}
-
-interface Tint {
-  mat: Tintable;
-  orig: Original;
-  /** 0 at the feet, 1 at the top of the character. */
-  offset: number;
-  lightness: number;
-  weight: number;
-}
 
 /** What a starred player looks like this frame (null: no star). */
 export interface StarState {
@@ -56,17 +28,11 @@ interface Box {
   vx: number;
 }
 
-const HSL = { h: 0, s: 0, l: 0 };
 const vivid = new THREE.Color();
 
-/**
- * One player's star effects. The first time a star lights up, it walks the character's mesh and
- * caches every material's own colour and emissive in `material.userData.starOriginal`; `restore()`
- * puts them back exactly.
- */
+/** One player's star effects: the rainbow over its whole mesh, a halo, and the sparkle trail. */
 export class StarFx {
-  private tints: Tint[] | null = null;
-  private tinted = false;
+  private readonly tint: StarTint;
   private phase = 0;
   /** Last frame's seconds left: a jump up means a new star (time for the pickup burst). */
   private lastLeft = 0;
@@ -74,69 +40,45 @@ export class StarFx {
   private readonly aura: THREE.Sprite;
 
   constructor(
-    private readonly root: THREE.Object3D,
+    root: THREE.Object3D,
     private readonly scene: THREE.Scene,
   ) {
+    this.tint = new StarTint(root);
     this.sparkles = new Sparkles();
     this.aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTexture(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     this.aura.visible = false;
     scene.add(this.sparkles.points, this.aura);
   }
 
-  /** Every frame: tint and sparkle while `star` is set, restore the moment it is not. */
+  /**
+   * Every frame: tint and sparkle while `star` is set, restore the moment it is not. `dt` is
+   * simulation time, so with the game frozen (paused, a card up, a phone held in portrait) it is 0
+   * and the rainbow, sparkles and halo hold still with everything else.
+   */
   update(dt: number, star: StarState | null, body: Box): void {
+    this.aura.visible = !!star;
+    if (!star) this.tint.restore();
+    else this.placeAura(star, body);
+    if (dt === 0) return;
     if (star && star.left > this.lastLeft + 0.05) this.sparkles.burst(star.kind, body, this.phase);
     this.lastLeft = star?.left ?? 0;
     this.sparkles.update(dt, star, body, this.phase);
-    this.aura.visible = !!star;
-    if (!star) {
-      this.restore();
-      return;
-    }
-    const reduce = prefs.reduceMotion;
-    this.phase += starCycleRate(star.kind, star.left, star.total, reduce) * dt;
-    const mix = starMix(star.left, reduce);
-    const sat = starSaturation(star.kind);
-    const glow = starGlow(star.kind) * mix;
-    // A soft halo behind the character in the star's colour. It breathes in size with the colour
-    // cycle (never in brightness), so reduced motion holds it still.
-    const a = this.aura;
-    const breathe = 1 + 0.06 * Math.sin(2 * Math.PI * this.phase);
-    a.position.set(body.x + body.w / 2, body.y + body.h * 0.5, -0.4);
-    a.scale.setScalar((body.h * 1.7 + 0.8) * breathe);
-    a.material.color.setHSL(starHue(star.kind, this.phase, 0.5), 1, 0.5, THREE.SRGBColorSpace);
-    a.material.opacity = (star.kind === 'mega' ? 0.75 : 0.55) * mix;
-    for (const t of this.capture()) {
-      const hue = starHue(star.kind, this.phase, t.offset);
-      vivid.setHSL(hue, sat, t.lightness, THREE.SRGBColorSpace);
-      t.mat.color.copy(t.orig.color).lerp(vivid, mix * t.weight);
-      if (t.mat.emissive) {
-        t.mat.emissive.setHSL(hue, 1, glow, THREE.SRGBColorSpace);
-        t.mat.emissiveIntensity = 1;
-      }
-    }
-    this.tinted = true;
+    if (!star) return;
+    this.phase += starCycleRate(star.kind, star.left, star.total, prefs.reduceMotion) * dt;
+    this.tint.apply(star.kind, this.phase, starMix(star.left, prefs.reduceMotion));
   }
 
   /** Puts every material's own colour and emissive back. */
   restore(): void {
-    if (!this.tinted || !this.tints) return;
-    this.tinted = false;
-    for (const t of this.tints) {
-      t.mat.color.copy(t.orig.color);
-      if (t.mat.emissive && t.orig.emissive) {
-        t.mat.emissive.copy(t.orig.emissive);
-        t.mat.emissiveIntensity = t.orig.intensity;
-      }
-    }
+    this.tint.restore();
   }
 
-  /** For the debug hooks: is it tinted, and does every material match its cached original? */
-  debug(): { tinted: boolean; restored: boolean; materials: number; sparkles: number } {
-    const restored = (this.tints ?? []).every(
-      (t) => t.mat.color.equals(t.orig.color) && (!t.orig.emissive || (!!t.mat.emissive?.equals(t.orig.emissive) && t.mat.emissiveIntensity === t.orig.intensity)),
-    );
-    return { tinted: this.tinted, restored, materials: this.tints?.length ?? 0, sparkles: this.sparkles.live };
+  /**
+   * For the debug hooks: is it tinted, and does every material match its original? `driven`: the
+   * material whose emissive the engine sets itself outside a star (see `StarTint.matchesOriginals`).
+   */
+  debug(driven?: THREE.Material): { tinted: boolean; restored: boolean; materials: number; sparkles: number } {
+    return { tinted: this.tint.tinted, restored: this.tint.matchesOriginals(driven), materials: this.tint.materials, sparkles: this.sparkles.live };
   }
 
   dispose(): void {
@@ -146,31 +88,18 @@ export class StarFx {
     this.aura.material.dispose();
   }
 
-  /** Finds every tintable material under the mesh once, remembering its own colours. */
-  private capture(): Tint[] {
-    if (this.tints) return this.tints;
-    const root = this.root;
-    root.updateMatrixWorld(true);
-    const found = new Map<Tintable, number>();
-    const pos = new THREE.Vector3();
-    root.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      root.worldToLocal(mesh.getWorldPosition(pos));
-      for (const m of mats as Tintable[]) if (m?.color instanceof THREE.Color && !found.has(m)) found.set(m, pos.y);
-    });
-    const ys = [...found.values()];
-    const lo = Math.min(...ys);
-    const span = Math.max(0.001, Math.max(...ys) - lo);
-    this.tints = [...found].map(([mat, y]) => {
-      const cached = mat.userData.starOriginal as Original | undefined;
-      const orig: Original = cached ?? { color: mat.color.clone(), emissive: mat.emissive?.clone() ?? null, intensity: mat.emissiveIntensity ?? 1 };
-      mat.userData.starOriginal = orig;
-      orig.color.getHSL(HSL, THREE.SRGBColorSpace);
-      return { mat, orig, offset: (y - lo) / span, lightness: starLightness(HSL.l), weight: starWeight(HSL.l) };
-    });
-    return this.tints;
+  /**
+   * A soft halo behind the character in the star's colour. It breathes in size with the colour cycle,
+   * not in opacity, so reduced motion (no cycle) holds it still.
+   */
+  private placeAura(star: StarState, body: Box): void {
+    const a = this.aura;
+    const mix = starMix(star.left, prefs.reduceMotion);
+    const breathe = 1 + 0.06 * Math.sin(2 * Math.PI * this.phase);
+    a.position.set(body.x + body.w / 2, body.y + body.h * 0.5, -0.4);
+    a.scale.setScalar((body.h * 1.7 + 0.8) * breathe);
+    a.material.color.setHSL(starHue(star.kind, this.phase, 0.5), 1, 0.5, THREE.SRGBColorSpace);
+    a.material.opacity = (star.kind === 'mega' ? 0.75 : 0.55) * mix;
   }
 }
 
@@ -388,18 +317,23 @@ interface Flying {
   mesh: THREE.Object3D;
   x: number;
   y: number;
-  /** Half the enemy's height: it flips around its middle. */
+  /** Half the enemy's height, in world units: it flips around its middle. */
   mid: number;
   dir: number;
   age: number;
   popup: THREE.Sprite;
+  /** Where the popup starts. */
+  px: number;
+  py: number;
 }
 
-/** Popups and knocked-off enemies are drawn in front of the level's tiles. */
+/** Knocked-off enemies are drawn in front of the level's tiles, easing out to this depth. */
 const FRONT_Z = 1.3;
+const FRONT_EASE = 0.12;
 const POPUP_LIFE = 0.9;
-/** The popup starts this far above the enemy, clear of the player's name tag. */
-const POPUP_RISE = 1.05;
+/** Popup height in world units (the player's name tag is 0.42): bigger on phones, where tiles are small. */
+const POPUP_SCALE = 0.46;
+const POPUP_SCALE_TOUCH = 0.75;
 
 /**
  * Enemies a star knocked away: each flips upside down, pops up and falls off the screen spinning,
@@ -410,20 +344,32 @@ export class KnockOffs {
   private readonly flying: Flying[] = [];
   private readonly pose: KnockPose = { dx: 0, dy: 0, roll: 0, spin: 0, done: false };
 
-  constructor(private readonly scene: THREE.Scene) {}
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly touch: boolean,
+  ) {}
 
   get count(): number {
     return this.flying.length;
   }
 
-  /** `dir` is ±1, away from the player; `chain` is how many this star has knocked off so far. */
-  add(mesh: THREE.Object3D, body: { x: number; y: number; w: number; h: number }, dir: number, chain: number): void {
+  /**
+   * `dir` is ±1, away from the starred player; `chain` is how many this star has knocked off so far;
+   * `clearAbove` is the top of that player's name tag. The popup starts on the side the enemy is not
+   * flying to, above both the enemy and the tag, and draws over everything so neither can hide it.
+   */
+  add(mesh: THREE.Object3D, body: Rect, dir: number, chain: number, clearAbove: number): void {
     const popup = labelSprite(comboLabel(chain), comboColor(chain), 'rgba(30,14,48,0.6)');
-    popup.scale.multiplyScalar(0.46 * (1 + Math.min(chain - 1, 6) * 0.07));
-    popup.renderOrder = 3;
-    popup.position.set(body.x + body.w / 2, body.y + body.h + POPUP_RISE, FRONT_Z + 0.1);
+    popup.scale.multiplyScalar((this.touch ? POPUP_SCALE_TOUCH : POPUP_SCALE) * (1 + Math.min(chain - 1, 6) * 0.07));
+    popup.material.depthTest = false;
+    popup.renderOrder = 4;
+    const half = popup.scale.y / 2;
+    const x = body.x + body.w / 2;
+    const py = Math.max(body.y + body.h + 0.25 + half, clearAbove + 0.1 + half);
+    const px = x - dir * 0.8;
+    popup.position.set(px, py, 0);
     this.scene.add(popup);
-    this.flying.push({ mesh, x: body.x + body.w / 2, y: body.y, mid: body.h / 2, dir, age: 0, popup });
+    this.flying.push({ mesh, x, y: body.y, mid: body.h / 2, dir, age: 0, popup, px, py });
   }
 
   step(dt: number): void {
@@ -442,15 +388,17 @@ export class KnockOffs {
       const pose = knockPose(f.age, f.dir, this.pose);
       const m = f.mesh;
       m.visible = true;
-      m.position.set(f.x + pose.dx, f.y + pose.dy, FRONT_Z);
+      // Ease out in front of the tiles instead of jumping there, which would pop its size.
+      const e = Math.min(1, f.age / FRONT_EASE);
+      m.position.set(f.x + pose.dx, f.y + pose.dy, FRONT_Z * e * (2 - e));
       // Reduced motion: it still flips and falls, but without the fast spin.
       const calm = prefs.reduceMotion;
       m.rotation.set(0, calm ? 0 : pose.spin, 0);
-      rollAboutMiddle(m, calm ? -f.dir * Math.min(Math.PI, Math.abs(pose.roll)) : pose.roll, f.mid * m.scale.y);
+      rollAboutMiddle(m, calm ? -f.dir * Math.min(Math.PI, Math.abs(pose.roll)) : pose.roll, f.mid);
       if (f.popup.parent) {
-        // The popup drifts up where the enemy was hit, easing out, and fades in its last third.
+        // The popup drifts up, easing out, and fades in its last third.
         const u = Math.min(1, f.age / POPUP_LIFE);
-        f.popup.position.y = f.y + f.mid * 2 + POPUP_RISE + (1 - (1 - u) ** 2) * 1.2;
+        f.popup.position.y = f.py + (1 - (1 - u) ** 2) * 1.2;
         f.popup.material.opacity = u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3;
       }
     }
@@ -461,4 +409,11 @@ export class KnockOffs {
     popup.material.map?.dispose();
     popup.material.dispose();
   }
+}
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }

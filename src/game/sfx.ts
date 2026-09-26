@@ -32,7 +32,8 @@ function tone(freqs: number[], step: number, type: OscillatorType = 'square', vo
 
 export const sfx = {
   jump: () => tone([330, 440, 550], 0.03),
-  token: () => tone([988, 1319], 0.06, 'square', 0.05),
+  /** A token: an original rising fifth (D6 to A6). */
+  token: () => tone([1175, 1760], 0.06, 'square', 0.05),
   stomp: () => tone([220, 110], 0.05, 'triangle', 0.15),
   bump: () => tone([140, 120], 0.04, 'triangle', 0.12),
   powerup: () => tone([523, 659, 784, 1047, 1319], 0.06),
@@ -43,10 +44,13 @@ export const sfx = {
   dash: () => tone([600, 900], 0.03, 'triangle', 0.08),
   shoot: () => tone([880, 660], 0.03, 'square', 0.05),
   star: () => tone([523, 784, 1047, 1568], 0.05, 'square', 0.06),
-  /** Grabbing a star: a quick rising fanfare in two voices, then a sparkly trill. */
+  /**
+   * Grabbing a star: a quick rising fanfare in two voices, then a sparkly trill. It is in E major, the
+   * star tune's key (src/config/music.ts), because the tune starts under it in the same frame.
+   */
   starGet: () => {
-    tone([392, 494, 587, 784, 988, 1175, 1568, 1319, 1568, 1319, 1568], 0.05, 'square', 0.06);
-    tone([196, 247, 294, 392, 494, 587, 784, 659, 784, 659, 784], 0.05, 'triangle', 0.08);
+    tone([330, 415, 494, 659, 831, 988, 1319, 1109, 1319, 1109, 1319], 0.05, 'square', 0.06);
+    tone([165, 208, 247, 330, 415, 494, 659, 554, 659, 554, 659], 0.05, 'triangle', 0.08);
   },
   /** A star knocks an enemy off: one semitone higher for every link in the chain. */
   kick: (chain: number) => {
@@ -54,7 +58,8 @@ export const sfx = {
     tone([330 * up, 494 * up, 660 * up], 0.035, 'square', 0.06);
   },
   trap: () => tone([330, 311, 262], 0.07, 'sawtooth', 0.06),
-  oneup: () => tone([659, 784, 1319, 1047, 1175, 1568], 0.07, 'square', 0.06),
+  /** An extra life: an original broken C-major figure. */
+  oneup: () => tone([523, 784, 659, 1047, 1319, 1568], 0.07, 'square', 0.06),
   heal: () => tone([262, 330, 392], 0.06, 'triangle', 0.1),
   card: () => tone([784, 988], 0.05, 'triangle', 0.06),
 };
