@@ -3,7 +3,8 @@ import type { CharacterSpec } from '../config/characters';
 import type { FormAbility } from '../config/levelSpec';
 import { disposeObject } from './dispose';
 import { blinkVisible, prefs } from './prefs';
-import { labelSprite, makeCape, makeCharacter } from './meshes';
+import { makeCape, makeCharacter } from './characterMeshes';
+import { labelSprite } from './meshes';
 import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
 import type { Pad } from './pad';
 import type { Grid } from './physics';
@@ -76,7 +77,7 @@ export class PlayerActor {
     cloneTag = 'fork',
   ) {
     this.mover = newMover(x, y, 0.8, SMALL_H);
-    this.mesh = makeCharacter(spec.color, spec.accent);
+    this.mesh = makeCharacter(spec);
     this.bodyMat = (this.mesh.getObjectByName('body') as THREE.Mesh | undefined)?.material as THREE.MeshLambertMaterial;
     this.cape = makeCape(spec.accent);
     this.cape.visible = false;

@@ -4,7 +4,8 @@ import type { StageCtx } from './ctx';
 import { Brief, HallucinationGhost, HotTake, Paperclip, RogueAgent, Spambot } from './Enemies';
 import { T } from './level';
 import { Trap } from './Items';
-import { labelSprite, makeDan, makeGhostKing, makeOrchestrator, makePaperclipMaximizer, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './meshes';
+import { makeDan, makeGhostKing, makeOrchestrator, makePaperclipMaximizer, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './enemyMeshes';
+import { labelSprite } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
 import { blinkVisible } from './prefs';
 

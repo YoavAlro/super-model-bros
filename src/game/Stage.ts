@@ -21,7 +21,8 @@ import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } fr
 import { LevelGrid, T } from './level';
 import { LevelView } from './LevelView';
 import { HANGOVER_SPEED, bankReset, codeRedPar, judgeHype, tiboDue, type HypeCallValue } from './hype';
-import { labelSprite, makeAura, makeBridge, makeBuiltBlock, makeCharacter, makeCrowd, makeEmDash, makeFlag, makeFogWall, makeGhost4o, makeHelper, makeParticles } from './meshes';
+import { makeCharacter, makeCrowd, makeGhost4o, makeHelper } from './characterMeshes';
+import { labelSprite, makeAura, makeBridge, makeBuiltBlock, makeEmDash, makeFlag, makeFogWall, makeParticles } from './meshes';
 import { createPuzzle, type Puzzle } from './Puzzles';
 import type { Pad } from './pad';
 import { bumpedTile, forTilesUnder, overlaps, type Body } from './physics';
@@ -346,7 +347,7 @@ export class Stage implements StageCtx {
     this.rival = null;
     if (this.storm?.race) {
       const r = CHARACTERS[this.storm.race.rival];
-      const mesh = makeCharacter(r.color, r.accent);
+      const mesh = makeCharacter(r);
       const tag = labelSprite(this.storm.race.tag, '#ffffff', 'rgba(20,40,120,0.6)');
       tag.scale.multiplyScalar(0.42);
       tag.position.y = 1.5;
@@ -1264,7 +1265,7 @@ export class Stage implements StageCtx {
     this.happen('soraCameos');
     this.cameoTime = 14;
     for (let i = 0; i < 5; i++) {
-      const group = makeCharacter(hero.spec.color, hero.spec.accent);
+      const group = makeCharacter(hero.spec);
       const tag = labelSprite(hero.form);
       tag.scale.multiplyScalar(0.42);
       tag.position.y = 1.5;

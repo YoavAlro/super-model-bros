@@ -8,8 +8,10 @@ import { Campaign } from './game/Campaign';
 import { unlockAudio } from './game/sfx';
 import { loadSave } from './save';
 import { showTitleScreen, type StartChoice } from './ui/TitleScreen';
+import { lockZoom } from './ui/zoomLock';
 
 const root = document.getElementById('app')!;
+lockZoom();
 
 function play(choice: StartChoice, startLevel?: string, flags?: string[], perks?: string[], startKart?: string): void {
   unlockAudio();
@@ -30,7 +32,11 @@ if (params.has('debug')) {
 }
 const level = params.get('level');
 const kart = params.get('kart');
-if (params.has('debug') && kart) {
+const gallery = params.get('gallery');
+if (params.has('debug') && gallery) {
+  // Every character or enemy mesh side by side: ?debug&gallery=characters (or enemies)
+  void import('./game/Gallery').then((m) => m.showGallery(root, gallery === 'enemies' ? 'enemies' : 'characters'));
+} else if (params.has('debug') && kart) {
   // A Benchmark Kart race on its own: ?debug&kart=kart-arc&char=mistral&players=2
   const char = params.get('char') as CharacterId | null;
   const lead = char && CHARACTERS[char] ? char : 'gpt';

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { StageCtx } from './ctx';
-import { makeAgentDrone, makeBrief, makeCrusher, makeGhost, makeHotTake, makeJailbreaker, makeLawyer, makePaperclip, makePiranha, makeSpambot, makeTimeline } from './meshes';
+import { makeAgentDrone, makeBrief, makeCrusher, makeGhost, makeHotTake, makeJailbreaker, makeLawyer, makePaperclip, makePiranha, makeSpambot, makeTimeline } from './enemyMeshes';
 import { moveBody, overlaps, type Body } from './physics';
 import { CloudRide } from './Platforms';
 import type { PlayerActor } from './Player';

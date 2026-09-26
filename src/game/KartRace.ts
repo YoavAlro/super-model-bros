@@ -7,7 +7,8 @@ import { el } from '../ui/dom';
 import { settingsPanel } from '../ui/Settings';
 import type { Input } from './Input';
 import { humansDone, KART, kartRivals, LANES, makeTrack, newRace, placeOf, stepRace, type Race } from './kart';
-import { canvasTexture, labelSprite, makeCharacter, makeToken } from './meshes';
+import { makeCharacter } from './characterMeshes';
+import { canvasTexture, labelSprite, makeToken } from './meshes';
 import { music } from './music';
 import { prefs } from './prefs';
 import { sfx } from './sfx';
@@ -187,7 +188,7 @@ export class KartRace {
         w.position.set(x, 0.28, z);
         group.add(w);
       }
-      const driver = makeCharacter(c.color, c.accent);
+      const driver = makeCharacter(c);
       driver.scale.setScalar(0.75);
       driver.position.set(-0.2, 0.55, 0);
       driver.rotation.y = Math.PI / 2;
