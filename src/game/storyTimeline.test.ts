@@ -176,6 +176,30 @@ describe('story timeline, both brothers', () => {
     expect(new Set(all.map((e) => e.key)).size).toBe(all.length);
   });
 
+  it('never puts a hype ahead of its own level when they share a month, on either path', () => {
+    const month = (at: number) => Math.floor(at / 100);
+    const at = (key: string) => {
+      const i = all.findIndex((e) => e.key === key);
+      expect(i, key).toBeGreaterThanOrEqual(0);
+      return i;
+    };
+    let checked = 0;
+    for (const id of PATH_IDS) {
+      const t = timeline(id);
+      for (const h of flat(t).filter((e) => e.kind === 'hype')) {
+        const level = row(t, h.level!)!;
+        if (month(parseWhen(h.date)!) !== month(level.at)) continue;
+        checked++;
+        expect(at(h.key), `${id} ${h.key} after ${level.key}`).toBeGreaterThan(at(level.key));
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(3);
+    const after = (hype: string, key: string) => at(hype) - at(key);
+    expect(after('hype:qstar', 'storm:boardCrisis')).toBeGreaterThan(0);
+    expect(after('hype:reasoning', 'model:gpt-5-1')).toBeGreaterThan(0);
+    expect(after('hype:agentTeams', 'model:claude-6-2')).toBeGreaterThan(0);
+  });
+
   it('puts same-day releases side by side, GPT first', () => {
     const i = all.findIndex((e) => e.key === 'model:gpt-3-2');
     expect(all[i]).toMatchObject({ name: 'GPT-4', date: 'Mar 14, 2023' });

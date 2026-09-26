@@ -220,7 +220,9 @@ export const HYPES: Record<HypeId, HypeSpec> = {
     grab: 'AI gadget! Hold jump to fly… while the battery lasts.',
     color: 0xff9f43,
     lines: [
-      fact('Spring 2024 brought two hyped AI gadgets, the Humane AI Pin and the Rabbit R1, and harsh reviews for both.', 'aiPinReview', 'rabbitReview'),
+      // Neutral first: the story timeline shows this line while the verdict is still hidden.
+      fact('Spring 2024 brought two hyped AI gadgets, the Humane AI Pin and the Rabbit R1.', 'aiPinReview', 'rabbitReview'),
+      fact('Reviews of both were harsh.', 'aiPinReview', 'rabbitReview'),
       tip('Verdict: passing hype. Like the jetpack, the battery ran out.'),
     ],
   },

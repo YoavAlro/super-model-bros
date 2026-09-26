@@ -299,7 +299,6 @@ export const WORLD_4: LevelSpec[] = [
     power: 'tool',
     boss: 'injectionPiranha',
     hypes: ['mcp'],
-    headline: 'intro',
     intro: {
       title: 'World 4-3 · Universal Pipes Keep',
       date: 'Oct–Nov 2024 · Training toward computer use',
@@ -314,7 +313,11 @@ export const WORLD_4: LevelSpec[] = [
     outro: {
       title: 'You learned computer use and MCP',
       date: 'Oct 22, 2024 · agents and tools',
-      lines: [fact('In November 2024, Anthropic open-sourced MCP, an open standard for connecting AI assistants to tools and data.', 'mcp'), ...INJECTION_FACTS],
+      lines: [
+        fact('On October 22, 2024, Anthropic released the upgraded Claude 3.5 Sonnet, with computer use in public beta.', 'computerUse'),
+        fact('In November 2024, Anthropic open-sourced MCP, an open standard for connecting AI assistants to tools and data.', 'mcp'),
+        ...INJECTION_FACTS,
+      ],
     },
     map: stitch(
       [

@@ -73,9 +73,12 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
     close.addEventListener('click', () => finish());
     head.append(top, tablist, summary, close);
 
-    const list = el('ol', 'tl-list');
+    // The scroller is the tab panel; the list inside it keeps its list semantics.
+    const list = el('div', 'tl-list');
     list.id = 'tl-list';
     list.setAttribute('role', 'tabpanel');
+    const groups = el('ol', 'tl-groups');
+    list.append(groups);
     modal.append(head, list);
     backdrop.append(modal);
     parent.append(backdrop);
@@ -95,7 +98,7 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
       list.setAttribute('aria-labelledby', `tl-tab-${tab}`);
       modal.style.setProperty('--tl-color', tab === 'both' ? 'var(--accent)' : hex(CHARACTERS[PATHS[tab].hero].color));
       rows = [];
-      list.replaceChildren();
+      groups.replaceChildren();
       if (tab === 'both') renderBoth();
       else renderPath(tab);
       const here = rows.findIndex((r) => r.li.classList.contains('here'));
@@ -112,9 +115,9 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
       span.textContent = `${t.from} → ${t.to}`;
       const p = t.progress;
       summary.textContent = `★ ${p.stars} of ${p.maxStars} · ${p.cleared} of ${p.total} cleared`;
-      list.append(item(t.origin, false));
+      groups.append(item(t.origin, false));
       for (const w of t.worlds) {
-        const ol = group(`World ${w.world} · ${w.name} · ${w.years}`);
+        const ol = group(`World ${w.world} · ${w.name}`, w.years);
         for (const e of w.entries) ol.append(item(e, false));
         if (w.kart) ol.append(item(w.kart, false));
       }
@@ -128,19 +131,28 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
       );
       const all = years.flatMap((y) => y.entries);
       span.textContent = `${all[0]?.date ?? ''} → ${all.at(-1)?.date ?? ''}`;
-      summary.textContent = '';
+      // The dots' key: each brother has his own slot, so it never rests on colour alone.
+      summary.replaceChildren(
+        ...PATH_IDS.flatMap((id, i) => [...(i ? [document.createTextNode(' · ')] : []), dots([id], false), document.createTextNode(` ${PATHS[id].name}`)]),
+      );
       for (const y of years) {
         const ol = group(`${y.year}`);
         for (const e of y.entries) ol.append(item(e, true));
       }
     }
 
-    /** A world or year: a sticky header (never focusable) over its own rows, so the next header pushes it away. */
-    function group(text: string): HTMLOListElement {
+    /**
+     * A world or year: a sticky header (never focusable) over its own rows, so the next header pushes it
+     * away. A narrow screen cuts the world's name, never its years.
+     */
+    function group(text: string, years?: string): HTMLOListElement {
       const li = el('li', 'tl-group');
       const ol = el('ol', 'tl-rows');
-      li.append(el('div', 'tl-world', text), ol);
-      list.append(li);
+      const header = el('div', 'tl-world');
+      header.append(el('span', 'tl-world-name', text));
+      if (years) header.append(el('span', 'tl-world-years', `· ${years}`));
+      li.append(header, ol);
+      groups.append(li);
       return ol;
     }
 
@@ -171,7 +183,14 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
       }
 
       const date = el('span', 'tl-date recap-date', e.date);
-      const line = el('span', 'tl-line', e.line?.text ?? '');
+      const line = el('span', 'tl-line');
+      if (e.line) {
+        line.append(el('span', 'tl-line-text', e.line.text));
+        // The row's cite numbers, as a mark that the line is sourced; the links are in the opened row.
+        const marks = el('span', 'tl-cites', (e.line.src ?? []).map((_, i) => `[${i + 1}]`).join(''));
+        marks.setAttribute('aria-hidden', 'true');
+        line.append(marks);
+      }
       grid.append(label, name, date, stat(e, both), line);
       sum.append(grid);
 
@@ -225,13 +244,21 @@ export function showStoryTimeline(parent: HTMLElement, opts: StoryTimelineOption
       return `Hype or shift? Clear ${where} to see history’s verdict.`;
     }
 
-    function dots(paths: PathId[]): HTMLElement {
+    /**
+     * One fixed slot per brother, GPT left and Claude right: a filled dot is his, a hollow ring is not.
+     * `labelled: false` for the key, whose text already names him.
+     */
+    function dots(paths: PathId[], labelled = true): HTMLElement {
       const box = el('span', 'tl-dots');
-      box.setAttribute('role', 'img');
-      box.setAttribute('aria-label', paths.map((id) => PATHS[id].name).join(' and '));
-      for (const id of paths) {
-        const dot = el('span', 'tl-dot');
-        dot.style.background = hex(CHARACTERS[PATHS[id].hero].color);
+      const names = paths.map((id) => PATHS[id].name).join(' and ');
+      if (labelled) {
+        box.setAttribute('role', 'img');
+        box.setAttribute('aria-label', names);
+        box.title = names;
+      } else box.setAttribute('aria-hidden', 'true');
+      for (const id of PATH_IDS) {
+        const dot = el('span', paths.includes(id) ? 'tl-dot' : 'tl-dot off');
+        if (paths.includes(id)) dot.style.background = hex(CHARACTERS[PATHS[id].hero].color);
         box.append(dot);
       }
       return box;

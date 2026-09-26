@@ -23,7 +23,10 @@ export interface TimelineEntry {
   name: string;
   /** Exactly as written in config. */
   date: string;
-  /** Sort key from `parseWhen(date)`, 0 if it does not parse. */
+  /**
+   * Sort key from `parseWhen(date)`, 0 if it does not parse. A hype dated by month only sorts no
+   * earlier than its own level in that month (Q*, Nov 2023, after the Nov 17 board crisis).
+   */
   at: number;
   /** The first sourced fact line (the content tests forbid null). */
   line: FactLine | null;
@@ -153,7 +156,9 @@ export function buildPathTimeline(path: PathSpec, levels: Record<string, LevelSp
       if (seenHypes.has(id)) continue;
       seenHypes.add(id);
       const h = HYPES[id];
-      world.entries.push(entry('hype', `hype:${id}`, h.name, h.when, firstFact(h.lines), path.id, { level: l.id, verdict: verdictFor(id, levels, bestStars) }));
+      const hype = entry('hype', `hype:${id}`, h.name, h.when, firstFact(h.lines), path.id, { level: l.id, verdict: verdictFor(id, levels, bestStars) });
+      if (hype.at % 100 === 0 && Math.floor(hype.at / 100) === Math.floor(row.at / 100)) hype.at = Math.max(hype.at, row.at);
+      world.entries.push(hype);
     }
     last = row;
   }
@@ -194,6 +199,8 @@ export function buildBothTimeline(
       const seen = merged.get(e.key);
       if (seen) {
         if (!seen.entry.paths.includes(path.id)) seen.entry.paths.push(path.id);
+        // A shared hype sorts after its level on both paths.
+        seen.entry.at = Math.max(seen.entry.at, e.at);
         continue;
       }
       const history: TimelineEntry = { ...e, paths: [...e.paths] };
