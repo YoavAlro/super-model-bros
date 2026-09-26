@@ -40,4 +40,19 @@ export const sfx = {
   die: () => tone([494, 440, 392, 330, 262, 196], 0.1, 'square', 0.07),
   flag: () => tone([392, 523, 659, 784, 1047, 784, 1047], 0.09),
   boss: () => tone([98, 92, 87], 0.12, 'sawtooth', 0.1),
+  dash: () => tone([600, 900], 0.03, 'triangle', 0.08),
+  shoot: () => tone([880, 660], 0.03, 'square', 0.05),
+  star: () => tone([523, 784, 1047, 1568], 0.05, 'square', 0.06),
+  trap: () => tone([330, 311, 262], 0.07, 'sawtooth', 0.06),
+  oneup: () => tone([659, 784, 1319, 1047, 1175, 1568], 0.07, 'square', 0.06),
+  heal: () => tone([262, 330, 392], 0.06, 'triangle', 0.1),
+  card: () => tone([784, 988], 0.05, 'triangle', 0.06),
 };
+
+export function audioContext(): AudioContext | null {
+  return ctx;
+}
+
+export function isMuted(): boolean {
+  return muted;
+}

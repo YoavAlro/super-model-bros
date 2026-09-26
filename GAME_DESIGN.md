@@ -49,6 +49,7 @@ with a short, sourced fact card. The funny moments of AI history are power-ups, 
 | Move | A/D or ←/→ | A/D | ←/→ | ◀ ▶ d-pad |
 | Jump (hold for higher) | Space/W/↑/Z | W or Space | ↑ | A |
 | Run | Shift/X | Left Shift | Right Shift, / or Enter | B |
+| Power (tool calls, think, traits) | S/↓/C | S | ↓ | ✦ (shown when you have one) |
 | Pause | Esc/P | Esc/P | Esc/P | II button |
 
 Physics feel: acceleration and friction, a variable jump height (release early for a short hop),
@@ -78,23 +79,31 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 
 | Path | What it is |
 |---|---|
-| `src/config/levels.ts` | Levels: ASCII map, theme, the real recipe, intro/outro fact cards |
+| `src/config/levels/world*.ts` | Levels: ASCII map (stitched from chunks), theme, the recipe, sourced intro/outro cards |
+| `src/config/levelSpec.ts` | The `LevelSpec` type and the map legend |
+| `src/config/paths.ts` | The GPT and Claude paths: which levels, in order (steps can be conditional) |
+| `src/config/sources.ts`, `types.ts` | Every cited source; `fact()` lines need one, `tip()` lines don't |
 | `src/config/characters.ts` | Playable roster: physics tuning, trait, unlock rule |
-| `src/config/themes.ts`, `dataTypes.ts` | Visual themes and token types |
-| `src/game/level.ts`, `physics.ts`, `diet.ts` | Pure logic: grid, collision, history scoring (unit tested) |
-| `src/game/Game.ts` | Loop, camera, collisions between actors, level flow |
-| `src/game/Player.ts`, `Enemies.ts`, `Items.ts` | Actors |
+| `src/config/themes.ts`, `dataTypes.ts` | Visual themes and token types (each token has a glyph as well as a color) |
+| `src/game/level.ts`, `physics.ts`, `movement.ts`, `diet.ts` | Pure logic: grid, collision, player control, history scoring (unit tested) |
+| `src/game/reach.ts` | Reachability checker: flies the real movement code through every level; tests fail on impossible jumps or soft-locks |
+| `src/game/progress.ts` | Pure run rules: next level, world ends, unlocks (unit tested) |
+| `src/game/Campaign.ts` | A run through a path: cards, saves, unlocks, world breaks |
+| `src/game/Stage.ts` | One level: fixed-step loop, camera, collisions, powers, bosses |
+| `src/game/Player.ts`, `Enemies.ts`, `Bosses.ts`, `Items.ts` | Actors |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
-| `src/game/Input.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) and synthesized sound |
+| `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
+| `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape |
 
-`?debug` in the URL exposes `window.__smb` (teleport, state, bossHp) for Playwright smoke tests.
+`?debug` in the URL exposes `window.__smb` (teleport, state, bosses, stomp, give, next) for Playwright smoke tests;
+`?debug&level=claude-2-2` skips the title and starts that level.
 
 ## Milestones
 
 | # | Milestone | Contents |
 |---|---|---|
 | M1 ✅ | World 1 | Engine, co-op, touch, 1-1 BookCorpus Plains, 1-2 WebText Caves, 1-3 Common Crawl Castle + the Garbage In boss |
-| M2 | World 2: Alignment Hills | Codex, InstructGPT; Claude joins; RLHF star; Reward Hacker boss; Claude's own path begins |
+| M2 ✅ | World 2: Alignment Hills | Codex, InstructGPT; Claude joins; RLHF star; Reward Hacker boss; Claude's own path begins |
 | M3 | World 3: Viral Skies | ChatGPT launch; the Timeline (Lakitu-style) cloud; DAN & Sydney twin boss; board-crisis storm level |
 | M4 | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
 | M5 | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |

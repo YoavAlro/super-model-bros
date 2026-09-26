@@ -36,7 +36,7 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | **The Timeline** | Lakitu | X/Twitter hot takes | A cloud that drops spiky takes; ride it once it's beaten |
 | **Rate limit** | Thwomp | Usage limits | Crushes you; the Tibo Reset stops it |
 | **Copyright lawyer** | Hammer Bro | Copyright lawsuits | Throws briefs in arcs |
-| **Reward orb** | Coin trap | Reward hacking | Looks like a token but drains Alignment |
+| **Reward orb** ✅ | Coin trap | Reward hacking | Looks like a token but drains Alignment |
 
 ## Power-ups
 
@@ -51,14 +51,14 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | **Tibo Reset** | 1-Up | An extra life and cleared rate limits; bank up to 3 |
 | **Distill mushroom** | Mini mushroom | Shrink into a mini model (Haiku, 4o-mini): fit through small gaps |
 | **Frontier mushroom** | Mega mushroom | Giant, for the finale |
-| **RLHF star** | Invincibility | Gold Human Feedback: raises Alignment (World 2+) |
+| **RLHF star** ✅ | Invincibility | Gold Human Feedback: raises Alignment (World 2+) |
 
 ## Bosses
 
 | World | Boss | Represents | Fight |
 |---|---|---|---|
 | 1 | **Garbage In** ✅ | Unfiltered web data | Giant Spambot: charges, leaps (screen shake), spawns junk. Three stomps. |
-| 2 | **Reward Hacker** | Reward hacking | Collects fake reward orbs to heal; make it chase the real objective |
+| 2 | **Reward Hacker** ✅ | Reward hacking | Collects fake reward orbs to heal; make it chase the real objective |
 | 3 | **DAN & Sydney** | The DAN jailbreak (2023) and the Bing "Sydney" transcripts | Twin boss. Based on "The Waluigi Effect", a real alignment idea: train for X and anti-X gets easier to elicit. |
 | 4 | **Injection Piranha** | Prompt injection | Spits hidden instructions out of the pipes |
 | 5 | **The Hallucination King** | Confident falsehoods | Only visible in Think mode |

@@ -4,8 +4,9 @@ A fan-made, educational platformer about how AI evolved. GPT and Claude run and 
 AI history: the tokens you collect are the real training data, each flag shows a real release date,
 and the bosses are the real dangers AI labs faced.
 
-**World 1 is playable:** BookCorpus Plains → WebText Caves → Common Crawl Castle, where you evolve
-from an untrained Transformer to GPT-3 and beat the Garbage In boss. Solo, or co-op on one keyboard.
+**Two paths.** The GPT path starts as an untrained Transformer in 2017; the Claude path starts when
+Anthropic is founded in 2021. Worlds 1–2 are playable: pre-training, then alignment (Codex, InstructGPT,
+Constitutional AI, Claude 1) with the RLHF star and the Reward Hacker boss. Solo, or co-op on one keyboard.
 
 - Design: [GAME_DESIGN.md](GAME_DESIGN.md)
 - Goal and done-conditions: [GOAL.md](GOAL.md)
@@ -23,6 +24,7 @@ npm run dev
 | Move | A/D or ←/→ | A/D | ←/→ | ◀ ▶ |
 | Jump | Space / W / ↑ | W / Space | ↑ | A |
 | Run | Shift | Left Shift | Right Shift | B |
+| Power | S / ↓ | S | ↓ | ✦ |
 
 ## Deploy
 

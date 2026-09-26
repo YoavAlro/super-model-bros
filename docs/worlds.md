@@ -6,7 +6,7 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 | World | Theme | Era | Boss | Status |
 |---|---|---|---|---|
 | 1 Pre-training Plains | plains · caves · castle | 2017–2020 | Garbage In | **built** |
-| 2 Alignment Hills | | 2021–2022 | Reward Hacker | planned |
+| 2 Alignment Hills | hills · castle | 2021–2022 | Reward Hacker | **built** |
 | 3 Viral Skies | | Nov 2022–2023 | DAN & Sydney | planned |
 | 4 Tool Pipes | | 2023–2024 | Injection Piranha | planned |
 | 5 Reasoning Ghost House | | Sep 2024–2025 | The Hallucination King | planned |
@@ -20,8 +20,8 @@ Each world is an era; each level evolves you into a real model. Legend: ✅ well
 | 1-1 BookCorpus Plains **built** | GPT-1 · 117M | Jun 2018 | Books 100% | ✅ |
 | 1-2 WebText Caves **built** | GPT-2 · 1.5B | Feb 2019 | Web 100% (WebText) | ✅ |
 | 1-3 Common Crawl Castle **built** | GPT-3 · 175B | May 2020 | Web 81% · Books 16% · Wiki 3%; boss | ✅ |
-| 2-1 | Codex | Aug 2021 | Code (GitHub) | ✅ |
-| 2-2 | InstructGPT | Jan 2022 | Human Feedback → RLHF star | ✅ |
+| 2-1 GitHub Hills **built** | Codex | Aug 2021 | Code (GitHub) | ✅ |
+| 2-2 RLHF Keep **built** | InstructGPT | Jan 2022 | Human Feedback → RLHF star; boss | ✅ |
 | 3-1 | ChatGPT | Nov 30, 2022 | Viral star; the Timeline appears | ✅ |
 | 3-2 | GPT-4 | Mar 14, 2023 | Vision (see hidden blocks) | ✅ |
 | 4-1 | Plugins & browsing · function calling | Mar–Jun 2023 | Tool flower | ✅ |
@@ -42,8 +42,8 @@ Claude's solo path starts in World 2. In World 1 co-op, Claude "arrives early", 
 
 | Level | You become | Date | Tokens / new power | |
 |---|---|---|---|---|
-| 2-1 | Research model → Constitutional AI | 2021 → Dec 2022 | Constitution principles (a new token) | ✅ |
-| 2-2 | Claude 1 | Mar 2023 | | ✅ |
+| 2-1 Constitution Hills **built** | Research model → Constitutional AI | 2021 → Dec 2022 | Constitution principles (a new token) | ✅ |
+| 2-2 Helpful, Honest, Harmless Keep **built** | Claude 1 | Mar 2023 | boss | ✅ |
 | 3-1 | Claude 2 | Jul 2023 | 100K context (longer float) | ✅ |
 | 3-2 | Claude 2.1 | Nov 2023 | 200K context | ✅ |
 | 4-1 | Claude 3 (Haiku / Sonnet / Opus) | Mar 2024 | Switch between three sizes | ✅ |

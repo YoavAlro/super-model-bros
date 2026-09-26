@@ -1,9 +1,6 @@
-export interface Pad {
-  left: boolean;
-  right: boolean;
-  jump: boolean;
-  run: boolean;
-}
+import { emptyPad, type Pad } from './pad';
+
+export type { Pad } from './pad';
 
 type KeyMap = Record<keyof Pad, string[]>;
 
@@ -12,22 +9,32 @@ const SOLO: KeyMap = {
   right: ['KeyD', 'ArrowRight'],
   jump: ['Space', 'KeyW', 'ArrowUp', 'KeyZ', 'KeyK'],
   run: ['ShiftLeft', 'ShiftRight', 'KeyX', 'KeyJ'],
+  action: ['KeyS', 'ArrowDown', 'KeyC', 'KeyL'],
 };
-/** One keyboard, two players: GPT on the left hand, Claude on the arrows. */
-const P1: KeyMap = { left: ['KeyA'], right: ['KeyD'], jump: ['KeyW', 'Space'], run: ['ShiftLeft'] };
-const P2: KeyMap = { left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['ArrowUp'], run: ['ShiftRight', 'Slash', 'Enter'] };
+/** One keyboard, two players: player 1 on the left hand, player 2 on the arrows. */
+const P1: KeyMap = { left: ['KeyA'], right: ['KeyD'], jump: ['KeyW', 'Space'], run: ['ShiftLeft'], action: ['KeyS'] };
+const P2: KeyMap = {
+  left: ['ArrowLeft'],
+  right: ['ArrowRight'],
+  jump: ['ArrowUp'],
+  run: ['ShiftRight', 'Slash', 'Enter'],
+  action: ['ArrowDown'],
+};
 
 const BLOCKED_DEFAULTS = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
-const emptyPad = (): Pad => ({ left: false, right: false, jump: false, run: false });
-
-/** Keyboard pads for 1–2 players, plus on-screen touch controls feeding player 1. */
+/**
+ * Keyboard pads for 1–2 players, plus on-screen touch controls feeding player 1. The game reads
+ * only `pads`, sampled once per frame, so a network or replay source could stand in for this class.
+ */
 export class Input {
   readonly pads: Pad[];
   private readonly maps: KeyMap[];
   private readonly keys = new Set<string>();
   private readonly touch = emptyPad();
   private pauseQueued = false;
+  private touchWrap: HTMLDivElement | null = null;
+  private powerBtn: HTMLButtonElement | null = null;
 
   constructor(players: 1 | 2, overlay: HTMLElement, isTouch: boolean) {
     this.maps = players === 2 ? [P1, P2] : [SOLO];
@@ -44,9 +51,12 @@ export class Input {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
+    this.touchWrap?.remove();
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // Let menus and cards use the keyboard normally.
+    if ((e.target as HTMLElement | null)?.closest?.('.modal-backdrop')) return;
     if (BLOCKED_DEFAULTS.has(e.code)) e.preventDefault();
     if (e.code === 'Escape' || e.code === 'KeyP') this.pauseQueued = true;
     this.keys.add(e.code);
@@ -59,6 +69,13 @@ export class Input {
   private readonly onBlur = (): void => {
     this.keys.clear();
   };
+
+  /** Drops held keys (after a modal card, so a held key doesn't keep running). */
+  clear(): void {
+    this.keys.clear();
+    for (const k of Object.keys(this.touch) as (keyof Pad)[]) this.touch[k] = false;
+    for (const pad of this.pads) for (const k of Object.keys(pad) as (keyof Pad)[]) pad[k] = false;
+  }
 
   static isTouchDevice(): boolean {
     return window.matchMedia('(pointer: coarse)').matches;
@@ -81,6 +98,13 @@ export class Input {
 
   requestPause(): void {
     this.pauseQueued = true;
+  }
+
+  /** Labels the touch power button with what it does right now (or hides it). */
+  setPowerLabel(label: string | null): void {
+    if (!this.powerBtn) return;
+    this.powerBtn.style.visibility = label ? 'visible' : 'hidden';
+    if (label && this.powerBtn.textContent !== label) this.powerBtn.textContent = label;
   }
 
   private buildTouchControls(overlay: HTMLElement): void {
@@ -113,16 +137,20 @@ export class Input {
 
     const buttons = document.createElement('div');
     buttons.className = 'action-buttons';
-    buttons.append(this.holdButton('B', 'run'), this.holdButton('A', 'jump'));
+    this.powerBtn = this.holdButton('✦', 'action');
+    this.powerBtn.style.visibility = 'hidden';
+    buttons.append(this.powerBtn, this.holdButton('B', 'run'), this.holdButton('A', 'jump'));
 
     wrap.append(dpad, buttons);
     overlay.append(wrap);
+    this.touchWrap = wrap;
   }
 
   private holdButton(label: string, key: keyof Pad): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = `touch-btn touch-${key}`;
     btn.textContent = label;
+    btn.setAttribute('aria-label', key);
     btn.addEventListener('pointerdown', (e) => {
       btn.setPointerCapture(e.pointerId);
       this.touch[key] = true;

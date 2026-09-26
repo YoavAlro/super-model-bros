@@ -11,6 +11,10 @@ export interface Body {
 
 export interface Grid {
   isSolid(tx: number, ty: number): boolean;
+  /** One-way platforms block only a body that lands on them from above. */
+  isOneWay?(tx: number, ty: number): boolean;
+  /** Conveyor push under a tile: -1, 0 or 1. */
+  conveyor?(tx: number, ty: number): number;
 }
 
 export interface TileHit {
@@ -53,8 +57,11 @@ export function moveBody(b: Body, dt: number, grid: Grid): TileHit[] {
     const row = b.vy > 0 ? Math.floor(ny + b.h - EPS) : Math.floor(ny);
     let blocked = false;
     for (let tx = x0; tx <= x1; tx++) {
-      if (grid.isSolid(tx, row)) {
-        hits.push({ tx, ty: row, side: b.vy > 0 ? 'head' : 'feet' });
+      const solid = grid.isSolid(tx, row);
+      // A one-way platform catches a falling body whose feet started at or above its top.
+      const ledge = !solid && b.vy < 0 && b.y >= row + 1 - EPS && !!grid.isOneWay?.(tx, row);
+      if (solid || ledge) {
+        if (solid) hits.push({ tx, ty: row, side: b.vy > 0 ? 'head' : 'feet' });
         blocked = true;
       }
     }
@@ -86,4 +93,13 @@ export function bumpedTile(b: Body, hits: TileHit[]): TileHit | undefined {
     if (!best || Math.abs(h.tx + 0.5 - cx) < Math.abs(best.tx + 0.5 - cx)) best = h;
   }
   return best;
+}
+
+/** Calls `fn` for every tile the body overlaps (optionally grown by `pad` on every side). */
+export function forTilesUnder(b: Body, pad: number, fn: (tx: number, ty: number) => void): void {
+  const x0 = Math.floor(b.x - pad + EPS);
+  const x1 = Math.floor(b.x + b.w + pad - EPS);
+  const y0 = Math.floor(b.y - pad + EPS);
+  const y1 = Math.floor(b.y + b.h + pad - EPS);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) fn(tx, ty);
 }

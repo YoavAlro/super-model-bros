@@ -1,48 +1,85 @@
 import * as THREE from 'three';
 import type { CharacterSpec } from '../config/characters';
-import type { Pad } from './Input';
-import { labelSprite, makeCharacter } from './meshes';
-import { moveBody, type Body, type Grid, type TileHit } from './physics';
+import type { FormAbility } from '../config/levelSpec';
+import { labelSprite, makeCape, makeCharacter } from './meshes';
+import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
+import type { Pad } from './pad';
+import type { Grid } from './physics';
 import { sfx } from './sfx';
 
 const SMALL_H = 0.95;
 const BIG_H = 1.75;
-const COYOTE = 0.09;
-const JUMP_BUFFER = 0.12;
-const MAX_FALL = 28;
+
+/** A power you keep until you get hit. */
+export type HeldPower = 'tool' | 'cape' | null;
+export type StarKind = 'rlhf' | 'viral';
 
 export class PlayerActor {
-  readonly body: Body;
+  readonly mover: Mover;
   readonly mesh: THREE.Group;
   big = false;
+  power: HeldPower = null;
+  /** Seconds of star invincibility left. */
+  star = 0;
+  starKind: StarKind | null = null;
   dead = false;
   finished = false;
+  /** Blinking grace period after a hit. */
   invulnerable = 0;
   /** Feet height before this step, for stomp detection. */
   prevBottom = 0;
+  /** Holding the power button with the reasoning cape. */
+  thinking = false;
+  /** The power button went down this step. */
+  actionPressed = false;
+  /** Seconds until the power button works again. */
+  cooldown = 0;
+  /** Scales horizontal speed (hangovers, fog, winter laziness). Set by the stage each step. */
+  speedScale = 1;
+  ability: FormAbility | undefined;
+  readonly perks = new Set<string>();
   private tag: THREE.Sprite;
-  private facing = 1;
-  private coyote = 0;
-  private jumpBuffer = 0;
-  private jumpHeldPrev = false;
-  private cutJump = false;
+  private readonly cape: THREE.Object3D;
+  private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
+  private actionHeldPrev = false;
   private squash = 0;
 
   constructor(
     readonly spec: CharacterSpec,
-    formName: string,
+    public form: string,
     x: number,
     y: number,
     private readonly scene: THREE.Scene,
+    /** Which controller drives this actor. */
+    readonly padIndex: number,
+    /** Fork clones copy their owner's moves and never cost a life. */
+    readonly clone = false,
   ) {
-    this.body = { x, y, w: 0.8, h: SMALL_H, vx: 0, vy: 0, onGround: false };
+    this.mover = newMover(x, y, 0.8, SMALL_H);
     this.mesh = makeCharacter(spec.color, spec.accent);
-    this.tag = this.makeTag(formName);
+    this.bodyMat = (this.mesh.getObjectByName('body') as THREE.Mesh | undefined)?.material as THREE.MeshLambertMaterial;
+    this.cape = makeCape(spec.accent);
+    this.cape.visible = false;
+    this.mesh.add(this.cape);
+    if (clone) this.mesh.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.setValues?.({ transparent: true, opacity: 0.55 }));
+    this.tag = this.makeTag(clone ? 'fork' : form);
     scene.add(this.mesh, this.tag);
   }
 
+  get body() {
+    return this.mover.body;
+  }
+
+  get invincible(): boolean {
+    return this.star > 0;
+  }
+
   setForm(formName: string): void {
+    this.form = formName;
+    if (this.clone) return;
     this.scene.remove(this.tag);
+    this.tag.material.map?.dispose();
+    this.tag.material.dispose();
     this.tag = this.makeTag(formName);
     this.scene.add(this.tag);
   }
@@ -51,15 +88,30 @@ export class PlayerActor {
     if (this.big) return;
     this.big = true;
     this.body.h = BIG_H;
-    sfx.powerup();
   }
 
-  /** Returns true if the hit was absorbed (shrank); false means the player dies. */
+  givePower(power: HeldPower): void {
+    this.grow();
+    this.power = power;
+  }
+
+  giveStar(kind: StarKind, seconds: number): void {
+    this.star = seconds;
+    this.starKind = kind;
+  }
+
+  /** Returns true if the hit was absorbed; false means the player dies. */
   hurt(): boolean {
-    if (this.invulnerable > 0 || this.dead || this.finished) return true;
-    if (!this.big) return false;
-    this.big = false;
-    this.body.h = SMALL_H;
+    if (this.invulnerable > 0 || this.star > 0 || this.dead || this.finished) return true;
+    if (this.clone) return false;
+    if (this.power) {
+      this.power = null;
+    } else if (this.big) {
+      this.big = false;
+      this.body.h = SMALL_H;
+    } else {
+      return false;
+    }
     this.invulnerable = 2;
     sfx.hurt();
     return true;
@@ -68,65 +120,78 @@ export class PlayerActor {
   kill(): void {
     if (this.dead) return;
     this.dead = true;
+    this.power = null;
+    this.star = 0;
     this.body.vx = 0;
     this.body.vy = 16;
-    sfx.die();
+    if (!this.clone) sfx.die();
+  }
+
+  /** Back on its feet after a respawn. */
+  revive(x: number, y: number): void {
+    this.dead = false;
+    this.big = false;
+    this.body.h = SMALL_H;
+    this.body.x = x;
+    this.body.y = y;
+    this.body.vx = 0;
+    this.body.vy = 0;
+    this.invulnerable = 2;
   }
 
   bounce(jumpHeld: boolean): void {
     this.body.vy = jumpHeld ? 18 : 12;
-    this.cutJump = !jumpHeld;
+    this.mover.cutJump = !jumpHeld;
   }
 
-  step(dt: number, pad: Pad, grid: Grid): TileHit[] {
+  stats(): MoveStats {
+    const s = this.spec;
+    const a = this.ability ?? {};
+    return {
+      walkSpeed: s.walkSpeed,
+      runSpeed: s.runSpeed,
+      jumpVelocity: s.jumpVelocity * (a.jump ?? 1),
+      gravity: s.gravity,
+      fallGravity: s.fallGravity * (a.float ?? 1),
+      glide: this.power === 'cape' ? 0.28 : this.perks.has('glide') ? 0.6 : undefined,
+      airDash: s.traitKind === 'airDash',
+      airJumps: this.perks.has('doubleJump') ? 1 : 0,
+      accel: s.accel,
+    };
+  }
+
+  step(dt: number, pad: Pad, grid: Grid): MoveEvents | null {
     const b = this.body;
     this.prevBottom = b.y;
     this.invulnerable = Math.max(0, this.invulnerable - dt);
+    this.cooldown = Math.max(0, this.cooldown - dt);
+    if (this.star > 0) {
+      this.star = Math.max(0, this.star - dt);
+      if (this.star === 0) this.starKind = null;
+    }
+    this.actionPressed = pad.action && !this.actionHeldPrev;
+    this.actionHeldPrev = pad.action;
+    this.thinking = this.power === 'cape' && pad.action && !this.dead && !this.finished;
 
     if (this.dead) {
       b.vy -= 50 * dt;
       b.y += b.vy * dt;
-      return [];
+      return null;
     }
     if (this.finished) {
       b.vx = 0;
       b.vy = Math.max(b.vy - 40 * dt, -6);
-      return moveBody(b, dt, grid);
+      const none: Pad = { left: false, right: false, jump: false, run: false, action: false };
+      return stepMover(this.mover, none, this.stats(), grid, dt);
     }
-
-    const s = this.spec;
-    const dir = (pad.right ? 1 : 0) - (pad.left ? 1 : 0);
-    if (dir !== 0) this.facing = dir;
-    const target = dir * (pad.run ? s.runSpeed : s.walkSpeed);
-    const turning = dir !== 0 && Math.sign(b.vx) === -dir;
-    const accel = (b.onGround ? 42 : 26) * (turning ? 1.8 : 1);
-    const friction = b.onGround ? 34 : 6;
-    b.vx = approach(b.vx, target, (dir !== 0 ? accel : friction) * dt);
-
-    const jumpPressed = pad.jump && !this.jumpHeldPrev;
-    this.jumpHeldPrev = pad.jump;
-    this.coyote = b.onGround ? COYOTE : this.coyote - dt;
-    this.jumpBuffer = jumpPressed ? JUMP_BUFFER : this.jumpBuffer - dt;
-    if (this.jumpBuffer > 0 && this.coyote > 0) {
-      // A running start jumps higher, like the classics.
-      b.vy = s.jumpVelocity + Math.abs(b.vx) * 0.12;
-      this.jumpBuffer = 0;
-      this.coyote = 0;
-      this.cutJump = false;
+    const ev = stepMover(this.mover, pad, this.stats(), grid, dt, this.speedScale * (this.thinking ? 0.55 : 1));
+    if (ev.jumped || ev.airJumped) {
       this.squash = -0.2;
-      sfx.jump();
+      if (!this.clone) sfx.jump();
     }
-    if (!pad.jump && b.vy > 0 && !this.cutJump) {
-      b.vy *= 0.5;
-      this.cutJump = true;
-    }
-
-    b.vy -= (b.vy > 0 ? s.gravity : s.fallGravity) * dt;
-    b.vy = Math.max(b.vy, -MAX_FALL);
-    const wasAirborne = !b.onGround;
-    const hits = moveBody(b, dt, grid);
-    if (wasAirborne && b.onGround) this.squash = 0.25;
-    return hits;
+    if (ev.dashed) sfx.dash();
+    if (ev.landed) this.squash = 0.25;
+    return ev;
   }
 
   updateMesh(t: number, dt: number): void {
@@ -136,11 +201,26 @@ export class PlayerActor {
     const sy = (this.big ? 1.8 : 1) * (1 - this.squash);
     this.mesh.scale.set(sx, sy, sx);
     this.mesh.position.set(b.x + b.w / 2, b.y, 0);
-    this.mesh.rotation.y = this.facing * 0.55;
+    this.mesh.rotation.y = this.mover.facing * 0.55;
     this.mesh.rotation.z = this.dead ? t * 8 : 0;
     // Waddle while running on the ground.
     this.mesh.rotation.x = b.onGround && Math.abs(b.vx) > 1 ? Math.sin(t * 22) * 0.06 : 0;
     this.mesh.visible = this.invulnerable <= 0 || Math.floor(t * 20) % 2 === 0;
+    this.cape.visible = this.power === 'cape';
+    (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
+    if (this.bodyMat) {
+      if (this.star > 0) {
+        const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : 0.13;
+        const pulse = 0.4 + 0.4 * Math.abs(Math.sin(t * 12));
+        this.bodyMat.emissive.setHSL(hue, 1, 0.5 * pulse);
+      } else if (this.power === 'tool') {
+        this.bodyMat.emissive.setHex(0x0d5c50);
+      } else if (this.thinking) {
+        this.bodyMat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
+      } else {
+        this.bodyMat.emissive.setHex(0x000000);
+      }
+    }
     this.tag.position.set(b.x + b.w / 2, b.y + b.h + 0.55, 0);
     this.tag.visible = !this.dead;
   }
@@ -154,8 +234,4 @@ export class PlayerActor {
     tag.scale.multiplyScalar(0.42);
     return tag;
   }
-}
-
-export function approach(value: number, target: number, delta: number): number {
-  return value < target ? Math.min(value + delta, target) : Math.max(value - delta, target);
 }

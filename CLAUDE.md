@@ -7,7 +7,7 @@ done-conditions, then `GAME_DESIGN.md` and `docs/` for the specs.
 ```bash
 npm install
 npm run dev        # local dev server
-npm test           # vitest: level parsing, physics, diet scoring
+npm test           # vitest: level parsing, physics, reachability, scoring, progression, sources
 npm run typecheck  # tsc
 npm run build      # typecheck + production build
 ```
@@ -15,14 +15,17 @@ Before every commit, run `npm test && npm run build`.
 
 ## Rules
 - Content (levels, characters, themes, events, facts) lives in `src/config/`. Engine code never hardcodes history.
-- Levels are ASCII maps; the legend is on `LevelSpec.map` in `src/config/levels.ts`. Check jumps against
-  the physics: a standing jump clears ~4 tiles, and a 4-tall pipe needs a running jump.
+- Levels are ASCII maps; the legend is on `LevelSpec.map` in `src/config/levelSpec.ts`. Check jumps against
+  the physics: a standing jump clears ~4 tiles, and a 4-tall pipe needs a running jump. `src/game/levels.test.ts`
+  runs the reachability checker on every level; it fails on impossible jumps and soft-locks.
+- Fact lines use `fact(text, ...sourceIds)`; gameplay advice uses `tip(text)`. Sources live in `src/config/sources.ts`.
 - Pure logic (`level.ts`, `physics.ts`, `diet.ts`, and any new rules) gets unit tests. Rendering doesn't.
 - Mario-inspired, not Mario: no Nintendo names, sprites, music, or layouts in the game.
 - Every fact card line needs a source. Verify 🔎 facts before shipping. Never invent quotes attributed to real people.
 - Rival labs are playable friends, never villains. Villains are abstract failure modes.
 - Every feature works on keyboard (solo and co-op) and touch (landscape).
-- Smoke test: `npm run build && npx vite preview`, then drive it with Playwright at desktop size and in an
-  iPhone landscape viewport. `?debug` exposes `window.__smb` (teleport, state, bossHp). Headless
-  software rendering runs at ~12fps, so give timed inputs generous waits. Look at the screenshots.
+- Smoke test: `npm run build && npx vite preview --port 4173`, then `npm run smoke -- all` (or level ids). It drives
+  Playwright at desktop size and in an iPhone landscape viewport and completes each level via `?debug`, which exposes
+  `window.__smb` (teleport, state, bosses, stomp, give, next); `?debug&level=<id>` skips the title. Headless
+  software rendering runs at ~12fps, so give timed inputs generous waits. Look at the screenshots in `smoke-shots/`.
 - When a milestone lands, tick it in `GAME_DESIGN.md` → Milestones.
