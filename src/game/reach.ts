@@ -94,6 +94,24 @@ function checkerGrid(grid: LevelGrid, gatesOpen: boolean, openGate?: (tx: number
   };
 }
 
+/**
+ * Where a 0.8-wide body of height `h` starts on spot (sx, sy). A spot is keyed by the column under
+ * the body's center, so a landing right at a ledge can key the empty column next to it. Such a body
+ * really stands hanging over the edge, feet still on the ledge (started in mid-air it would look like
+ * a soft-lock). A "ledge" whose column is solid at body height is a wall's side, not a floor.
+ */
+export function standingX(view: Grid, sx: number, sy: number, h: number): number {
+  const floorAt = (tx: number) => view.isSolid(tx, sy - 1) || !!view.isOneWay?.(tx, sy - 1);
+  const fits = (tx: number) => {
+    for (let ty = sy; ty < sy + h; ty++) if (view.isSolid(tx, ty)) return false;
+    return true;
+  };
+  if (floorAt(sx)) return sx + 0.1;
+  if (floorAt(sx - 1) && fits(sx - 1)) return sx - 0.35;
+  if (floorAt(sx + 1) && fits(sx + 1)) return sx + 0.55;
+  return sx + 0.1;
+}
+
 export function analyzeReach(grid: LevelGrid, start: { x: number; y: number }, goalX: number, opts: ReachOptions): ReachReport {
   const view = checkerGrid(grid, !!opts.gatesOpen, opts.openGate);
   const W = grid.width;
@@ -115,22 +133,11 @@ export function analyzeReach(grid: LevelGrid, start: { x: number; y: number }, g
     return hit;
   };
 
-  // A spot is keyed by the column under the body's center, so a landing right at a ledge can key
-  // the empty column next to it. Start such a body where it really stands: hanging over the edge,
-  // feet still on the ledge (otherwise it would start in mid-air and look like a soft-lock).
-  const floorAt = (tx: number, ty: number) => view.isSolid(tx, ty) || !!view.isOneWay?.(tx, ty);
-  const startX = (sx: number, sy: number) => {
-    if (floorAt(sx, sy - 1)) return sx + 0.1;
-    if (floorAt(sx - 1, sy - 1)) return sx - 0.35;
-    if (floorAt(sx + 1, sy - 1)) return sx + 0.55;
-    return sx + 0.1;
-  };
-
   /** Flies a family of policies from a spot: where each lands, and whether any reaches the goal. */
   const simulate = (sx: number, sy: number, fam: Family): { lands: number[]; goal: boolean } => {
     const lands: number[] = [];
     let goal = false;
-    const m = newMover(startX(sx, sy), sy, 0.8, opts.h);
+    const m = newMover(standingX(view, sx, sy, opts.h), sy, 0.8, opts.h);
     m.body.onGround = true;
     let flights: Flight[] = [{ m, airborne: false, apex: false, edgeAt: -1, members: fam.members }];
     let next: Flight[] = [];

@@ -19,7 +19,9 @@ Before every commit, run `npm test && npm run build`.
   the physics: for the weakest character a standing jump clears 3 tiles and a running jump 4, so a 4-tall pipe
   needs a run-up and nothing may need 5. `src/game/levels.test.ts` runs the reachability checker on every level;
   it fails on impossible jumps and soft-locks, and on jumps with no human margin: every level must still be
-  finishable at `HUMAN_MARGIN` (95%) of the weakest jump, so no jump needs a pixel-perfect take-off.
+  finishable at `HUMAN_MARGIN` (90%) of the weakest jump, or 95% for a deliberate 4-tall climb named in
+  `DELIBERATE_CLIMBS`. That checks height and distance to spare, not that the obvious route is safe: a block over
+  a pit can still knock a runner in, so play those spots.
 - Fact lines use `fact(text, ...sourceIds)`; gameplay advice uses `tip(text)`. Sources live in `src/config/sources.ts`.
 - Pure logic (`level.ts`, `physics.ts`, `diet.ts`, and any new rules) gets unit tests. Rendering doesn't.
 - Mario-inspired, not Mario: no Nintendo names, sprites, music, or layouts in the game.
