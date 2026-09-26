@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { ROSTER } from '../config/characters';
-import { characterGallery } from './characterMeshes';
+import { IDLE, animateCharacter, characterGallery, makeCape } from './characterMeshes';
 import { enemyGallery } from './enemyMeshes';
 import { canvasTexture, labelSprite } from './meshes';
+import { basic } from './toonKit';
 
 /**
  * Debug-only mesh gallery (`?debug&gallery=characters` or `=enemies`): every mesh in a lit lineup
@@ -27,6 +28,19 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
   scene.add(sun);
 
   const items = which === 'characters' ? characterGallery(ROSTER) : enemyGallery();
+  // Review flags: &silhouette draws everything black (every hero must read by shape alone), and
+  // &cape hangs the reasoning cape on every hero and swings it through its whole range.
+  const flags = new URLSearchParams(location.search);
+  if (flags.has('silhouette')) scene.overrideMaterial = basic(0x000000);
+  // &yaw=3.14 holds every mesh at one turn (3.14 shows their backs, as in the kart chase view).
+  const yaw = flags.has('yaw') ? Number(flags.get('yaw')) : null;
+  const capes: THREE.Object3D[] = [];
+  const wearCape = (m: THREE.Object3D) => {
+    if (!flags.has('cape') || !m.userData.plan || m.userData.plan === 'helper' || m.userData.plan === 'ghost') return;
+    const cape = makeCape(0xffffff);
+    m.add(cape);
+    capes.push(cape.userData.pivot as THREE.Object3D);
+  };
   const perRow = which === 'characters' ? items.length : 7;
   const close = which === 'characters' ? 2 : 1;
   const cell = which === 'characters' ? 2.6 : 4.2;
@@ -40,6 +54,7 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
     item.mesh.position.set(x, y, 0);
     scene.add(item.mesh);
     spinners.push(item.mesh);
+    wearCape(item.mesh);
     const tag = labelSprite(item.name);
     tag.scale.multiplyScalar(0.45);
     tag.position.set(x, y - 0.6, 0.5);
@@ -51,6 +66,8 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
       const small = characterGallery([c])[0].mesh;
       small.position.set((i - (ROSTER.length - 1) / 2) * 1.2, -4.2, 0);
       scene.add(small);
+      spinners.push(small);
+      wearCape(small);
     });
     const ground = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 1.2), new THREE.MeshLambertMaterial({ color: 0x46c04a }));
     ground.position.set(0, -4.4, 0);
@@ -66,7 +83,12 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
   const t0 = performance.now();
   renderer.setAnimationLoop((now) => {
     const t = (now - t0) / 1000;
-    for (const m of spinners) m.rotation.y = Math.sin(t * 0.8) * 0.5;
+    for (const m of spinners) {
+      if (yaw !== null) m.rotation.y = yaw;
+      else if (m.position.y > -4) m.rotation.y = Math.sin(t * 0.8) * 0.5;
+      animateCharacter(m, t, IDLE);
+    }
+    for (const p of capes) p.rotation.x = 0.6 + 0.45 * Math.sin(t * 1.5);
     renderer.render(scene, camera);
   });
   (window as unknown as { __smbGallery: () => number }).__smbGallery = () => items.length;

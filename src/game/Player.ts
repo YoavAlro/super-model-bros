@@ -3,7 +3,7 @@ import type { CharacterSpec } from '../config/characters';
 import type { FormAbility } from '../config/levelSpec';
 import { disposeObject } from './dispose';
 import { blinkVisible, prefs } from './prefs';
-import { makeCape, makeCharacter } from './characterMeshes';
+import { animateCharacter, makeCape, makeCharacter, type CharacterMotion } from './characterMeshes';
 import { labelSprite } from './meshes';
 import { approach, newMover, stepMover, type MoveEvents, type MoveStats, type Mover } from './movement';
 import type { Pad } from './pad';
@@ -59,7 +59,12 @@ export class PlayerActor {
   mega = 0;
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
-  private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
+  /** The body's material plus any big second-colour mass (`userData.glow`): the star, tool and think glows. */
+  private readonly glowMats: (THREE.Material & { emissive: THREE.Color })[];
+  /** Seconds left of an air-dash's streaming look. */
+  private dashTime = 0;
+  /** Reused every frame for the mascot's idle life. */
+  private readonly motion: CharacterMotion = { speed: 0, airborne: false, vy: 0 };
   private actionHeldPrev = false;
   private ghosted = false;
   private squash = 0;
@@ -78,11 +83,18 @@ export class PlayerActor {
   ) {
     this.mover = newMover(x, y, 0.8, SMALL_H);
     this.mesh = makeCharacter(spec);
-    this.bodyMat = (this.mesh.getObjectByName('body') as THREE.Mesh | undefined)?.material as THREE.MeshLambertMaterial;
+    const glow = new Set<THREE.Material & { emissive: THREE.Color }>();
+    this.mesh.traverse((o) => {
+      const m = (o as THREE.Mesh).material as (THREE.Material & { emissive?: THREE.Color }) | undefined;
+      if (m?.emissive && (o.name === 'body' || m.userData.glow)) glow.add(m as THREE.Material & { emissive: THREE.Color });
+    });
+    this.glowMats = [...glow];
     this.cape = makeCape(spec.accent);
     this.cape.visible = false;
     this.mesh.add(this.cape);
     if (clone) this.mesh.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.setValues?.({ transparent: true, opacity: 0.55 }));
+    // Ink outlines are back-face hulls: on a see-through clone they read as a muddy shell.
+    if (clone) showOutlines(this.mesh, false);
     this.tag = this.makeTag(clone ? cloneTag : form);
     scene.add(this.mesh, this.tag);
   }
@@ -271,7 +283,10 @@ export class PlayerActor {
       this.squash = -0.2;
       if (!this.clone) sfx.jump();
     }
-    if (ev.dashed) sfx.dash();
+    if (ev.dashed) {
+      sfx.dash();
+      this.dashTime = 0.3;
+    }
     if (ev.landed) this.squash = 0.25;
     return ev;
   }
@@ -296,24 +311,37 @@ export class PlayerActor {
         const m = (o as THREE.Mesh).material as THREE.Material | undefined;
         if (m) m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
       });
+      showOutlines(this.mesh, !ghosted);
     }
     this.cape.visible = this.power === 'cape';
     (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
-    if (this.bodyMat) {
+    for (const mat of this.glowMats) {
       if (this.star > 0) {
         const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : this.starKind === 'mega' ? 0.12 + Math.sin(t * 3) * 0.04 : 0.13;
         const pulse = 0.4 + 0.4 * Math.abs(Math.sin(t * 12));
-        this.bodyMat.emissive.setHSL(hue, 1, 0.5 * pulse);
+        mat.emissive.setHSL(hue, 1, 0.5 * pulse);
       } else if (this.power === 'tool') {
-        this.bodyMat.emissive.setHex(0x0d5c50);
+        mat.emissive.setHex(0x0d5c50);
       } else if (this.thinking) {
-        this.bodyMat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
+        mat.emissive.setHSL(0.75, 0.8, 0.25 + 0.1 * Math.sin(t * 6));
       } else {
-        this.bodyMat.emissive.setHex(0x000000);
+        mat.emissive.setHex(0x000000);
       }
     }
     this.tag.position.set(b.x + b.w / 2, b.y + b.h + 0.55, 0);
     this.tag.visible = !this.dead;
+    // Tall parts (ears, antennae, spouts) push the tag up when stretched big or giant.
+    this.tag.position.y = Math.max(this.tag.position.y, b.y + ((this.mesh.userData.top as number | undefined) ?? 1) * sy + 0.32);
+    // The mascot's idle life: blinks, swinging limbs, and its own signature motion.
+    this.dashTime = Math.max(0, this.dashTime - dt);
+    const m = this.motion;
+    m.speed = Math.abs(b.vx);
+    m.airborne = !b.onGround;
+    m.vy = b.vy;
+    m.thinking = this.thinking;
+    m.dashing = this.dashTime > 0;
+    m.dead = this.dead;
+    animateCharacter(this.mesh, t, m);
   }
 
   dispose(): void {
@@ -327,4 +355,11 @@ export class PlayerActor {
     tag.scale.multiplyScalar(0.42);
     return tag;
   }
+}
+
+/** Shows or hides a mascot's ink outlines (meshes named 'outline'). */
+function showOutlines(root: THREE.Object3D, on: boolean): void {
+  root.traverse((o) => {
+    if (o.name === 'outline') o.visible = on;
+  });
 }

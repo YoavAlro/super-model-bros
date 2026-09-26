@@ -7,7 +7,7 @@ import { el } from '../ui/dom';
 import { settingsPanel } from '../ui/Settings';
 import type { Input } from './Input';
 import { humansDone, KART, kartRivals, LANES, makeTrack, newRace, placeOf, stepRace, type Race } from './kart';
-import { makeCharacter } from './characterMeshes';
+import { animateCharacter, makeCharacter, type CharacterMotion } from './characterMeshes';
 import { canvasTexture, labelSprite, makeToken } from './meshes';
 import { music } from './music';
 import { prefs } from './prefs';
@@ -39,7 +39,9 @@ export class KartRace {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
   readonly race: Race;
-  private readonly karts: { group: THREE.Group; racer: Race['racers'][number] }[] = [];
+  private readonly karts: { group: THREE.Group; driver: THREE.Group; racer: Race['racers'][number] }[] = [];
+  /** Reused every frame for the drivers' idle life. */
+  private readonly driving: CharacterMotion = { speed: 0, airborne: false, vy: 0, seated: true };
   private readonly things: { mesh: THREE.Object3D; index: number }[] = [];
   private state: KartState = 'countdown';
   private countdown = 2.4;
@@ -197,7 +199,7 @@ export class KartRace {
       tag.position.y = racer.human ? 2.4 : 1.9;
       group.add(body, driver, tag);
       this.scene.add(group);
-      this.karts.push({ group, racer });
+      this.karts.push({ group, driver, racer });
     }
   }
 
@@ -221,6 +223,9 @@ export class KartRace {
       k.group.position.set(r.s, hop, this.laneZ(r.z));
       k.group.rotation.z = r.stun > 0 && !prefs.reduceMotion ? Math.sin(t * 30) * 0.15 : 0;
       k.group.rotation.x = r.boost > 0 && !prefs.reduceMotion ? Math.sin(t * 40) * 0.04 : 0;
+      this.driving.speed = r.v;
+      this.driving.airborne = r.hop > 0;
+      animateCharacter(k.driver, t, this.driving);
     }
     const lead = this.karts.find((k) => k.racer.human);
     for (const th of this.things) {

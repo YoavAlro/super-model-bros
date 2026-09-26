@@ -21,7 +21,7 @@ import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } fr
 import { LevelGrid, T } from './level';
 import { LevelView } from './LevelView';
 import { HANGOVER_SPEED, bankReset, codeRedPar, judgeHype, tiboDue, type HypeCallValue } from './hype';
-import { makeCharacter, makeCrowd, makeGhost4o, makeHelper } from './characterMeshes';
+import { IDLE, TROT, animateCharacter, makeCharacter, makeCrowd, makeGhost4o, makeHelper } from './characterMeshes';
 import { labelSprite, makeAura, makeBridge, makeBuiltBlock, makeEmDash, makeFlag, makeFogWall, makeParticles } from './meshes';
 import { createPuzzle, type Puzzle } from './Puzzles';
 import type { Pad } from './pad';
@@ -443,6 +443,7 @@ export class Stage implements StageCtx {
     for (const s of this.shots) s.shot.updateMesh(t);
     for (const b of this.bosses) b.updateMesh(t);
     if (this.helper?.visible) this.helper.position.y = this.grid.spawnOf('helper')!.y + Math.abs(Math.sin(t * 5)) * 0.3;
+    if (this.helper?.visible) animateCharacter(this.helper, t, IDLE);
     this.updateCrowd(t);
     this.animateParticles(t);
     if (this.fogWall) this.fogWall.position.x = this.fogX;
@@ -1285,6 +1286,7 @@ export class Stage implements StageCtx {
       c.hop += dt * 3;
       c.group.position.set(c.x, (hero?.body.y ?? c.y) + Math.abs(Math.sin(c.hop)) * 1.2, -0.3);
       c.group.rotation.y = c.dir * 0.55;
+      animateCharacter(c.group, this.time, TROT);
     }
     if (this.cameoTime <= 0) {
       for (const c of this.cameos) {
@@ -1315,6 +1317,7 @@ export class Stage implements StageCtx {
         this.ghost.position.x += (tx - this.ghost.position.x) * Math.min(1, dt * 4);
         this.ghost.position.y += (ty - this.ghost.position.y) * Math.min(1, dt * 4);
       }
+      animateCharacter(this.ghost, this.time, IDLE);
     }
     if (this.codeRed) {
       const alarm = this.scene.getObjectByName('alarm') as THREE.PointLight | undefined;
@@ -1342,6 +1345,7 @@ export class Stage implements StageCtx {
     }
     r.mesh.position.set(r.x, Math.max(2, ground) + Math.abs(Math.sin(this.time * 12)) * 0.15, -0.6);
     r.mesh.rotation.y = 0.55;
+    animateCharacter(r.mesh, this.time, TROT);
     if (r.x >= goal) {
       r.done = true;
       this.hud.toast(race.lose, 'info', 3500);
