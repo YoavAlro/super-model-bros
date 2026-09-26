@@ -10,16 +10,16 @@ import { showTitleScreen, type StartChoice } from './ui/TitleScreen';
 
 const root = document.getElementById('app')!;
 
-function play(choice: StartChoice, startLevel?: string, flags?: string[]): void {
+function play(choice: StartChoice, startLevel?: string, flags?: string[], perks?: string[]): void {
   unlockAudio();
-  void new Campaign(root, { save: loadSave(), choice, onExit: title, startLevel, flags }).start();
+  void new Campaign(root, { save: loadSave(), choice, onExit: title, startLevel, flags, perks }).start();
 }
 
 function title(): void {
   showTitleScreen(root, loadSave(), (choice) => play(choice));
 }
 
-// Smoke tests can skip the title: ?debug&path=claude&level=claude-2-2&players=1&char=gemini&flags=shadowBooks
+// Smoke tests can skip the title: ?debug&path=claude&level=claude-2-2&players=1&char=gemini&flags=shadowBooks&perks=teamFork
 const params = new URLSearchParams(location.search);
 if (params.has('debug')) {
   (window as unknown as { __smbLevelIds: () => string[] }).__smbLevelIds = () =>
@@ -50,6 +50,7 @@ if (params.has('debug') && level) {
     },
     level,
     params.get('flags')?.split(',') ?? [],
+    params.get('perks')?.split(',') ?? [],
   );
 } else {
   title();

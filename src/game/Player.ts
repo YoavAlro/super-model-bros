@@ -7,12 +7,16 @@ import type { Pad } from './pad';
 import type { Grid } from './physics';
 import { sfx } from './sfx';
 
+const SMALL_W = 0.8;
 const SMALL_H = 0.95;
 const BIG_H = 1.75;
+/** Frontier size: the giant finale form. */
+const MEGA_W = 1.4;
+const MEGA_H = 3;
 
 /** A power you keep until you get hit. */
 export type HeldPower = 'tool' | 'cape' | null;
-export type StarKind = 'rlhf' | 'viral';
+export type StarKind = 'rlhf' | 'viral' | 'mega';
 
 export class PlayerActor {
   readonly mover: Mover;
@@ -46,6 +50,10 @@ export class PlayerActor {
   hypeClone = false;
   /** In levels with three model sizes: 0 small and quick, 1 regular, 2 large and strong. */
   sizeMode = 1;
+  /** For fork clones: the player this fork copies. */
+  forkOf: PlayerActor | null = null;
+  /** Seconds of frontier size left (the giant finale form). */
+  mega = 0;
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
   private readonly bodyMat: THREE.MeshLambertMaterial | undefined;
@@ -120,6 +128,29 @@ export class PlayerActor {
     this.starKind = kind;
   }
 
+  /**
+   * The frontier mushroom: invincible for a while, and giant if a body that size fits here
+   * (`fits` gets the giant body's x, width and height).
+   */
+  giveMega(seconds: number, fits: (x: number, w: number, h: number) => boolean): void {
+    this.grow();
+    this.giveStar('mega', seconds);
+    const x = this.body.x - (MEGA_W - this.body.w) / 2;
+    if (this.mega > 0 || !fits(x, MEGA_W, MEGA_H)) return;
+    this.mega = seconds;
+    this.body.x = x;
+    this.body.w = MEGA_W;
+    this.body.h = MEGA_H;
+  }
+
+  private endMega(): void {
+    if (this.body.w !== MEGA_W) return;
+    this.mega = 0;
+    this.body.x += (MEGA_W - SMALL_W) / 2;
+    this.body.w = SMALL_W;
+    this.body.h = this.big ? BIG_H : SMALL_H;
+  }
+
   /** Undo the latest power-up (flattery): the held power first, then size. Returns false if there was none. */
   losePowerUp(): boolean {
     if (this.power) this.power = null;
@@ -158,6 +189,7 @@ export class PlayerActor {
     this.dead = true;
     this.power = null;
     this.star = 0;
+    this.endMega();
     this.body.vx = 0;
     this.body.vy = 16;
     if (!this.clone) sfx.die();
@@ -167,6 +199,8 @@ export class PlayerActor {
   revive(x: number, y: number): void {
     this.dead = false;
     this.big = false;
+    this.mega = 0;
+    this.body.w = SMALL_W;
     this.body.h = SMALL_H;
     this.body.x = x;
     this.body.y = y;
@@ -209,6 +243,10 @@ export class PlayerActor {
       this.star = Math.max(0, this.star - dt);
       if (this.star === 0) this.starKind = null;
     }
+    if (this.mega > 0) {
+      this.mega = Math.max(0, this.mega - dt);
+      if (this.mega === 0) this.endMega();
+    }
     this.actionPressed = pad.action && !this.actionHeldPrev;
     this.actionHeldPrev = pad.action;
     this.thinking = this.power === 'cape' && pad.action && !this.dead && !this.finished;
@@ -237,8 +275,8 @@ export class PlayerActor {
   updateMesh(t: number, dt: number): void {
     const b = this.body;
     this.squash = approach(this.squash, 0, dt * 2.5);
-    const sx = (this.big ? 1.12 : 1) * (1 + this.squash * 0.5);
-    const sy = (this.big ? 1.8 : 1) * (1 - this.squash);
+    const sx = (this.mega > 0 ? 1.8 : this.big ? 1.12 : 1) * (1 + this.squash * 0.5);
+    const sy = (this.mega > 0 ? 3 : this.big ? 1.8 : 1) * (1 - this.squash);
     this.mesh.scale.set(sx, sy, sx);
     this.mesh.position.set(b.x + b.w / 2, b.y, 0);
     this.mesh.rotation.y = this.mover.facing * 0.55;
@@ -250,7 +288,7 @@ export class PlayerActor {
     (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
     if (this.bodyMat) {
       if (this.star > 0) {
-        const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : 0.13;
+        const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : this.starKind === 'mega' ? 0.12 + Math.sin(t * 3) * 0.04 : 0.13;
         const pulse = 0.4 + 0.4 * Math.abs(Math.sin(t * 12));
         this.bodyMat.emissive.setHSL(hue, 1, 0.5 * pulse);
       } else if (this.power === 'tool') {

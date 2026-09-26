@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { StageCtx } from './ctx';
-import { makeBrief, makeGhost, makeHotTake, makeJailbreaker, makeLawyer, makePiranha, makeSpambot, makeTimeline } from './meshes';
+import { makeAgentDrone, makeBrief, makeCrusher, makeGhost, makeHotTake, makeJailbreaker, makeLawyer, makePaperclip, makePiranha, makeSpambot, makeTimeline } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
 import { CloudRide } from './Platforms';
 import type { PlayerActor } from './Player';
@@ -449,5 +449,153 @@ export class Lawyer extends Enemy {
       const toward = Math.sign(lead.body.x - b.x) || -1;
       ctx.addEnemy(new Brief(b.x + b.w / 2 - 0.25, b.y + b.h, toward * 4.5, 11, ctx.scene));
     }
+  }
+}
+
+/**
+ * A rate limit: a heavy block that hangs from the ceiling and slams down when you pass under it,
+ * then grinds back up. You can stand on top of it. A Tibo Reset clears the limits: it freezes.
+ * Placed with `z` on the tile just under the ceiling; it is two tiles wide.
+ */
+export class Crusher extends Enemy {
+  readonly kind = 'crusher';
+  readonly mesh: THREE.Group;
+  stompable = false;
+  shootable = false;
+  state: 'wait' | 'fall' | 'rest' | 'rise' = 'wait';
+  /** Seconds of "limits reset" left: it stays up and does not hurt. */
+  frozen = 0;
+  private t = 0;
+  private readonly homeY: number;
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x + 0.5, y + 1 - 1.8, 1.8, 1.8, scene);
+    this.homeY = this.body.y;
+    this.mesh = makeCrusher();
+    scene.add(this.mesh);
+  }
+
+  step(dt: number, ctx: StageCtx): void {
+    if (!this.alive) return this.stepDead(dt);
+    const b = this.body;
+    this.t += dt;
+    this.frozen = Math.max(0, this.frozen - dt);
+    this.harmful = this.frozen <= 0;
+    if (this.state === 'wait') {
+      const cx = b.x + b.w / 2;
+      const under = ctx.players().some((p) => p.body.y + p.body.h <= b.y + 0.1 && Math.abs(p.body.x + p.body.w / 2 - cx) < 2.3);
+      if (this.frozen <= 0 && this.t > 0.4 && under) this.go('fall');
+    } else if (this.state === 'fall') {
+      b.vx = 0;
+      b.vy = Math.max(b.vy - 90 * dt, -30);
+      moveBody(b, dt, ctx.grid);
+      if (b.onGround) {
+        this.go('rest');
+        if (b.x < ctx.camRight && b.x + b.w > ctx.camLeft) ctx.shake(0.15);
+      }
+      if (b.y < -4) this.remove();
+    } else if (this.state === 'rest') {
+      if (this.t > 0.9) this.go('rise');
+    } else {
+      b.vy = 0;
+      b.y = Math.min(this.homeY, b.y + 3.4 * dt);
+      if (b.y >= this.homeY) this.go('wait');
+    }
+  }
+
+  /** Limits reset: it grinds back up and stays there for a while. */
+  freeze(seconds: number): void {
+    this.frozen = seconds;
+    if (this.state === 'fall' || this.state === 'rest') this.go('rise');
+  }
+
+  onTouch(_ctx: StageCtx, p: PlayerActor): 'hurt' | 'none' {
+    const b = this.body;
+    const top = b.y + b.h;
+    // Its top is a floor.
+    if (p.prevBottom >= top - 0.2 && p.body.vy <= 0.5) {
+      p.body.y = top;
+      p.body.vy = this.state === 'rise' ? 0 : Math.min(0, p.body.vy);
+      p.body.onGround = true;
+      return 'none';
+    }
+    // Only a falling crusher hurts; otherwise it is just a heavy block in the way.
+    if (!this.harmful || this.state !== 'fall') {
+      const pushRight = p.body.x + p.body.w / 2 > b.x + b.w / 2;
+      p.body.x = pushRight ? b.x + b.w : b.x - p.body.w;
+      p.body.vx = 0;
+      return 'none';
+    }
+    return 'hurt';
+  }
+
+  private go(state: Crusher['state']): void {
+    this.state = state;
+    this.t = 0;
+  }
+
+  updateMesh(t: number): void {
+    const b = this.body;
+    const jitter = this.state === 'wait' && this.frozen <= 0 ? Math.sin(t * 40) * 0.02 : 0;
+    this.mesh.position.set(b.x + b.w / 2 + jitter, b.y, 0);
+    const body = this.mesh.getObjectByName('crusherBody') as THREE.Mesh | undefined;
+    const mat = body?.material as THREE.MeshLambertMaterial | undefined;
+    if (mat) mat.emissive.setHex(this.frozen > 0 ? 0x1a6a3a : 0x000000);
+  }
+}
+
+/** A runaway agent: a small, quick copy that hops toward the nearest player. Stomp it. */
+export class RogueAgent extends Enemy {
+  readonly kind = 'agent';
+  readonly mesh: THREE.Group;
+  private hop = 0.6;
+
+  constructor(x: number, y: number, scene: THREE.Scene, active = false) {
+    super(x, y, 0.7, 0.7, scene);
+    this.active = active;
+    this.mesh = makeAgentDrone();
+    scene.add(this.mesh);
+  }
+
+  step(dt: number, ctx: StageCtx): void {
+    if (!this.alive) return this.stepDead(dt);
+    const b = this.body;
+    const target = ctx.players().sort((p, q) => Math.abs(p.body.x - b.x) - Math.abs(q.body.x - b.x))[0];
+    if (target && b.onGround && Math.abs(target.body.x - b.x) < 14) this.dir = Math.sign(target.body.x - b.x) || this.dir;
+    this.hop -= dt;
+    if (this.hop <= 0 && b.onGround) {
+      b.vy = 10 + ctx.rng() * 4;
+      this.hop = 1 + ctx.rng() * 1.2;
+    }
+    this.walk(dt, 2.8, ctx);
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.y = this.dir * 0.5;
+  }
+}
+
+/** A paperclip on legs: the Maximizer's output. Walks and turns at walls; stomp it. */
+export class Paperclip extends Enemy {
+  readonly kind = 'paperclip';
+  readonly mesh: THREE.Group;
+
+  constructor(x: number, y: number, scene: THREE.Scene, active = false, dir = -1) {
+    super(x, y, 0.6, 0.9, scene);
+    this.active = active;
+    this.dir = dir;
+    this.mesh = makePaperclip(1.2);
+    scene.add(this.mesh);
+  }
+
+  step(dt: number, ctx: StageCtx): void {
+    if (!this.alive) return this.stepDead(dt);
+    this.walk(dt, 2.6, ctx);
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    if (this.alive) this.mesh.rotation.y = t * 3;
   }
 }

@@ -34,7 +34,9 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | **Jailbreaker** ✅ | Koopa | Jailbreak prompts | Stomp it into its shell, then kick the shell |
 | **Injection piranha** ✅ | Piranha Plant | Prompt injection | Hides in tool pipes |
 | **The Timeline** ✅ | Lakitu | X/Twitter hot takes | A cloud that drops spiky takes; ride it once it's beaten |
-| **Rate limit** | Thwomp | Usage limits | Crushes you; the Tibo Reset stops it |
+| **Rate limit** ✅ | Thwomp | Usage limits (HTTP 429) | Hangs from a ceiling and slams down when you rush under it; stand on it, or bait it and pass while it rises. A Tibo Reset freezes it |
+| **Runaway agent** ✅ | | Agents acting on their own | Small, quick, hops toward you; the Rogue Swarm's minions |
+| **Paperclip** ✅ | | The Maximizer's output | Walks and turns at walls; stomp it |
 | **Copyright lawyer** ✅ | Hammer Bro | Copyright lawsuits | A walking briefcase ("copyright claim") that throws briefs in arcs |
 | **Reward orb** ✅ | Coin trap | Reward hacking | Looks like a token but drains Alignment |
 
@@ -47,10 +49,10 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | **Tool flower** ✅ | Fire Flower | Shoot function calls |
 | **Viral star** ✅ | Star | Invincibility, like the ChatGPT launch |
 | **Reasoning cape** ✅ | Cape | Glide slowly; hold to "think" and see hidden paths |
-| **Fork cherry** | Double Cherry | Clone into agents that copy your moves |
-| **Tibo Reset** | 1-Up | An extra life and cleared rate limits; bank up to 3 |
+| **Fork cherry** ✅ | Double Cherry | Clone into agents that copy your moves (up to two); the power button lines them up behind you. Two-key plates need a fork (or a co-op partner) |
+| **Tibo Reset** ✅ | 1-Up | An extra life and cleared rate limits; bank up to 3, and a banked reset saves you from a crusher |
 | **Distill mushroom** | Mini mushroom | Shrink into a mini model (Haiku, 4o-mini): fit through small gaps |
-| **Frontier mushroom** | Mega mushroom | Giant, for the finale |
+| **Frontier mushroom** ✅ | Mega mushroom | Giant and invincible for 12 seconds, for the finale |
 | **RLHF star** ✅ | Invincibility | Gold Human Feedback: raises Alignment (World 2+) |
 
 ## Bosses
@@ -62,5 +64,5 @@ Traits are affectionate nods to each model's real reputation, never digs.
 | 3 | **DAN & Sydney** ✅ | The DAN jailbreak (2023) and the Bing "Sydney" transcripts | Twin boss. Based on "The Waluigi Effect", a real alignment idea: train for X and anti-X gets easier to elicit. |
 | 4 | **Injection Piranha** ✅ | Prompt injection | Spits hidden instructions out of the pipes |
 | 5 | **The Hallucination King** ✅ | Confident falsehoods | Only visible in Think mode |
-| 6 | **The Rogue Swarm** | Runaway agents | Many small copies; defeat the orchestrator |
-| 7 | **The Paperclip Maximizer** | The classic AI-safety thought experiment | The final castle. A thought experiment, not a company. |
+| 6 | **The Rogue Swarm** ✅ | Runaway agents | The orchestrator hovers behind a shield while its agents run; stop every agent, then stomp it while it is down |
+| 7 | **The Paperclip Maximizer** ✅ | The classic AI-safety thought experiment | The final castle. It hovers, drops paperclips, shakes, and slams down; stomp it while it rests (a frontier-size player can hit it anytime). A thought experiment, not a company. |

@@ -355,3 +355,23 @@ canvas { display: block; }
 body.large-text .modal { font-size: 18px; }
 body.large-text .hud-training { font-size: 14px; width: min(360px, calc(100vw - 32px)); }
 body.large-text .toast { font-size: 17px; }
+
+/* ---------- Finale recap ---------- */
+.recap {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  display: grid;
+  gap: 6px;
+}
+.recap-grid { display: grid; grid-template-columns: auto 1fr auto auto; gap: 2px 10px; align-items: baseline; }
+.recap-label { color: var(--muted); font-variant-numeric: tabular-nums; }
+.recap-date { color: var(--muted); font-size: 12px; }
+.recap-stars { color: var(--accent); white-space: nowrap; text-align: right; }
+.recap-right { color: #6ee7a0; font-weight: 800; }
+.recap-wrong { color: #ff8a8a; font-weight: 800; }
+@media (max-height: 500px) {
+  .recap { font-size: 12px; gap: 4px; }
+}

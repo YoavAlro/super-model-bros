@@ -25,7 +25,7 @@ export type TileId = (typeof T)[keyof typeof T];
 /** What a question block releases. */
 export type BlockContent = 'token' | 'scale' | 'power' | 'hype' | 'oneup' | 'moment';
 
-export type EnemyKind = 'spambot' | 'jailbreaker' | 'ghost' | 'piranha' | 'rewardOrb' | 'lawyer' | 'crusher' | 'praise' | 'timeline';
+export type EnemyKind = 'spambot' | 'jailbreaker' | 'ghost' | 'piranha' | 'rewardOrb' | 'lawyer' | 'crusher' | 'praise' | 'timeline' | 'agent' | 'paperclip';
 
 export type SpawnKind = 'spawn' | 'flag' | 'boss' | 'helper' | 'token' | 'heart' | 'platform' | EnemyKind;
 
@@ -106,6 +106,8 @@ const SPAWN_CHARS: Record<string, SpawnKind> = {
   l: 'lawyer',
   z: 'crusher',
   y: 'praise',
+  d: 'agent',
+  i: 'paperclip',
 };
 
 export interface Solidity {

@@ -232,4 +232,85 @@ export const SOURCES: Record<string, Source> = {
     publisher: 'TechCrunch',
     url: 'https://techcrunch.com/2026/07/20/anthropics-landmark-1-5b-copyright-settlement-is-approved/',
   },
+
+  // World 6: agents
+  operatorNews: {
+    title: 'OpenAI launches Operator, an AI agent that performs tasks autonomously',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2025/01/23/openai-launches-operator-an-ai-agent-that-performs-tasks-autonomously/',
+  },
+  deepResearch: { title: 'Introducing deep research', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-deep-research/' },
+  codexAgent: { title: 'Introducing Codex', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-codex/' },
+  chatgptAgent: { title: 'Introducing ChatGPT agent', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-chatgpt-agent/' },
+  gpt54: { title: 'Introducing GPT-5.4', publisher: 'OpenAI', url: 'https://openai.com/index/introducing-gpt-5-4/' },
+  gpt55: {
+    title: 'OpenAI announces GPT-5.5, its latest artificial intelligence model',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2026/04/23/openai-announces-latest-artificial-intelligence-model.html',
+  },
+  opus45: { title: 'Introducing Claude Opus 4.5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-opus-4-5' },
+  claudeCode1b: {
+    title: 'Anthropic acquires Bun as Claude Code reaches $1B milestone',
+    publisher: 'Anthropic',
+    url: 'https://www.anthropic.com/news/anthropic-acquires-bun-as-claude-code-reaches-usd1b-milestone',
+  },
+  opus47: { title: 'Introducing Claude Opus 4.7', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-opus-4-7' },
+  opus48: { title: 'Introducing Claude Opus 4.8', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-opus-4-8' },
+  multiAgentRisks: { title: 'Multi-Agent Risks from Advanced AI', publisher: 'arXiv (Hammond et al.)', url: 'https://arxiv.org/abs/2502.14143' },
+  pentagonTimeline: {
+    title: 'A Timeline of the Anthropic-Pentagon Dispute',
+    publisher: 'TechPolicy.Press',
+    url: 'https://www.techpolicy.press/a-timeline-of-the-anthropic-pentagon-dispute/',
+  },
+  pentagonStatement: {
+    title: 'Statement on the comments from Secretary of War Pete Hegseth',
+    publisher: 'Anthropic',
+    url: 'https://www.anthropic.com/news/statement-comments-secretary-war',
+  },
+  pentagonRuling: {
+    title: 'Judge rules the Pentagon’s supply chain risk label for Anthropic unlawful',
+    publisher: 'CNN',
+    url: 'https://www.cnn.com/2026/08/27/tech/anthropic-pentagon-supply-chain-risk-unlawful-hnk',
+  },
+  pentagonAppeal: {
+    title: 'U.S. appeals court upholds Pentagon designation of Anthropic as supply chain risk',
+    publisher: 'CNBC',
+    url: 'https://www.cnbc.com/2026/09/25/pentagon-anthropic-ai-risk-appeals-court.html',
+  },
+
+  // World 7: the frontier
+  glasswing: { title: 'Project Glasswing: Securing critical software for the AI era', publisher: 'Anthropic', url: 'https://www.anthropic.com/glasswing' },
+  mythosPreview: { title: 'Assessing Claude Mythos Preview’s cybersecurity capabilities', publisher: 'Anthropic', url: 'https://www.anthropic.com/research/mythos-preview' },
+  fable5: { title: 'Claude Fable 5 and Claude Mythos 5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-fable-5-mythos-5' },
+  fableSuspend: {
+    title: 'Statement on the US government directive to suspend access to Fable 5 and Mythos 5',
+    publisher: 'Anthropic',
+    url: 'https://www.anthropic.com/news/fable-mythos-access',
+  },
+  fableRedeploy: { title: 'Redeploying Fable 5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/redeploying-fable-5' },
+  opus5: { title: 'Introducing Claude Opus 5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-opus-5' },
+  opus55: { title: 'Introducing Claude Opus 5.5', publisher: 'Anthropic', url: 'https://www.anthropic.com/news/claude-opus-5-5' },
+  gpt56Preview: {
+    title: 'OpenAI limits GPT-5.6 rollout after government request, says restrictions shouldn’t be the norm',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2026/06/26/openai-limits-gpt-5-6-rollout-after-government-request-says-restrictions-shouldnt-be-the-norm/',
+  },
+  gpt56Release: { title: 'OpenAI gets permission to roll out GPT-5.6 to the public on July 9', publisher: 'Engadget', url: 'https://www.engadget.com/2210308/openai-rolls-out-gpt5-6-july-9/' },
+  astra: { title: 'GPT-6 Astra', publisher: 'OpenAI', url: 'https://openai.com/index/gpt-6-astra/' },
+  astraSafety: { title: 'GPT-6 Astra safety overview', publisher: 'OpenAI', url: 'https://openai.com/index/safety-overview-gpt-6-astra/' },
+  astraRollout: { title: 'OpenAI announces rollout of GPT-6 Astra model', publisher: 'CNBC', url: 'https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html' },
+  astraPaid: { title: 'GPT-6 Astra is now available to all Pro, Enterprise, and Business Premium users (post)', publisher: 'Sam Altman on X', url: 'https://x.com/sama/status/2095973658867171733' },
+  astraPlus: { title: 'Now out to all Plus and Business users (post)', publisher: 'Sam Altman on X', url: 'https://x.com/sama/status/2096008528834244741' },
+  astraSlowdown: {
+    title: 'OpenAI says it slowed Astra model development over security concerns (Aug 7, 2026)',
+    publisher: 'TechCrunch',
+    url: 'https://techcrunch.com/2026/08/07/openai-says-it-slowed-astra-model-development-over-security-concerns/',
+  },
+  astraPause: {
+    title: 'OpenAI says it paused AI training for two weeks and announces new security protocols (Aug 18, 2026)',
+    publisher: 'Fortune',
+    url: 'https://fortune.com/2026/08/18/openai-says-it-paused-ai-training-for-two-weeks-and-announces-new-security-protocols-following-hugging-face-hack/',
+  },
+  tiboAgain: { title: 'Oops... I did it again (post)', publisher: 'Thibault Sottiaux on X', url: 'https://x.com/thsottiaux/status/2078320950488297917' },
+  paperclip: { title: 'Ethical Issues in Advanced Artificial Intelligence', publisher: 'Nick Bostrom', url: 'https://nickbostrom.com/ethics/ai' },
 };

@@ -79,7 +79,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 
 | Path | What it is |
 |---|---|
-| `src/config/levels/world*.ts`, `chunks.ts` | Levels: ASCII map (stitched from chunks, with token placeholders), theme, the recipe, sourced intro/outro cards |
+| `src/config/levels/world*.ts`, `chunks.ts`, `chunks67.ts` | Levels: ASCII map (stitched from chunks, with token placeholders), theme, the recipe, sourced intro/outro cards |
 | `src/config/levelSpec.ts` | The `LevelSpec` type and the map legend |
 | `src/config/paths.ts` | The GPT and Claude paths: which levels, in order (steps can be conditional) |
 | `src/config/events.ts` | Storms, hype power-ups (effect, verdict, perk, sourced verdict card) and Moments (toast + sourced fact) |
@@ -93,14 +93,15 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | `src/game/Campaign.ts` | A run through a path: cards, saves, unlocks, world breaks |
 | `src/game/Stage.ts` | One level: fixed-step loop, camera, collisions, powers, bosses |
 | `src/game/Player.ts`, `Enemies.ts`, `Bosses.ts`, `Items.ts`, `Platforms.ts` | Actors (platforms are rideable actors: moving platforms, Timeline clouds) |
-| `src/game/storm.ts`, `puzzleRules.ts` | Pure storm and puzzle rules (unit tested) |
-| `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave |
+| `src/game/storm.ts`, `puzzleRules.ts`, `gates.ts`, `forks.ts` | Pure storm, puzzle, gate-timeline and fork rules (unit tested) |
+| `src/game/recap.ts`, `src/config/recap.ts`, `src/ui/Recap.ts` | The finale recap: your stars and hype calls against the real timeline (rules unit tested) |
+| `src/game/Puzzles.ts` | Bonus puzzles built from map marks: strawberry, Naming Maze, Chart Crime, the lost cave, two-key plates |
 | `src/game/LevelView.ts`, `meshes.ts` | Rendering (instanced tiles, backdrops, procedural meshes) |
 | `src/game/Input.ts`, `pad.ts`, `sfx.ts` | Controls (1–2 keyboards + touch) feeding plain `Pad` state, and synthesized sound |
 | `scripts/smoke.mjs` | Playwright smoke test: completes levels via `?debug` on desktop and iPhone landscape |
 
 `?debug` in the URL exposes `window.__smb` (teleport, state, bosses, stomp, give, next) for Playwright smoke tests;
-`?debug&level=claude-2-2` skips the title and starts that level.
+`?debug&level=claude-2-2` skips the title and starts that level (`&flags=shadowBooks`, `&perks=teamFork` set run state).
 
 ## Milestones
 
@@ -111,7 +112,7 @@ coyote time and jump buffering, and running jumps that go higher. Claude floats 
 | M3 ✅ | World 3: Viral Skies | ChatGPT launch; the Timeline (Lakitu-style) cloud; DAN & Sydney twin boss; board-crisis storm level (GPT) and pause-letter fog storm (Claude) |
 | M4 ✅ | Event system | Hype power-ups (lasting vs passing verdicts), storm levels, Moments gags, all config-driven |
 | M5 ✅ | Worlds 4–5 | Tool Pipes (fire flower = function calls, injection piranhas); Reasoning Ghost House (cape = Think, hallucination ghosts, King Boo-style boss) |
-| M6 | Worlds 6–7 | Swarm Factory (double cherry = fork agents, Rogue Swarm boss); Frontier Castle (Paperclip Maximizer) → Astra / Opus 5.5 finales and recap |
+| M6 ✅ | Worlds 6–7 | Swarm Factory (fork cherry = agent clones, two-key plates, rate-limit crushers, Rogue Swarm boss); storms for the Pentagon dispute, the export freeze and Astra's phased rollout; Frontier Castle (frontier mushroom, Paperclip Maximizer) → Astra / Opus 5.5 finales and the recap |
 | M7 | Unlockables & Benchmark Kart | Gemini, Llama, DeepSeek, Mistral, Grok with their traits; kart races between worlds |
 | M8 | Polish | Music, accessibility, performance, a fact-verification pass over every 🔎 |
 | M9 | Online multiplayer | Hosted rooms for online co-op/versus |

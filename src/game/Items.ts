@@ -49,7 +49,8 @@ export class Token {
 }
 
 /** Things question blocks release besides tokens. */
-export type ItemKind = 'scale' | 'rlhf' | 'viral' | 'tool' | 'cape' | 'fork' | 'mega' | 'oneup' | 'hype' | 'moment';
+/** `frozen` is a power-up iced over by an access suspension: take it now, and it thaws later. */
+export type ItemKind = 'scale' | 'rlhf' | 'viral' | 'tool' | 'cape' | 'fork' | 'mega' | 'oneup' | 'hype' | 'moment' | 'frozen';
 
 const MOTION: Record<ItemKind, 'slide' | 'bounce' | 'stay'> = {
   scale: 'slide',
@@ -62,6 +63,7 @@ const MOTION: Record<ItemKind, 'slide' | 'bounce' | 'stay'> = {
   cape: 'stay',
   hype: 'stay',
   moment: 'stay',
+  frozen: 'stay',
 };
 
 /** A power-up: rises out of its block, then slides, bounces, or waits on top of it. */

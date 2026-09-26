@@ -346,6 +346,15 @@ export function makePowerItem(kind: string, color = 0xff4fd8): THREE.Group {
       stem.rotation.z = -x * 2;
       g.add(cherry, stem);
     }
+  } else if (kind === 'frozen') {
+    const inside = makePowerItem('fork');
+    inside.position.y = 0.05;
+    const ice = new THREE.Mesh(
+      new THREE.BoxGeometry(0.78, 0.78, 0.78),
+      new THREE.MeshLambertMaterial({ color: 0xbfe8ff, emissive: 0x3a7aa0, emissiveIntensity: 0.5, transparent: true, opacity: 0.55, depthWrite: false }),
+    );
+    ice.position.y = 0.42;
+    g.add(inside, ice);
   } else if (kind === 'oneup') {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 20, Math.PI * 1.6), lambert(0x46e07a, 0x138a3a));
     ring.position.y = 0.45;
@@ -858,5 +867,135 @@ export function makeGhostKing(): THREE.Group {
     g.add(spike);
   }
   g.add(crown);
+  return g;
+}
+
+/** A rate limit: a heavy block stamped "429" (the HTTP status for Too Many Requests), with a scowl. */
+export function makeCrusher(): THREE.Group {
+  const g = new THREE.Group();
+  const block = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 1), lambert(0x6a6f7a));
+  block.name = 'crusherBody';
+  block.position.y = 0.9;
+  const face = canvasTexture(64, (c, s) => {
+    c.fillStyle = '#8a303a';
+    c.fillRect(0, 0, s, s);
+    c.fillStyle = '#ffe0e0';
+    c.font = 'bold 24px system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('429', s / 2, s * 0.72);
+    c.fillStyle = '#111';
+    c.fillRect(s * 0.18, s * 0.26, s * 0.22, s * 0.12);
+    c.fillRect(s * 0.6, s * 0.26, s * 0.22, s * 0.12);
+  });
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: face }));
+  plate.name = 'crusherFace';
+  plate.position.set(0, 0.9, 0.51);
+  const spikeMat = lambert(0x9aa0aa);
+  for (const x of [-0.6, 0, 0.6]) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.3, 4), spikeMat);
+    spike.rotation.x = Math.PI;
+    spike.position.set(x, -0.1, 0);
+    g.add(spike);
+  }
+  g.add(block, plate);
+  return g;
+}
+
+/** A runaway agent: a small one-eyed robot. */
+export function makeAgentDrone(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.5), lambert(0xff8a3d, 0x401800));
+  body.position.y = 0.35;
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff2040 }));
+  eye.position.set(0, 0.4, 0.26);
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.22), lambert(0x333333));
+  antenna.position.y = 0.7;
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), lambert(0xffd166, 0xffd166));
+  bulb.position.y = 0.83;
+  const legMat = lambert(0x2b2b30);
+  for (const x of [-0.18, 0.18]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.2), legMat);
+    leg.position.set(x, 0.07, 0);
+    g.add(leg);
+  }
+  g.add(body, eye, antenna, bulb);
+  return g;
+}
+
+/** The Rogue Swarm's orchestrator: a hovering hub with a ring of eyes. */
+export function makeOrchestrator(): THREE.Group {
+  const g = new THREE.Group();
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), lambert(0xc0562a, 0x301000));
+  hub.scale.set(1.1, 0.7, 1);
+  hub.position.y = 0.9;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.1, 8, 28), lambert(0xffd166, 0x604000));
+  ring.name = 'ring';
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.9;
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2040 });
+  for (let i = 0; i < 5; i++) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), eyeMat);
+    const a = -0.9 + i * 0.45;
+    eye.position.set(Math.sin(a) * 0.95, 1.0, Math.cos(a) * 0.72);
+    g.add(eye);
+  }
+  const shield = makeShield();
+  shield.name = 'shield';
+  shield.scale.setScalar(1.7);
+  shield.position.y = 0.9;
+  g.add(hub, ring, shield);
+  return g;
+}
+
+/** A paperclip, bent out of a tube. */
+export function makePaperclip(scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const pts = [
+    [0.12, -0.05], [0.12, 0.55], [0, 0.66], [-0.12, 0.55], [-0.12, 0.05], [0, -0.05], [0.07, 0.05], [0.07, 0.45], [0, 0.52], [-0.05, 0.45], [-0.05, 0.15],
+  ].map(([x, y]) => new THREE.Vector3(x * 1.4, y, 0));
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.03, 6), lambert(0xd8dde6, 0x303540));
+  tube.position.y = 0.1;
+  g.add(tube);
+  g.scale.setScalar(scale);
+  return g;
+}
+
+/** The Paperclip Maximizer: a boxy machine with a hopper, a paperclip on top, and one unblinking eye. */
+export function makePaperclipMaximizer(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 1.6), lambert(0x7a8090));
+  body.position.y = 1.2;
+  const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.5, 0.7, 4), lambert(0x5a6070));
+  hopper.rotation.y = Math.PI / 4;
+  hopper.position.y = 2.75;
+  const eye = new THREE.Mesh(new THREE.CircleGeometry(0.42, 20), new THREE.MeshBasicMaterial({ color: 0xffd166 }));
+  eye.position.set(0, 1.5, 0.81);
+  const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.16, 16), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  pupil.position.set(0, 1.5, 0.82);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.18, 0.05), new THREE.MeshBasicMaterial({ color: 0x222228 }));
+  mouth.position.set(0, 0.6, 0.81);
+  const clip = makePaperclip(2.2);
+  clip.name = 'clip';
+  clip.position.set(0, 3.0, 0);
+  const treadMat = lambert(0x2b2b30);
+  for (const x of [-1.1, 1.1]) {
+    const tread = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.7), treadMat);
+    tread.position.set(x, 0.15, 0);
+    g.add(tread);
+  }
+  g.add(body, hopper, eye, pupil, mouth, clip);
+  return g;
+}
+
+/** A pressure plate on the floor: glows when something stands on it. */
+export function makePlate(): THREE.Group {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.08, 0.96), lambert(0x3a3a44));
+  base.position.y = 0.04;
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.06, 0.76), lambert(0xffc040, 0x000000));
+  pad.name = 'pad';
+  pad.position.y = 0.1;
+  g.add(base, pad);
   return g;
 }

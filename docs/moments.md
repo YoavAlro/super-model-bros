@@ -22,7 +22,7 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
 
 | Moment | When | World | The fact it teaches | Path | |
 |---|---|---|---|---|---|
-| **The Tibo Reset** | 2026 | 6–7 | Codex lead Thibault "Tibo" Sottiaux repeatedly reset paid users' Codex usage limits, which became a running joke on X; users stacked banked resets, and he later posted about being gifted a "very fancy new reset button" | G | 🔎 |
+| **The Tibo Reset** | May–Sep 2026 | 7 | Codex lead Thibault "Tibo" Sottiaux repeatedly reset paid users' Codex usage limits, which became a running joke on X; users stacked banked resets, and he later posted about being gifted a "very fancy new reset button" | G | ✅ |
 | **How many R's in strawberry?** | 2024 | 5 | Models read **tokens, not letters**. "Strawberry" was also the reported codename for the reasoning work behind o1 | G | ✅ |
 | **Winter Laziness** | Dec 2023 | 4 | Users reported GPT-4 getting "lazier" and OpenAI acknowledged the feedback; the internet's favorite theory was that it had learned to take December off | G | ✅ |
 | **Nothing without its people** | Nov 2023 | 4 | During the board crisis, most OpenAI employees signed a letter threatening to leave, and "OpenAI is nothing without its people" spread across X | G | ✅ |
@@ -33,7 +33,7 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
 | **GPUs Are Melting** | Mar 2025 | 5 | Demand for GPT-4o image generation was so high that OpenAI temporarily rate-limited it, and the CEO joked on X that the GPUs were melting | G | ✅ |
 | **The Em Dash Habit** | until Nov 2025 | 3–6 | The em dash became a meme as a sign of AI-written text. In Nov 2025 ChatGPT started obeying custom instructions not to use em dashes, called a "small-but-happy win" | G | ✅ |
 | **Sora Cameo Flood** | Oct 2025 | 6 | Sora 2 launched with "cameos", and the feed quickly filled with videos of OpenAI's own CEO | G | ✅ |
-| **Code Red** | Dec 2025 | 6 | After Gemini 3 launched, OpenAI's CEO declared an internal "code red" to focus on ChatGPT quality; GPT-5.2 shipped soon after | G | 🔎 |
+| **Code Red** | Dec 2025 | 6 | After Gemini 3 launched, OpenAI's CEO declared an internal "code red" to focus on ChatGPT quality; GPT-5.2 shipped soon after | G | ✅ |
 
 ## Claude moments
 
@@ -68,7 +68,7 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
 | Code Red | Red alarm level: all bonus rooms are locked, speed run only |
 | Golden Gate Claude | Every platform becomes a tiny bridge for 30 seconds |
 | Claude Plays Pokémon | A cave maze bonus level you keep getting lost in |
-| Project Vend | A shop between levels that keeps giving discounts and selling tungsten cubes |
+| Project Vend | A shop in the level (a `!` block): everything is 100% off, and one item is a useless tungsten cube |
 | Glue on pizza | A rival's cameo: its power-ups are glue and rocks |
 
 ## Wiring
@@ -79,8 +79,9 @@ Legend: ✅ well-established · 🔎 recent, verify before shipping. Lineage: **
   for Tibo Reset 1-Ups. Every Moment that happens in a level adds its fact to the outro card.
   Built so far: em dash trail, Tibo Reset (+1 life, banked resets, more likely after 3 deaths),
   Winter Laziness (GPT 4-2), Golden Gate Claude (Claude 4-2), the Glazing (GPT 5-3), #keep4o (GPT 5-4),
-  Code Red, "nothing without its people" (GPT 3-3), and the puzzles: strawberry (GPT 5-1), the Naming
-  Maze (GPT 5-3), Chart Crime (GPT 5-4) and Claude Plays Pokémon's cave (Claude 5-2).
+  Code Red and the em dash fix (GPT 6-3), "nothing without its people" (GPT 3-3), Project Vend's shop (Claude 6-1),
+  Tibo Resets (GPT 7-1 and 7-2), and the puzzles: strawberry (GPT 5-1), the Naming Maze (GPT 5-3), Chart Crime
+  (GPT 5-4), Claude Plays Pokémon's cave (Claude 5-2) and the two-key plates (World 6-1 on both paths).
 - Two are **recurring gags** rather than one-offs: the Tibo Reset (a 1-Up block that shows up
   more often after you die a lot) and the Em Dash trail (a persistent gag until the fix unlocks).
 - Puzzles (the Strawberry count, the Naming Maze, Chart Crime) are bonus rooms built from normal tiles.

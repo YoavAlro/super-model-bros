@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import type { BossId } from '../config/levelSpec';
 import type { StageCtx } from './ctx';
-import { Brief, HallucinationGhost, HotTake, Spambot } from './Enemies';
+import { Brief, HallucinationGhost, HotTake, Paperclip, RogueAgent, Spambot } from './Enemies';
 import { T } from './level';
 import { Trap } from './Items';
-import { labelSprite, makeDan, makeGhostKing, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './meshes';
+import { labelSprite, makeDan, makeGhostKing, makeOrchestrator, makePaperclipMaximizer, makePiranha, makeRewardHacker, makeScroll, makeShield, makeSpambot, makeSydney } from './meshes';
 import { moveBody, overlaps, type Body } from './physics';
 
 /**
@@ -18,6 +18,10 @@ export abstract class Boss {
   abstract readonly name: string;
   /** Toast shown when it wakes up. */
   abstract readonly intro: string;
+  /** Toast when a stomp bounces off it. */
+  get shieldHint(): string {
+    return `${this.name} is shielded right now. Hit the other one!`;
+  }
   hp: number;
   alive = true;
   awake = false;
@@ -556,6 +560,244 @@ class HallucinationKing extends Boss {
   }
 }
 
+/**
+ * World 6: the Rogue Swarm. Many small copies and one orchestrator. The orchestrator hovers
+ * behind a shield while its agents are out; clear the wave and it comes down, open to a stomp.
+ */
+class RogueSwarm extends Boss {
+  readonly mesh: THREE.Group;
+  readonly name = 'The Rogue Swarm';
+  readonly intro = 'The Rogue Swarm! Its orchestrator hides behind its agents. Stop the agents, then stomp the orchestrator.';
+  get shieldHint(): string {
+    return 'The orchestrator is shielded while its agents run. Stop every agent first!';
+  }
+  private phase: 'shielded' | 'down' | 'rise' = 'shielded';
+  private t = 0;
+  private wave: RogueAgent[] = [];
+  private spawned = false;
+  private readonly home: { x: number; y: number };
+  /** The arena floor: it comes all the way down, through planks and blocks. */
+  private readonly groundY: number;
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x, y + 4.5, 2.4, 1.8, 3, scene);
+    this.home = { x, y: y + 4.5 };
+    this.groundY = y;
+    this.mesh = makeOrchestrator();
+    this.addLabel('THE ORCHESTRATOR', '#ffe6d0', 'rgba(90,30,0,0.65)');
+    scene.add(this.mesh);
+  }
+
+  vulnerable(): boolean {
+    return super.vulnerable() && this.phase === 'down';
+  }
+
+  bounceOff(): boolean {
+    return this.alive && this.phase !== 'down';
+  }
+
+  /** Agents still running in the current wave. */
+  get agentsLeft(): number {
+    return this.wave.filter((a) => a.alive).length;
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    this.t += dt;
+    const rage = this.maxHp - this.hp;
+    if (this.phase === 'shielded') {
+      if (!this.spawned) this.spawnWave(ctx, 3 + rage);
+      b.x = this.home.x - b.w / 2 + Math.sin(ctx.time * (0.7 + rage * 0.2)) * 7;
+      b.y = this.home.y + Math.sin(ctx.time * 2) * 0.3;
+      if (this.t > 1.5 && this.agentsLeft === 0) {
+        this.go('down');
+        ctx.toast('The agents are down: the orchestrator is exposed. Stomp it!', 'good');
+      }
+      return false;
+    }
+    if (this.phase === 'down') {
+      const wasAirborne = b.y > this.groundY;
+      b.vx = 0;
+      b.vy = Math.max(b.vy - 45 * dt, -24);
+      b.y = Math.max(this.groundY, b.y + b.vy * dt);
+      if (b.y <= this.groundY) b.vy = 0;
+      if (this.t > 3.6 - rage * 0.4) this.go('rise');
+      return wasAirborne && b.y <= this.groundY;
+    }
+    // Rise back up and send out a new wave.
+    b.vy = 0;
+    b.y = Math.min(this.home.y, b.y + 5 * dt);
+    if (b.y >= this.home.y) {
+      this.spawned = false;
+      this.go('shielded');
+    }
+    return false;
+  }
+
+  private spawnWave(ctx: StageCtx, n: number): void {
+    this.spawned = true;
+    this.wave = [];
+    const b = this.body;
+    for (let i = 0; i < n; i++) {
+      const a = new RogueAgent(b.x + b.w / 2 - 0.5 + (i - (n - 1) / 2) * 0.9, b.y, ctx.scene, true);
+      a.body.vy = 6 + i;
+      this.wave.push(a);
+      ctx.addEnemy(a);
+    }
+  }
+
+  protected onHit(ctx: StageCtx): void {
+    if (!this.alive) {
+      for (const a of this.wave) if (a.alive) a.defeat(false);
+      return;
+    }
+    ctx.toast(`Orchestrator stopped! It reboots with a bigger swarm. ${this.hp} to go.`, 'good');
+    this.go('rise');
+  }
+
+  private go(phase: RogueSwarm['phase']): void {
+    this.phase = phase;
+    this.t = 0;
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.z = this.alive ? Math.sin(t * 3) * 0.05 : t * 4;
+    const ring = this.mesh.getObjectByName('ring');
+    if (ring) ring.rotation.z = t * 2;
+    const shield = this.mesh.getObjectByName('shield');
+    if (shield) shield.visible = this.alive && this.phase !== 'down';
+  }
+}
+
+/**
+ * World 7: the Paperclip Maximizer, the classic thought experiment. It hovers, drops paperclips,
+ * and slams down to grab more material; stomp it while it rests on the ground. It resists being
+ * changed, so stomps from above bounce off while it hovers. A frontier-size player can hit it anytime.
+ */
+class PaperclipMaximizer extends Boss {
+  readonly mesh: THREE.Group;
+  readonly name = 'The Paperclip Maximizer';
+  readonly intro = 'The Paperclip Maximizer! It turns everything into paperclips, and resists being switched off. Stomp it when it lands.';
+  get shieldHint(): string {
+    return 'It resists being changed while it hovers. Stomp it when it lands!';
+  }
+  private phase: 'hover' | 'slam' | 'rest' | 'rise' = 'hover';
+  private t = 0;
+  private drop = 1;
+  /** A frontier-size player is nearby: big enough to change its goal at any time. */
+  private frontier = false;
+  private readonly home: { x: number; y: number };
+  /** The arena floor: it slams straight down to it, through any blocks. */
+  private readonly groundY: number;
+  /** About to slam: it shakes first, so you can get out from under it. */
+  private windup = false;
+  private static readonly RESIST = [
+    'It resists being changed! But its goal is slipping.',
+    'Its one goal wobbles. Keep going!',
+    'Nearly switched off. It is making paperclips out of panic.',
+    'One more! Change the goal.',
+  ];
+
+  constructor(x: number, y: number, scene: THREE.Scene) {
+    super(x - 1, y + 5, 3, 2.9, 5, scene);
+    this.home = { x: x - 1, y: y + 5 };
+    this.groundY = y;
+    this.mesh = makePaperclipMaximizer();
+    this.addLabel('THE PAPERCLIP MAXIMIZER', '#f0f0f0', 'rgba(40,40,60,0.7)');
+    scene.add(this.mesh);
+  }
+
+  vulnerable(): boolean {
+    return super.vulnerable() && (this.phase === 'rest' || this.frontier);
+  }
+
+  bounceOff(): boolean {
+    return this.alive && !this.vulnerable();
+  }
+
+  step(dt: number, ctx: StageCtx): boolean {
+    const b = this.body;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+    this.frontier = ctx.players().some((p) => p.mega > 0);
+    if (!this.alive) {
+      this.fall(dt);
+      return false;
+    }
+    this.t += dt;
+    const rage = this.maxHp - this.hp;
+    if (this.phase === 'hover') {
+      const lead = ctx.lead();
+      const tx = lead ? lead.body.x + lead.body.w / 2 - b.w / 2 : this.home.x;
+      b.x += Math.sign(tx - b.x) * Math.min(Math.abs(tx - b.x), (2.5 + rage * 0.6) * dt);
+      // It works the middle of the arena, between the frontier mushroom blocks.
+      b.x = Math.max(this.home.x - 6, Math.min(this.home.x + 6, b.x));
+      b.y = this.home.y + Math.sin(ctx.time * 2.4) * 0.3;
+      this.drop -= dt;
+      if (this.drop <= 0) {
+        this.drop = 1.5 - rage * 0.18;
+        if (ctx.enemies().filter((e) => e instanceof Paperclip && e.alive).length < 4) {
+          const clip = new Paperclip(b.x + b.w / 2 - 0.5, b.y, ctx.scene, true, ctx.rng() < 0.5 ? -1 : 1);
+          ctx.addEnemy(clip);
+        }
+      }
+      const hover = 3.4 - rage * 0.35;
+      this.windup = this.t > hover - 0.7;
+      if (this.t > hover) {
+        this.windup = false;
+        this.go('slam');
+      }
+      return false;
+    }
+    if (this.phase === 'slam') {
+      b.vx = 0;
+      b.vy = Math.max(b.vy - 70 * dt, -30);
+      b.y = Math.max(this.groundY, b.y + b.vy * dt);
+      if (b.y <= this.groundY) {
+        b.vy = 0;
+        this.go('rest');
+        for (const dir of [-1, 1]) ctx.addEnemy(new Paperclip(b.x + (dir < 0 ? -0.6 : b.w), b.y, ctx.scene, true, dir));
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'rest') {
+      if (this.t > 2.6 - rage * 0.2) this.go('rise');
+      return false;
+    }
+    b.vy = 0;
+    b.y = Math.min(this.home.y, b.y + 6 * dt);
+    if (b.y >= this.home.y) this.go('hover');
+    return false;
+  }
+
+  protected onHit(ctx: StageCtx): void {
+    if (!this.alive) {
+      for (const e of ctx.enemies()) if (e instanceof Paperclip && e.alive) e.defeat(false);
+      return;
+    }
+    ctx.toast(`${PaperclipMaximizer.RESIST[Math.min(PaperclipMaximizer.RESIST.length - 1, this.maxHp - this.hp - 1)]} ${this.hp} to go.`, 'good');
+    this.go('rise');
+  }
+
+  private go(phase: PaperclipMaximizer['phase']): void {
+    this.phase = phase;
+    this.t = 0;
+  }
+
+  updateMesh(t: number): void {
+    super.updateMesh(t);
+    this.mesh.rotation.z = this.alive ? (this.windup ? Math.sin(t * 50) * 0.06 : this.phase === 'rest' ? Math.sin(t * 30) * 0.02 : 0) : t * 3;
+    const clip = this.mesh.getObjectByName('clip');
+    if (clip) clip.rotation.y = t * (this.phase === 'hover' ? 2 : 6);
+  }
+}
+
 /** Builds the boss (or bosses) a level's `G` spawns. */
 export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scene): Boss[] {
   switch (id) {
@@ -567,6 +809,10 @@ export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scen
       return [new InjectionPiranhaBoss(x, y, scene)];
     case 'hallucinationKing':
       return [new HallucinationKing(x, y, scene)];
+    case 'rogueSwarm':
+      return [new RogueSwarm(x, y, scene)];
+    case 'paperclip':
+      return [new PaperclipMaximizer(x, y, scene)];
     case 'danSydney': {
       const dan = new DanBoss(x, y, scene);
       const sydney = new SydneyBoss(x - 6, y, scene);
@@ -574,7 +820,5 @@ export function createBosses(id: BossId, x: number, y: number, scene: THREE.Scen
       sydney.twin = dan;
       return [dan, sydney];
     }
-    default:
-      throw new Error(`Boss ${id} is not built yet`);
   }
 }

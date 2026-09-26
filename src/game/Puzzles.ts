@@ -3,7 +3,7 @@ import type { MomentId } from '../config/events';
 import type { PuzzleSpec } from '../config/levelSpec';
 import { LevelGrid, T, type Mark } from './level';
 import type { LevelView } from './LevelView';
-import { canvasTexture, labelSprite } from './meshes';
+import { canvasTexture, labelSprite, makePlate } from './meshes';
 import type { PlayerActor } from './Player';
 import { enterInOrder, letterCount, tokenCount } from './puzzleRules';
 import { sfx } from './sfx';
@@ -323,6 +323,51 @@ class CavePuzzle extends Puzzle {
   }
 }
 
+/** A two-key switch: every `1` plate must be held down at once, by forks of you or a co-op partner. */
+class ForkPlatesPuzzle extends Puzzle {
+  private readonly plates: { mark: Mark; mesh: THREE.Group; down: boolean }[];
+  private touched = false;
+
+  constructor(host: PuzzleHost) {
+    super(host);
+    this.plates = marksOf(host.grid, '1').map((mark) => {
+      const mesh = makePlate();
+      mesh.position.set(mark.x + 0.5, mark.y, 0);
+      host.scene.add(mesh);
+      return { mark, mesh, down: false };
+    });
+  }
+
+  region() {
+    const xs = this.plates.map((p) => p.mark.x);
+    return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs) + 1 } : null;
+  }
+
+  debug() {
+    return { kind: 'forkPlates', solved: this.solved, plates: this.plates.map((p) => ({ x: p.mark.x, y: p.mark.y, down: p.down })) };
+  }
+
+  step(): void {
+    if (this.solved || this.plates.length === 0) return;
+    const bodies = this.host.players().map((p) => p.body);
+    for (const plate of this.plates) {
+      const m = plate.mark;
+      plate.down = bodies.some((b) => b.onGround && Math.abs(b.y - m.y) < 0.15 && b.x < m.x + 1 && b.x + b.w > m.x);
+      const pad = plate.mesh.getObjectByName('pad') as THREE.Mesh | undefined;
+      if (pad) {
+        pad.position.y = plate.down ? 0.06 : 0.1;
+        ((pad.material as THREE.MeshLambertMaterial).emissive as THREE.Color).setHex(plate.down ? 0xa06000 : 0x000000);
+      }
+    }
+    const down = this.plates.filter((p) => p.down).length;
+    if (down > 0 && !this.touched) {
+      this.touched = true;
+      this.host.toast('A two-key switch: one agent can only hold one plate. Split the task with a fork (or a friend).', 'info');
+    }
+    if (down === this.plates.length) this.solve('Every plate held at once! The team opened the door.');
+  }
+}
+
 export function createPuzzle(spec: PuzzleSpec | undefined, host: PuzzleHost): Puzzle | null {
   if (!spec) return null;
   switch (spec.kind) {
@@ -336,5 +381,7 @@ export function createPuzzle(spec: PuzzleSpec | undefined, host: PuzzleHost): Pu
       return new ChartCrimePuzzle(host, spec);
     case 'cave':
       return new CavePuzzle(host);
+    case 'forkPlates':
+      return new ForkPlatesPuzzle(host);
   }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HYPES, MOMENTS, STORMS } from '../config/events';
 import { ALL_LEVELS } from '../config/levels';
+import { canFork, FORK_SPACING, forkOffset, MAX_FORKS } from './forks';
+import { gateGroups, openingGateTiles, stepGates } from './gates';
 import { addPerk, bankReset, codeRedPar, hypeScore, judgeHype, MAX_BANKED_RESETS, tiboDue } from './hype';
 import { LevelGrid } from './level';
 
@@ -111,5 +113,73 @@ describe('puzzle rules', async () => {
     const byLabel = Object.fromEntries(Object.values(pipes).map((p) => [p.label, p.order]));
     // o1 (Dec 2024) < GPT-4.5 (Feb 27, 2025) < GPT-4.1 (Apr 14, 2025) < o3 = o4-mini (Apr 16, 2025); o2 skipped.
     expect(byLabel).toEqual({ o1: 1, 'GPT-4.5': 2, 'GPT-4.1': 3, o3: 4, 'o4-mini': 4, o2: null });
+  });
+});
+
+describe('storm gates', () => {
+  const grid = (rows: string[]) => new LevelGrid(rows);
+
+  it('groups neighboring gate columns, left to right', () => {
+    const g = grid(['  DD   D ', '  DD   D ', '#########']);
+    expect(gateGroups(g).map((x) => [x.x0, x.x1, x.tiles.length])).toEqual([
+      [2, 3, 4],
+      [7, 7, 2],
+    ]);
+  });
+
+  it('opens a gate only after a player waits next to it, in order', () => {
+    const g = gateGroups(grid(['            DD      DD ', '#######################']));
+    const state = { resolved: 0, waited: 0 };
+    const waits = [1, 1];
+    // Too far away: nothing happens.
+    expect(stepGates(state, g, waits, [2], 0.6)).toBe(-1);
+    expect(state.waited).toBe(0);
+    // Waiting next to the first gate opens it after a second.
+    expect(stepGates(state, g, waits, [10], 0.6)).toBe(-1);
+    expect(stepGates(state, g, waits, [10], 0.6)).toBe(0);
+    // The second gate starts its own wait.
+    expect(stepGates(state, g, waits, [18], 0.5)).toBe(-1);
+    expect(stepGates(state, g, waits, [18], 0.5)).toBe(1);
+    expect(stepGates(state, g, waits, [18], 5)).toBe(-1);
+  });
+
+  it('resolves a closed road at once, without opening it', () => {
+    const g = gateGroups(grid(['  D    D ', '#########']));
+    const state = { resolved: 0, waited: 0 };
+    expect(stepGates(state, g, [null, 2], [1], 0.01)).toBe(0);
+    expect(openingGateTiles(g, [null, 2])).toEqual(new Set(['7,1']));
+  });
+
+  it('ships every storm gate with a label, and closed roads that say so', () => {
+    for (const s of Object.values(STORMS)) {
+      for (const gate of s.gates ?? []) {
+        expect(gate.label.length, s.id).toBeGreaterThan(10);
+        if (gate.wait !== null) expect(gate.wait).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('fork rules', () => {
+  it('caps a player’s forks and lines them up behind it', () => {
+    expect(canFork(0)).toBe(true);
+    expect(canFork(MAX_FORKS - 1)).toBe(true);
+    expect(canFork(MAX_FORKS)).toBe(false);
+    expect(forkOffset(0, 1)).toBe(-FORK_SPACING);
+    expect(forkOffset(1, 1)).toBe(-2 * FORK_SPACING);
+    expect(forkOffset(0, -1)).toBe(FORK_SPACING);
+  });
+
+  it('spaces forks so the first one fits the two-key plates', () => {
+    // Plates sit two tiles apart: standing anywhere on the right one puts your first fork on the left one.
+    const plateA = 3;
+    const plateB = 5;
+    const w = 0.8;
+    const standing = [4.3, 5, 5.5, 5.9];
+    for (const x of standing) {
+      const fork = x + forkOffset(0, 1);
+      expect(x < plateB + 1 && x + w > plateB, `player at ${x}`).toBe(true);
+      expect(fork < plateA + 1 && fork + w > plateA, `fork at ${fork}`).toBe(true);
+    }
   });
 });

@@ -14,8 +14,8 @@ a cloud you can ride. Its big moments are set pieces where virality lit the fire
 | Nov 2023 | Grok launches inside X; the OpenAI board crisis plays out live on X | Grok cameo; board-crisis storm | B/G | ✅ |
 | Jan 2025 | DeepSeek R1 trends and tops the App Store | Rival rush | B | ✅ |
 | Feb 2025 | "Vibe coding" is coined on X | Hype power-up (lasting) | B | ✅ |
-| Dec 2025–Jan 2026 | Claude Code goes viral over the holidays | Viral star rain | C | 🔎 |
-| Jan 2026 | OpenClaw and Moltbook screenshots spread | Hype power-up (passing) | B | 🔎 |
+| Nov 2025 | Claude Code reaches $1B in run-rate revenue (the "viral over the holidays" framing could not be verified, so the card uses this) | Intro fact, Claude 6-1 | C | ✅ |
+| Jan 2026 | OpenClaw and Moltbook screenshots spread | Hype power-up (passing) | B | ✅ |
 
 In-game posts paraphrase moments anonymously. Never fabricate a quote attributed to a real person.
 
@@ -27,7 +27,8 @@ permanent upgrade for the rest of the run (whatever you called); **passing** one
 short hangover (a slowdown). The recap scores your calls. Config: `HYPES` in `src/config/events.ts`;
 rules: `src/game/hype.ts`. Placed: AutoGPT (GPT 3-2, Claude 3-2), Q* (GPT 3-3), GPT Store (GPT 4-2),
 Sora and AI gadgets (GPT 4-3), AI gadgets (Claude 4-1), Artifacts (Claude 4-2), MCP (Claude 4-3), reasoning models
-(GPT 5-1, Claude 5-2), vibe coding (GPT 5-3, Claude 5-2), Ghibli images (GPT 5-3); Moltbook and agent teams in World 6.
+(GPT 5-1, Claude 5-2), vibe coding (GPT 5-3, Claude 5-2), Ghibli images (GPT 5-3), Moltbook (GPT 6-4, Claude 6-2)
+and agent teams (Claude 6-2). The finale recap lists every hype on the path: your call next to history's verdict.
 
 | Lasting hype | Upgrade it leaves |
 |---|---|
@@ -49,8 +50,8 @@ Sora and AI gadgets (GPT 4-3), AI gadgets (Claude 4-1), Artifacts (Claude 4-2), 
 | Nov 2024 | MCP | Lasting | Every pipe connects | B | ✅ |
 | Feb 2025 | Vibe coding | Lasting | Code tokens become platforms | B | ✅ |
 | Mar 2025 | Ghibli-style images | Passing (the users stay) | User flood; the GPU mount overheats | G | ✅ |
-| Jan 2026 | Moltbook: a social network for AI agents | Passing | Your forks post instead of helping | B | 🔎 |
-| 2026 | Agent teams | Lasting | Forks coordinate | B | 🔎 |
+| Jan 2026 | Moltbook: a social network for AI agents | Passing | Your forks post instead of helping | B | ✅ |
+| Feb 2026 | Agent teams (Claude Code) | Lasting | Forks coordinate | C | ✅ |
 
 ## Storm levels (short, timed danger)
 
@@ -65,12 +66,16 @@ Auto-scrolling or hazard levels pinned to real incidents. Surviving one earns a 
 | Dec 2023 | NYT copyright lawsuit **built** (in GPT 4-2) | Copyright claims throw briefs; fact on the outro | G | ✅ |
 | Jan 2025 | DeepSeek R1 shock **built** (GPT 5-2, Claude 5-1) | Speed-run against a cheap rival | B | ✅ |
 | Sep 2025 | Authors' lawsuit settlement (~$1.5B) **built** (Claude 5-4) | Triggered if the Claude path grabbed "shadow library" books earlier (in 2-1) | C | ✅ |
-| Jan–Feb 2026 | Agent security exposure (OpenClaw) | Your forks go rogue | B | 🔎 |
-| Feb–Aug 2026 | Pentagon "supply chain risk" dispute | A closed region; hold your red lines; a court later rules the label unlawful | C | 🔎 |
-| Jun 12–Jul 1, 2026 | Export-control suspension of Fable 5 / Mythos 5 | Your newest power-up is frozen | C | 🔎 |
-| Sep 2026 | Critical cyber capability threshold | Phased rollout: gates open one at a time | G | 🔎 |
+| Jan–Feb 2026 | Agent security exposure (OpenClaw) | Folded into the Moltbook hype card (the exposed database) rather than its own storm | B | ✅ |
+| Feb–Sep 2026 | Pentagon "supply chain risk" dispute **built** (Claude 6-3) | Closed roads you climb around; one reopens after the Aug 27 ruling, the last stays closed after the Sep 25 appeal ruling | C | ✅ |
+| Jun 12–Jul 1, 2026 | Export-control suspension of Fable 5 / Mythos 5 **built** (Claude 7-2) | Power blocks give frozen power-ups; they thaw when access returns | C | ✅ |
+| Sep 2026 | Critical cyber capability threshold **built** (GPT 7-2) | Phased rollout: gates open one at a time after you wait for your phase | G | ✅ |
 
-## Sources for the 🔎 rows
+Storm config: `STORMS` in `src/config/events.ts` (`gates` for closed roads and rollouts, `freeze` for the
+export freeze); gate rules: `src/game/gates.ts` (unit tested, and the reachability checker keeps closed
+roads shut).
+
+## Sources for the recent rows
 
 - [TechPolicy.Press: Anthropic–Pentagon timeline](https://www.techpolicy.press/a-timeline-of-the-anthropic-pentagon-dispute/) · [CNN: ruling](https://www.cnn.com/2026/08/27/tech/anthropic-pentagon-supply-chain-risk-unlawful-hnk)
 - [Fortune: Moltbook / OpenClaw](https://fortune.com/2026/01/31/ai-agent-moltbot-clawdbot-openclaw-data-privacy-security-nightmare-moltbook-social-network/)

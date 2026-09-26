@@ -135,7 +135,8 @@ export class LevelView {
       for (let tx = 0; tx < grid.width; tx++) {
         const tile = grid.get(tx, ty) as TileId;
         if (tile === T.EMPTY) continue;
-        if (tile === T.GROUND) cells.push({ kind: grid.get(tx, ty + 1) === T.EMPTY ? 'grass' : 'ground', tx, ty });
+        // Ground under a gate gets a grassy top too, so it looks right once the gate opens.
+        if (tile === T.GROUND) cells.push({ kind: grid.get(tx, ty + 1) === T.EMPTY || grid.get(tx, ty + 1) === T.GATE ? 'grass' : 'ground', tx, ty });
         else if (tile === T.QUESTION) {
           cells.push({ kind: 'question', tx, ty });
           cells.push({ kind: 'used', tx, ty, hiddenAtStart: true });

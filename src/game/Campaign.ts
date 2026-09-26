@@ -2,15 +2,18 @@ import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
 import { LEVELS } from '../config/levels';
 import { HYPES, MOMENTS } from '../config/events';
+import { RECAP_CLOSING } from '../config/recap';
 import { PATHS, type PathSpec } from '../config/paths';
 import { tip, type FactCard, type FactLine } from '../config/types';
 import { newRun, writeSave, type RunState, type SaveData } from '../save';
 import { showFactCard } from '../ui/FactCard';
 import { Hud } from '../ui/Hud';
+import { recapTable } from '../ui/Recap';
 import type { StartChoice } from '../ui/TitleScreen';
 import { shares, total } from './diet';
 import { Input } from './Input';
 import { checkUnlocks, endsWorld, formBefore, nextStep, recordLevel } from './progress';
+import { buildRecap } from './recap';
 import { setMuted } from './sfx';
 import { Stage, type StageResult } from './Stage';
 
@@ -25,6 +28,8 @@ export interface CampaignOptions {
   startLevel?: string;
   /** Debug: run flags to start with (e.g. shadowBooks). */
   flags?: string[];
+  /** Debug: lasting-hype perks to start with (e.g. teamFork). */
+  perks?: string[];
 }
 
 /** Plays a path: intro card, level, outro card, save, unlocks, world breaks, and the ending. */
@@ -53,6 +58,7 @@ export class Campaign {
       if (i >= 0) this.run.step = i;
     }
     for (const f of opts.flags ?? []) if (!this.run.flags.includes(f)) this.run.flags.push(f);
+    for (const p of opts.perks ?? []) if (!this.run.perks.includes(p)) this.run.perks.push(p);
     save.runs[choice.path] = this.run;
     this.lives = save.settings.assist ? ASSIST_LIVES : START_LIVES;
     setMuted(!save.settings.sfx);
@@ -194,14 +200,31 @@ export class Campaign {
     }
   }
 
-  /** The end of the built part of the path. */
+  /** The end of the path: the finale recap compares your run with real history. */
   private async ending(): Promise<void> {
-    const card: FactCard = {
-      title: `${this.path.name}: to be continued`,
-      date: 'More worlds are on the way',
-      lines: [tip('The next worlds are still being built. Your progress is saved: try the other brother’s path from the title screen.')],
-    };
-    await this.card(card, CHARACTERS[this.path.partner].color, 'Back to title');
+    const recap = buildRecap(this.run, this.path, LEVELS);
+    const first = recap.levels[0];
+    const last = recap.levels[recap.levels.length - 1];
+    const perks = recap.perks.map((p) => Object.values(HYPES).find((h) => h.perk === p)?.name).filter((n): n is string => !!n);
+    const lines: FactLine[] = [
+      tip(`${recap.rank.title}! ${recap.rank.line}`),
+      tip(`History stars: ${recap.stars.got} of ${recap.stars.max}. From ${first.model} to ${last.model}, ${first.date} to ${last.date}.`),
+    ];
+    if (recap.calls.total) {
+      const missed = recap.calls.total - recap.calls.made;
+      lines.push(tip(`Hype or shift? ${recap.calls.right} of ${recap.calls.total} calls matched history${missed ? ` (${missed} never grabbed)` : ''}.`));
+    }
+    if (perks.length) lines.push(tip(`Lasting shifts you carried to the end: ${perks.join(', ')}.`));
+    lines.push(tip(RECAP_CLOSING));
+    await showFactCard(this.root, {
+      card: { title: `${this.path.name} complete!`, date: `Recap · ${first.date} → ${last.date}`, lines },
+      color: CHARACTERS[this.path.hero].color,
+      extra: recapTable(recap),
+      button: 'Back to title',
+    });
+    // The run is over: the title screen offers a fresh start instead of Continue.
+    delete this.opts.save.runs[this.path.id];
+    writeSave(this.opts.save);
   }
 
   private card(card: FactCard, color: number, button = 'Continue'): Promise<void> {
@@ -241,7 +264,7 @@ export class Campaign {
         const api = this.stage?.debug() as Record<string, (...a: unknown[]) => unknown> | undefined;
         return api?.[name]?.(...args) ?? null;
       };
-    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival'];
+    const names = ['state', 'level', 'lives', 'alignment', 'counts', 'bossHp', 'bosses', 'boss', 'flag', 'player', 'teleport', 'invincible', 'give', 'stomp', 'items', 'traps', 'star', 'enemies', 'hearts', 'platforms', 'riding', 'phase', 'autoscroll', 'hype', 'endHype', 'perks', 'moments', 'clones', 'bridges', 'startHype', 'goldenGate', 'praise', 'puzzle', 'gates', 'size', 'form', 'thinking', 'rival', 'forks', 'resets', 'mega', 'frozen', 'gateState', 'crushers'];
     const api: Record<string, (...args: unknown[]) => unknown> = Object.fromEntries(names.map((n) => [n, stageFn(n)]));
     api.card = () => document.querySelector('.modal h2')?.textContent ?? null;
     api.next = () => {
@@ -251,6 +274,7 @@ export class Campaign {
     };
     api.run = () => JSON.parse(JSON.stringify(this.run));
     api.progress = () => JSON.parse(JSON.stringify(this.opts.save.progress));
+    api.recap = () => buildRecap(this.run, this.path, LEVELS);
     window.__smb = api;
   }
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CHARACTERS, type CharacterId } from '../config/characters';
-import { HYPES, MOMENTS, STORMS, type HypeSpec, type MomentId, type StormSpec } from '../config/events';
+import { HYPES, MOMENTS, STORMS, type HypeSpec, type MomentId, type MomentSpec, type StormSpec } from '../config/events';
 import type { LevelSpec, PowerId } from '../config/levelSpec';
 import type { PathSpec } from '../config/paths';
 import { THEMES } from '../config/themes';
@@ -11,7 +11,9 @@ import type { Hud } from '../ui/Hud';
 import { createBosses, type Boss } from './Bosses';
 import type { StageCtx } from './ctx';
 import { dietHint, dietMatch, emptyCounts, historyStars, total, type Counts } from './diet';
-import { Enemy, HallucinationGhost, InjectionPiranha, Jailbreaker, Lawyer, Spambot, Timeline } from './Enemies';
+import { Crusher, Enemy, HallucinationGhost, InjectionPiranha, Jailbreaker, Lawyer, Paperclip, RogueAgent, Spambot, Timeline } from './Enemies';
+import { canFork, forkOffset } from './forks';
+import { gateGroups, stepGates, type GateGroup, type GateState } from './gates';
 import type { Input } from './Input';
 import { Debris, FunctionCall, Heart, PowerItem, Token, Trap, type ItemKind } from './Items';
 import { LevelGrid, T } from './level';
@@ -133,6 +135,12 @@ export class Stage implements StageCtx {
   private yawn = 0;
   private puzzle: Puzzle | null = null;
   private rival: { mesh: THREE.Group; x: number; done: boolean } | null = null;
+  /** Storm gates: the level's gate groups and how far their timeline has got. */
+  private gates: GateGroup[] = [];
+  private readonly gateState: GateState = { resolved: 0, waited: 0 };
+  /** Export freeze: true until a player passes the thaw mark; who took frozen power-ups meanwhile. */
+  private frozen = false;
+  private owedPower: PlayerActor[] = [];
 
   private state: State = 'intro';
   lives: number;
@@ -263,6 +271,10 @@ export class Stage implements StageCtx {
     this.yawn = 0;
     this.random = mulberry32(hashString(spec.id) + this.deaths);
     if (this.alignment !== null) this.alignment = ALIGN_START;
+    this.gateState.resolved = 0;
+    this.gateState.waited = 0;
+    this.frozen = !!this.storm?.freeze;
+    this.owedPower = [];
 
     const spawn = this.grid.spawnOf('spawn') ?? { x: 2, y: 2 };
     this.playersList = this.opts.chars.map((id, i) => {
@@ -273,6 +285,8 @@ export class Stage implements StageCtx {
       for (const perk of this.opts.perks) p.perks.add(perk);
       return p;
     });
+    // Agent teams: every level starts with a fork on your team.
+    for (const p of [...this.playersList]) if (p.perks.has('teamFork')) this.addFork(p);
     this.updateSight();
 
     const mood = spec.timeline ?? 'hype';
@@ -283,6 +297,9 @@ export class Stage implements StageCtx {
       else if (s.kind === 'ghost') this.enemyList.push(new HallucinationGhost(s.x, s.y, this.scene));
       else if (s.kind === 'lawyer') this.enemyList.push(new Lawyer(s.x, s.y, this.scene));
       else if (s.kind === 'timeline') this.enemyList.push(new Timeline(s.x, s.y, this.scene, mood));
+      else if (s.kind === 'crusher') this.enemyList.push(new Crusher(s.x, s.y, this.scene));
+      else if (s.kind === 'agent') this.enemyList.push(new RogueAgent(s.x, s.y, this.scene));
+      else if (s.kind === 'paperclip') this.enemyList.push(new Paperclip(s.x, s.y, this.scene));
       else if (s.kind === 'token' && s.token) this.tokens.push(new Token(s.token, s.x, s.y, this.scene));
       else if (s.kind === 'rewardOrb') this.trapList.push(new Trap('rewardOrb', s.x, s.y, this.scene));
       else if (s.kind === 'praise') this.trapList.push(new Trap('praise', s.x, s.y, this.scene));
@@ -327,6 +344,7 @@ export class Stage implements StageCtx {
       this.scene.add(this.fogWall);
       this.scene.fog = new THREE.Fog(0xc8ccd8, 18, 42);
     }
+    this.gates = this.storm?.gates ? gateGroups(this.grid) : [];
     this.crowd = makeCrowd(10);
     this.crowd.visible = false;
     this.scene.add(this.crowd);
@@ -615,6 +633,11 @@ export class Stage implements StageCtx {
       this.once('sizes', `${sizes[mode]}! Small models are quick, large ones are strong (and break bricks).`, 'good');
       return;
     }
+    if (!p.clone && p.power !== 'tool' && p.power !== 'cape' && this.regroupForks(p)) {
+      p.cooldown = 0.4;
+      this.once('regroup', 'Regrouped! Your forks line up behind you.', 'good');
+      return;
+    }
     if (p.power === 'tool') {
       if (this.shots.filter((s) => s.owner === p && s.shot.alive).length >= 2) return;
       const b = p.body;
@@ -647,7 +670,7 @@ export class Stage implements StageCtx {
       const content = this.grid.contents.get(this.grid.index(tx, ty));
       const spec = this.spec;
       if (content === 'scale') this.items.push(new PowerItem('scale', tx, ty + 1, this.scene));
-      else if (content === 'power') this.items.push(new PowerItem(this.powerItem(), tx, ty + 1, this.scene));
+      else if (content === 'power') this.items.push(new PowerItem(this.frozen ? 'frozen' : this.powerItem(), tx, ty + 1, this.scene));
       else if (content === 'oneup') this.items.push(new PowerItem('oneup', tx, ty + 1, this.scene));
       else if (content === 'hype' && spec.hypes?.length) {
         // Each $ block releases the next hype on the level's list.
@@ -785,12 +808,32 @@ export class Stage implements StageCtx {
         sfx.powerup();
         this.once('cape', `Reasoning cape! Hold jump to glide. Hold ${this.isTouch ? '✦' : 'S / ↓'} to think and see hidden paths.`, 'good');
         break;
+      case 'fork':
+        p.grow();
+        sfx.powerup();
+        if (this.addFork(p)) {
+          this.once('fork', `Fork cherry! A fork of you joins in and copies your moves. Press ${this.isTouch ? '⑂' : 'S / ↓'} to regroup.`, 'good');
+        } else {
+          this.hud.toast('You already run a full team of forks.', 'info');
+        }
+        break;
+      case 'mega':
+        p.giveMega(12, (x, w, h) => !this.overlapsSolid({ x, y: p.body.y, w, h, vx: 0, vy: 0, onGround: false }));
+        sfx.star();
+        this.once('mega', 'Frontier mushroom! You are a giant frontier model for a while: nothing can stop you.', 'good');
+        break;
+      case 'frozen':
+        if (!this.owedPower.includes(p)) this.owedPower.push(p);
+        sfx.bump();
+        this.once('frozen', this.storm?.freeze?.frozen ?? 'Frozen.', 'bad');
+        break;
       case 'oneup':
         this.lives++;
         sfx.oneup();
         if (this.spec.oneUp === 'tibo') {
           this.resets = bankReset(this.resets);
           this.happen('tiboReset');
+          this.freezeCrushers();
         } else {
           this.hud.toast('Checkpoint! +1 life. Labs save checkpoints so a crashed training run can resume.', 'good');
         }
@@ -801,9 +844,91 @@ export class Stage implements StageCtx {
   }
 
   private applyRefItem(item: PowerItem, p: PlayerActor): void {
+    const moment = item.kind === 'moment' && item.ref ? MOMENTS[item.ref as MomentId] : null;
     if (item.kind === 'hype' && item.ref) this.startHype(HYPES[item.ref as keyof typeof HYPES], p);
-    else if (item.kind === 'moment' && item.ref === 'goldenGate') this.startGoldenGate(p);
+    else if (moment?.id === 'goldenGate') this.startGoldenGate(p);
+    else if (moment?.shop) this.openShop(moment, p);
     else this.applyItem(item.kind, p);
+  }
+
+  // -------------------------------------------------------- forks and limits
+  private forksOf(owner: PlayerActor): PlayerActor[] {
+    return this.playersList.filter((c) => c.forkOf === owner && !c.dead && !c.hypeClone);
+  }
+
+  /** Adds a fork that copies its owner's moves. Returns false when the owner's team is full. */
+  private addFork(owner: PlayerActor): boolean {
+    const n = this.forksOf(owner).length;
+    if (!canFork(n)) return false;
+    const b = owner.body;
+    const c = new PlayerActor(owner.spec, '', this.forkX(owner, n), b.y + 0.2, this.scene, owner.padIndex, true, 'fork');
+    c.forkOf = owner;
+    c.brain = (_self, pad) => pad;
+    c.ability = owner.ability;
+    for (const perk of owner.perks) c.perks.add(perk);
+    if (owner.big) c.grow();
+    this.playersList.push(c);
+    return true;
+  }
+
+  /** Where fork `i` lines up behind its owner: on screen, and never inside a wall. */
+  private forkX(owner: PlayerActor, i: number): number {
+    const b = owner.body;
+    const x = Math.max(this.camLeft, b.x + forkOffset(i, owner.mover.facing));
+    return this.overlapsSolid({ ...b, x, y: b.y + 0.3 }) ? b.x : x;
+  }
+
+  /** The power button with forks: every fork lines up behind you again. */
+  private regroupForks(owner: PlayerActor): boolean {
+    const forks = this.forksOf(owner);
+    if (!forks.length) return false;
+    forks.forEach((c, i) => {
+      c.body.x = this.forkX(owner, i);
+      c.body.y = owner.body.y + 0.3;
+      c.body.vx = 0;
+      c.body.vy = 0;
+      c.invulnerable = 1;
+    });
+    sfx.powerup();
+    return true;
+  }
+
+  /** Rate limits reset: every crusher grinds back up and stays put for a while. */
+  private freezeCrushers(): void {
+    for (const e of this.enemyList) if (e instanceof Crusher && e.alive) e.freeze(10);
+  }
+
+  /** A crusher lands on you: a banked Tibo Reset saves you (and clears every limit). */
+  private spendReset(p: PlayerActor): boolean {
+    if (p.clone || this.resets <= 0) return false;
+    this.resets--;
+    this.freezeCrushers();
+    p.invulnerable = 2;
+    sfx.oneup();
+    this.hud.toast(`Tibo Reset! A banked reset cleared the rate limits. ${this.resets} left.`, 'good');
+    return true;
+  }
+
+  // -------------------------------------------------------------------- shop
+  /** A Moment's shop (Project Vend): pick one item; everything is free. */
+  private openShop(moment: MomentSpec, p: PlayerActor): void {
+    const shop = moment.shop!;
+    this.happen(moment.id, false);
+    if (this.state !== 'playing') return;
+    this.state = 'card';
+    void showFactCard<number>(this.opts.root, {
+      card: { title: shop.title, date: shop.date, lines: [tip(shop.pitch)] },
+      color: 0xd97757,
+      buttons: shop.items.map((item, i) => ({ label: `${item.label} · 100% off`, value: i })),
+    }).then((i) => {
+      const item = shop.items[i] ?? shop.items[0];
+      if (item.effect === 'scale') p.grow();
+      else if (item.effect === 'life') this.lives++;
+      sfx.powerup();
+      this.hud.toast(item.toast, 'good', 3600);
+      if (this.state === 'card') this.state = 'playing';
+      this.input.clear();
+    });
   }
 
   private stepShots(dt: number): void {
@@ -853,8 +978,9 @@ export class Stage implements StageCtx {
           e.onStomp(this, p);
           p.bounce(pad.jump);
           sfx.stomp();
-        } else if (e.onTouch(this, p) === 'hurt' && !p.hurt()) {
-          this.killPlayer(p);
+        } else if (e.onTouch(this, p) === 'hurt') {
+          if (e instanceof Crusher && this.spendReset(p)) continue;
+          if (!p.hurt()) this.killPlayer(p);
         }
       }
       for (const boss of this.bosses) {
@@ -868,7 +994,7 @@ export class Stage implements StageCtx {
         } else if (stomp && boss.bounceOff()) {
           p.bounce(true);
           sfx.bump();
-          this.once(`shield-${boss.name}`, `${boss.name} is shielded right now. Hit the other one!`);
+          this.once(`shield-${boss.name}`, boss.shieldHint);
         } else if (boss.harmful() && !p.invincible) {
           if (!p.hurt()) this.killPlayer(p);
           else p.body.vx = Math.sign(p.body.x - boss.body.x) * 10;
@@ -1171,6 +1297,42 @@ export class Stage implements StageCtx {
       const lag = this.players().filter((p) => p.body.x < this.fogX);
       if (lag.length) this.once('fog', 'The fog slows you down. Keep moving!', 'bad');
     }
+    if (storm.gates && this.gates.length) {
+      const xs = this.heroes().map((p) => p.body.x + p.body.w / 2);
+      const i = stepGates(this.gateState, this.gates, storm.gates.map((g) => g.wait), xs, dt);
+      if (i >= 0) {
+        const gate = storm.gates[i];
+        if (gate.wait !== null) this.openGateGroup(this.gates[i]);
+        this.hud.toast(gate.label, gate.wait !== null ? 'good' : 'bad', 4500);
+      }
+    }
+    if (storm.freeze && this.frozen) {
+      const mark = this.grid.marks.find((m) => m.ch === '9');
+      if (mark && this.heroes().some((p) => p.body.x >= mark.x)) this.thaw();
+    }
+  }
+
+  private openGateGroup(group: GateGroup): void {
+    for (const t of group.tiles) {
+      this.grid.set(t.x, t.y, T.EMPTY);
+      this.view.removeTile(t.x, t.y);
+    }
+    this.shake(0.2);
+    sfx.flag();
+  }
+
+  /** Access returns: frozen power-ups thaw, and whoever took one gets the real thing. */
+  private thaw(): void {
+    this.frozen = false;
+    const power = this.powerItem();
+    this.hud.toast(this.storm?.freeze?.thaw ?? 'Thawed!', 'good', 4500);
+    for (const p of this.owedPower) if (!p.dead) this.applyItem(power, p);
+    this.owedPower = [];
+    for (const item of this.items) {
+      if (item.taken || item.kind !== 'frozen') continue;
+      item.take();
+      this.items.push(new PowerItem(power, Math.floor(item.body.x), item.body.y, this.scene, undefined, undefined, false));
+    }
   }
 
   private stepFlag(dt: number): void {
@@ -1223,6 +1385,10 @@ export class Stage implements StageCtx {
     p.kill();
     this.riding.delete(p);
     if (p.clone) return;
+    for (const c of this.forksOf(p)) {
+      c.kill();
+      this.riding.delete(c);
+    }
     if (this.ghost && this.ghostKept) {
       this.ghostKept = false;
       this.ghost.visible = false;
@@ -1375,6 +1541,9 @@ export class Stage implements StageCtx {
     if (this.goldenGate > 0) status.push(`Golden Gate ${Math.ceil(this.goldenGate)}s`);
     if (this.codeRed) status.push(`Code red ${Math.floor(this.time)}s · par ${codeRedPar(this.grid.width)}s`);
     if (this.resets > 0) status.push(`⟲ resets ×${this.resets}`);
+    if (this.frozen && this.storm?.freeze) status.push(this.storm.freeze.status);
+    const gate = this.storm?.gates?.[this.gateState.resolved];
+    if (gate?.wait && this.gateState.waited > 0) status.push(`${this.storm?.gateWaiting ?? 'Opening…'} ${Math.ceil(gate.wait - this.gateState.waited)}s`);
     this.hud.update({
       level: spec,
       players: this.playersList
@@ -1391,7 +1560,17 @@ export class Stage implements StageCtx {
       status: status.join(' · ') || null,
     });
     const powerLabel =
-      hero?.power === 'tool' ? 'fn' : hero?.power === 'cape' ? '∴' : hero?.ability?.sizes ? '⇅' : this.hype?.spec.effect === 'build' ? '▭' : null;
+      hero?.power === 'tool'
+        ? 'fn'
+        : hero?.power === 'cape'
+          ? '∴'
+          : hero?.ability?.sizes
+            ? '⇅'
+            : this.hype?.spec.effect === 'build'
+              ? '▭'
+              : hero && this.forksOf(hero).length
+                ? '⑂'
+                : null;
     this.input.setPowerLabel(powerLabel);
   }
 
@@ -1445,6 +1624,12 @@ export class Stage implements StageCtx {
       perks: () => [...this.playersList[0].perks],
       moments: () => [...this.happened],
       clones: () => this.playersList.filter((p) => p.clone && !p.dead).length,
+      forks: () => (this.playersList[0] ? this.forksOf(this.playersList[0]).length : 0),
+      resets: () => this.resets,
+      mega: () => this.playersList[0].mega,
+      frozen: () => this.frozen,
+      gateState: () => ({ ...this.gateState, groups: this.gates.length }),
+      crushers: () => this.enemyList.filter((e): e is Crusher => e instanceof Crusher && e.alive).map((c) => ({ x: c.body.x, y: c.body.y, state: c.state, frozen: c.frozen })),
       bridges: () => this.bridges.filter((b) => b.alive).length,
       puzzle: () => this.puzzle?.debug() ?? null,
       gates: () => {
@@ -1459,9 +1644,11 @@ export class Stage implements StageCtx {
       platforms: () => this.platforms.filter((p) => p.alive).map((p) => ({ x: p.body.x, y: p.body.y, w: p.body.w, top: p.top })),
       riding: () => this.riding.has(this.playersList[0]),
       phase: () => this.grid.solidity.phase,
-      /** Drops player 1 onto the first boss that can be stomped right now. */
+      /** Drops player 1 onto the first boss that can be stomped right now (clearing any minions that shield it). */
       stomp: () => {
-        const b = this.bosses.find((bb) => bb.alive && bb.awake && bb.vulnerable()) ?? this.bosses.find((bb) => bb.alive);
+        const open = this.bosses.find((bb) => bb.alive && bb.awake && bb.vulnerable());
+        if (!open && this.bosses.some((bb) => bb.awake)) for (const e of this.enemyList) if (e.alive && e instanceof RogueAgent) e.defeat(false);
+        const b = open ?? this.bosses.find((bb) => bb.alive);
         if (!b) return false;
         const p = this.playersList[0].body;
         if (!b.awake) {

@@ -81,6 +81,16 @@ async function completeLevel(page, id, tag) {
   const outro = await waitFor(page, () => window.__smb.card(), null, 20000);
   if (!outro) throw new Error(`${id}: no outro card`);
   await page.screenshot({ path: `${OUT}/${tag}-${id}-outro.png` });
+  // A finale's outro leads to the path recap.
+  if (/path is complete/.test(await page.evaluate(() => document.querySelector('.modal-date')?.textContent ?? ''))) {
+    await sleep(500);
+    await page.evaluate(() => window.__smb.next());
+    const recap = await waitFor(page, () => (window.__smb.card() ?? '').includes('complete!') && window.__smb.card(), null, 8000);
+    if (!recap) throw new Error(`${id}: no recap after the finale`);
+    await sleep(400);
+    await page.screenshot({ path: `${OUT}/${tag}-${id}-recap.png` });
+    return `${outro} → ${recap}`;
+  }
   return outro;
 }
 

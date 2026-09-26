@@ -9,7 +9,7 @@ import { fact, tip, type FactLine } from './types';
  * The engine reads these; it never hardcodes history.
  */
 
-export type StormId = 'boardCrisis' | 'pauseLetter' | 'deepseek' | 'settlement';
+export type StormId = 'boardCrisis' | 'pauseLetter' | 'deepseek' | 'settlement' | 'supplyChain' | 'exportFreeze' | 'rollout';
 
 export interface StormSpec {
   id: StormId;
@@ -28,6 +28,16 @@ export interface StormSpec {
   fog?: { speed: number; slow: number; start: number };
   /** A friendly rival races you to the flag; beat it for a bonus life. */
   race?: { rival: CharacterId; tag: string; speed: number; win: string; lose: string };
+  /**
+   * The level's gate groups (`D` columns, left to right). Each one opens after a player has waited
+   * next to it for `wait` seconds, or never (`wait: null`: find another way). Its label is toasted
+   * when it opens, or when you first reach it if it never does.
+   */
+  gates?: { label: string; wait: number | null }[];
+  /** Shown while a player waits at a gate that is about to open. */
+  gateWaiting?: string;
+  /** Power blocks release iced-over power-ups until a player passes the `9` mark; then they thaw. */
+  freeze?: { frozen: string; thaw: string; status: string };
 }
 
 export const STORMS: Record<StormId, StormSpec> = {
@@ -59,6 +69,35 @@ export const STORMS: Record<StormId, StormSpec> = {
   settlement: {
     id: 'settlement',
     name: 'The Settlement',
+  },
+  supplyChain: {
+    id: 'supplyChain',
+    name: 'Supply Chain Risk',
+    gates: [
+      { label: 'Feb 27, 2026: the Pentagon moves to label Anthropic a "supply chain risk". This road is closed; find another way.', wait: null },
+      { label: 'Aug 27, 2026: a federal judge in California rules one designation unlawful. This road reopens.', wait: 1.5 },
+      { label: 'Sep 25, 2026: a federal appeals court in Washington upholds the other designation, 2–1. This road stays closed.', wait: null },
+    ],
+    gateWaiting: 'The court is deciding…',
+  },
+  exportFreeze: {
+    id: 'exportFreeze',
+    name: 'The Export Freeze',
+    freeze: {
+      frozen: 'Access suspended: your newest power-up is frozen. Take it anyway; it thaws when access returns.',
+      thaw: 'June 30: the export controls are lifted. July 1: Fable 5 is back, and your frozen power-ups thaw!',
+      status: '❄ Access suspended',
+    },
+  },
+  rollout: {
+    id: 'rollout',
+    name: 'The Phased Rollout',
+    gates: [
+      { label: 'Phase 1 · Sep 3: approved organizations get access first.', wait: 2 },
+      { label: 'Phase 2 · Sep 4: Pro, Enterprise and Business Premium users, and the API.', wait: 2.5 },
+      { label: 'Phase 3 · Sep 4, about two hours later: Plus and Business users.', wait: 2.5 },
+    ],
+    gateWaiting: 'Rolling out… wait for your phase.',
   },
 };
 
@@ -314,6 +353,9 @@ export type MomentId =
   | 'claudePokemon'
   | 'projectVend';
 
+/** What a shop item does when you take it. */
+export type ShopEffect = 'nothing' | 'scale' | 'life';
+
 export interface MomentSpec {
   id: MomentId;
   name: string;
@@ -321,6 +363,8 @@ export interface MomentSpec {
   toast: string;
   /** Added to the level's outro card once the moment has happened. */
   fact: FactLine;
+  /** A shop that opens when the moment's item is taken. */
+  shop?: { title: string; date: string; pitch: string; items: { label: string; effect: ShopEffect; toast: string }[] };
 }
 
 export const MOMENTS: Record<MomentId, MomentSpec> = {
@@ -423,5 +467,15 @@ export const MOMENTS: Record<MomentId, MomentSpec> = {
       'In Project Vend (June 2025), Anthropic let Claude run a small office shop. Staff talked it into handing out discount codes, and a joke request for a tungsten cube started a run on "specialty metal items".',
       'projectVend',
     ),
+    shop: {
+      title: 'The office shop',
+      date: 'Project Vend · a shop run by Claude',
+      pitch: 'An AI shopkeeper runs this stand, and it hands out a discount code to anyone who asks nicely. Everything is 100% off. Pick one.',
+      items: [
+        { label: 'Tungsten cube', effect: 'nothing', toast: 'A tungsten cube! Heavy, shiny, and no use at all. The shop lost money on it.' },
+        { label: 'Scale crystal', effect: 'scale', toast: 'A free Scale crystal. The shop is not making money.' },
+        { label: 'Extra life', effect: 'life', toast: 'A free extra life. Discount codes all around!' },
+      ],
+    },
   },
 };

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ROSTER } from '../config/characters';
 import { ALL_LEVELS, LEVELS } from '../config/levels';
+import { STORMS } from '../config/events';
 import { MAP_HEIGHT } from '../config/mapTools';
 import { PATHS } from '../config/paths';
+import { gateGroups, openingGateTiles } from './gates';
 import { LevelGrid } from './level';
 import type { MoveStats } from './movement';
 import { analyzeReach } from './reach';
@@ -47,6 +49,14 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     }
   });
 
+  it('matches its storm: one gate group per scripted gate, and a thaw mark for a freeze', () => {
+    const storm = spec.storm ? STORMS[spec.storm] : undefined;
+    const groups = gateGroups(grid);
+    if (storm?.gates) expect(groups.length).toBe(storm.gates.length);
+    if (storm?.freeze) expect(grid.marks.some((m) => m.ch === '9'), 'thaw mark 9').toBe(true);
+    if (storm?.gates || storm?.freeze) expect(spec.puzzle, 'storm gates and puzzle gates do not mix').toBeUndefined();
+  });
+
   it('offers every token in its recipe', () => {
     const offered = grid.tokenTypes(spec.blockToken);
     for (const id of Object.keys(spec.recipe)) expect(offered.has(id as never), id).toBe(true);
@@ -63,7 +73,10 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     // The level's form ability (longer context = floatier jumps) applies to whoever plays it.
     const a = spec.ability ?? {};
     const stats = { ...WEAKEST, jumpVelocity: WEAKEST.jumpVelocity * (a.jump ?? 1), fallGravity: WEAKEST.fallGravity * (a.float ?? 1) };
-    const r = analyzeReach(grid, spawn, goal.x, { stats, h });
+    // Storm gates that open once you wait count as open; closed roads stay shut.
+    const gates = spec.storm ? STORMS[spec.storm].gates : undefined;
+    const open = gates ? openingGateTiles(gateGroups(grid), gates.map((g) => g.wait)) : null;
+    const r = analyzeReach(grid, spawn, goal.x, { stats, h, openGate: open ? (x, y) => open.has(`${x},${y}`) : undefined });
     expect(r.goalReachable, `stuck around x=${r.furthestX}`).toBe(true);
     expect(r.deadEnds, 'soft-lock spots').toEqual([]);
   });

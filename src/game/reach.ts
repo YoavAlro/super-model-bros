@@ -19,6 +19,8 @@ export interface ReachOptions {
   h: number;
   /** Gates stay shut unless the level opens them on a timer. */
   gatesOpen?: boolean;
+  /** Opens just these gate tiles (a storm's gates that open once you wait). */
+  openGate?: (tx: number, ty: number) => boolean;
 }
 
 export interface ReachReport {
@@ -58,7 +60,7 @@ function policies(): Policy[] {
 const POLICIES = policies();
 
 /** The grid as the checker sees it: hidden blocks absent, toggles solid, gates per options. */
-function checkerGrid(grid: LevelGrid, gatesOpen: boolean): Grid {
+function checkerGrid(grid: LevelGrid, gatesOpen: boolean, openGate?: (tx: number, ty: number) => boolean): Grid {
   const solidity: Solidity = { hiddenSolid: false, phase: 0 };
   return {
     isSolid(tx, ty) {
@@ -66,7 +68,7 @@ function checkerGrid(grid: LevelGrid, gatesOpen: boolean): Grid {
       if (ty < 0 || ty >= grid.height) return false;
       const t = grid.get(tx, ty);
       if (t === T.TOGGLE_B) return true;
-      if (t === T.GATE) return !gatesOpen;
+      if (t === T.GATE) return !(gatesOpen || openGate?.(tx, ty));
       return tileSolid(t, solidity);
     },
     isOneWay: (tx, ty) => grid.isOneWay(tx, ty),
@@ -75,7 +77,7 @@ function checkerGrid(grid: LevelGrid, gatesOpen: boolean): Grid {
 }
 
 export function analyzeReach(grid: LevelGrid, start: { x: number; y: number }, goalX: number, opts: ReachOptions): ReachReport {
-  const view = checkerGrid(grid, !!opts.gatesOpen);
+  const view = checkerGrid(grid, !!opts.gatesOpen, opts.openGate);
   const W = grid.width;
   const key = (x: number, y: number) => y * W + x;
   const startKey = key(start.x, start.y);
