@@ -151,7 +151,7 @@ export const PIRANHA_ARENA = [
   '                          ',
   '                          ',
   '                          ',
-  '    *              *      ',
+  '  *                *      ',
   '            G             ',
   '     PP     PP     PP     ',
   '     PP     PP     PP   H ',

@@ -16,8 +16,10 @@ Before every commit, run `npm test && npm run build`.
 ## Rules
 - Content (levels, characters, themes, events, facts) lives in `src/config/`. Engine code never hardcodes history.
 - Levels are ASCII maps; the legend is on `LevelSpec.map` in `src/config/levelSpec.ts`. Check jumps against
-  the physics: a standing jump clears ~4 tiles, and a 4-tall pipe needs a running jump. `src/game/levels.test.ts`
-  runs the reachability checker on every level; it fails on impossible jumps and soft-locks.
+  the physics: for the weakest character a standing jump clears 3 tiles and a running jump 4, so a 4-tall pipe
+  needs a run-up and nothing may need 5. `src/game/levels.test.ts` runs the reachability checker on every level;
+  it fails on impossible jumps and soft-locks, and on jumps with no human margin: every level must still be
+  finishable at `HUMAN_MARGIN` (95%) of the weakest jump, so no jump needs a pixel-perfect take-off.
 - Fact lines use `fact(text, ...sourceIds)`; gameplay advice uses `tip(text)`. Sources live in `src/config/sources.ts`.
 - Pure logic (`level.ts`, `physics.ts`, `diet.ts`, and any new rules) gets unit tests. Rendering doesn't.
 - Mario-inspired, not Mario: no Nintendo names, sprites, music, or layouts in the game.

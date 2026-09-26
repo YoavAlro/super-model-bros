@@ -18,6 +18,14 @@ const WEAKEST: MoveStats = {
   fallGravity: Math.max(...ROSTER.map((c) => c.fallGravity)),
 };
 
+/**
+ * People are not frame-perfect: on a phone they take off a little early or a little slow. So every
+ * level must also be finishable, with no soft-locks, when the weakest character's jump velocity is
+ * scaled by this margin. A jump that passes only at full strength needs a pixel-perfect take-off.
+ * (At 0.94 the deliberate 4-tall climbs, like the lying bar in 5-4, shrink to a 0.04 s window.)
+ */
+const HUMAN_MARGIN = 0.95;
+
 describe('paths', () => {
   it('reference levels that exist, in world order', () => {
     for (const path of Object.values(PATHS)) {
@@ -64,20 +72,29 @@ describe.each(ALL_LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, spec)
     expect(sum).toBeCloseTo(1, 5);
   });
 
-  it.each([
-    ['small', 0.95],
-    ['big', 1.75],
-  ])('can be finished, with no soft-locks, by the weakest %s character', (_size, h) => {
+  const expectFinishable = (h: number, jumpScale: number) => {
     const spawn = grid.spawnOf('spawn')!;
     const goal = grid.spawnOf('flag') ?? grid.spawnOf('boss')!;
     // The level's form ability (longer context = floatier jumps) applies to whoever plays it.
     const a = spec.ability ?? {};
-    const stats = { ...WEAKEST, jumpVelocity: WEAKEST.jumpVelocity * (a.jump ?? 1), fallGravity: WEAKEST.fallGravity * (a.float ?? 1) };
+    const stats = { ...WEAKEST, jumpVelocity: WEAKEST.jumpVelocity * (a.jump ?? 1) * jumpScale, fallGravity: WEAKEST.fallGravity * (a.float ?? 1) };
     // Storm gates that open once you wait count as open; closed roads stay shut.
     const gates = spec.storm ? STORMS[spec.storm].gates : undefined;
     const open = gates ? openingGateTiles(gateGroups(grid), gates.map((g) => g.wait)) : null;
     const r = analyzeReach(grid, spawn, goal.x, { stats, h, openGate: open ? (x, y) => open.has(`${x},${y}`) : undefined });
     expect(r.goalReachable, `stuck around x=${r.furthestX}`).toBe(true);
     expect(r.deadEnds, 'soft-lock spots').toEqual([]);
-  });
+  };
+
+  it.each([
+    ['small', 0.95],
+    ['big', 1.75],
+  ])('can be finished, with no soft-locks, by the weakest %s character', (_size, h) => expectFinishable(h, 1));
+
+  it.each([
+    ['small', 0.95],
+    ['big', 1.75],
+  ])(`leaves a human margin: the weakest %s character finishes it on ${Math.round(HUMAN_MARGIN * 100)}% of its jump`, (_size, h) =>
+    expectFinishable(h, HUMAN_MARGIN),
+  );
 });
