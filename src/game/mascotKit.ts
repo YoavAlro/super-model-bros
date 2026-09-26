@@ -150,14 +150,12 @@ export function frontZ(x: number, y: number, c: V3, r: V3): number {
 
 // ---------------------------------------------------------------- 2D outlines
 
-/** GPT's speech bubble: a rounded square (0.62 × 0.52, corner r 0.2) with a tail at its lower right. */
+/** GPT's speech bubble: a rounded square (0.62 × 0.52, corner r 0.2). Its pointer is `pointerShape`. */
 export function bubbleShape(): THREE.Shape {
   const s = new THREE.Shape();
   s.moveTo(-0.11, -0.26);
-  s.lineTo(0.06, -0.26);
-  s.lineTo(0.37, -0.41);
-  s.lineTo(0.251, -0.201);
-  s.absarc(0.11, -0.06, 0.2, -Math.PI / 4, 0, false);
+  s.lineTo(0.11, -0.26);
+  s.absarc(0.11, -0.06, 0.2, -Math.PI / 2, 0, false);
   s.lineTo(0.31, 0.06);
   s.absarc(0.11, 0.06, 0.2, 0, Math.PI / 2, false);
   s.lineTo(-0.11, 0.26);
@@ -165,6 +163,72 @@ export function bubbleShape(): THREE.Shape {
   s.lineTo(-0.31, -0.06);
   s.absarc(-0.11, -0.06, 0.2, Math.PI, 1.5 * Math.PI, false);
   return s;
+}
+
+/**
+ * The bubble's pointer, in the bubble's own frame: its root is buried in the lower-right corner and
+ * its tip juts down and out to (0.37, -0.41), so it can wag from the corner without a gap showing.
+ */
+export function pointerShape(): THREE.Shape {
+  const s = new THREE.Shape();
+  s.moveTo(0.02, -0.17);
+  s.lineTo(0.37, -0.41);
+  s.lineTo(0.24, -0.08);
+  s.lineTo(0.02, -0.17);
+  return s;
+}
+
+/** A five-point star (never the four-point sparkle), `outer` to its points, centred on the origin. */
+export function starShape(outer: number, inner = outer * 0.45): THREE.Shape {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? inner : outer;
+    const a = Math.PI / 2 + (i * Math.PI) / 5;
+    if (i) s.lineTo(r * Math.cos(a), r * Math.sin(a));
+    else s.moveTo(r * Math.cos(a), r * Math.sin(a));
+  }
+  return s;
+}
+
+/**
+ * A tube along `curve` whose radius tapers from `r0` to `r1`, closed with a round cap at the tip and
+ * painted along its length (`colorAt(u)`, u = 0 at the root, 1 at the tip). Ready for a vertex-coloured material.
+ */
+export function taperedTube(curve: THREE.Curve<THREE.Vector3>, segments: number, r0: number, r1: number, radial: number, colorAt: (u: number, out: THREE.Color) => void): THREE.BufferGeometry {
+  const tube = new THREE.TubeGeometry(curve, segments, 1, radial);
+  const pos = tube.getAttribute('position');
+  const colors = new Float32Array(pos.count * 3);
+  const v = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const col = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const u = Math.floor(i / (radial + 1)) / segments;
+    curve.getPointAt(u, c);
+    v.fromBufferAttribute(pos, i).sub(c).multiplyScalar(r0 + (r1 - r0) * u).add(c);
+    pos.setXYZ(i, v.x, v.y, v.z);
+    colorAt(u, col);
+    colors.set([col.r, col.g, col.b], i * 3);
+  }
+  tube.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  tube.computeVertexNormals();
+  const end = curve.getPointAt(1);
+  colorAt(1, col);
+  const cap = solidColor(new THREE.SphereGeometry(r1, radial, 6).translate(end.x, end.y, end.z), col.getHex());
+  return merged([{ g: tube }, { g: cap }]);
+}
+
+/** The eyelid cap of a `makeEye` eye (its only lit mesh), found by material rather than child order. */
+export function lidOf(eye: THREE.Object3D): THREE.Mesh | undefined {
+  return eye.children.find((o) => (o as THREE.Mesh).material instanceof THREE.MeshToonMaterial) as THREE.Mesh | undefined;
+}
+
+/** The pupil of a `makeEye` eye with a coloured iris: the smaller of its two dark discs in front. */
+export function pupilOf(eye: THREE.Object3D): THREE.Mesh | undefined {
+  const dark = eye.children.filter((o) => {
+    const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+    return m instanceof THREE.MeshBasicMaterial && m.color.getHex() !== 0xffffff;
+  }) as THREE.Mesh[];
+  return dark.length === 2 ? dark.sort((a, b) => a.position.z - b.position.z)[1] : undefined;
 }
 
 /** The same bubble without its tail and with a three-scallop ghost hem. */

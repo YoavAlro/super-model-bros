@@ -37,6 +37,20 @@ export function idleMoment(idle: number, every: number, dur: number): number {
   return into < dur ? into / dur : -1;
 }
 
+/** A pop-in scale for something appearing: 0 at u = 0, overshooting to about 1.15, settling at 1 from u = 1. */
+export function popIn(u: number): number {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  return Math.sin((u * Math.PI) / 2) * (1 + 0.3 * Math.sin(u * Math.PI));
+}
+
+/** A smooth 0 → 1 → 0 envelope over an idle moment's progress (-1 outside it), holding at 1 in the middle. */
+export function hold(p: number, edge = 0.2): number {
+  if (p < 0 || p >= 1) return 0;
+  const u = Math.min(1, p / edge, (1 - p) / edge);
+  return u * u * (3 - 2 * u);
+}
+
 /** Radians per second of the stride cycle at a given running speed (world units per second). */
 export const strideRate = (speed: number): number => 4 + Math.min(speed, 16) * 1.1;
 

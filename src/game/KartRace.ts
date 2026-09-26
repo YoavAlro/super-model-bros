@@ -175,8 +175,11 @@ export class KartRace {
     for (const racer of this.race.racers) {
       const c = CHARACTERS[racer.id as CharacterId];
       const group = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.1), new THREE.MeshLambertMaterial({ color: c.color }));
+      // A darker shade of the lab's colour with a bright stripe, so the driver stands out against it.
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.1), new THREE.MeshLambertMaterial({ color: new THREE.Color(c.color).multiplyScalar(0.45) }));
       body.position.y = 0.45;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.12, 1.12), new THREE.MeshLambertMaterial({ color: c.color }));
+      stripe.position.y = 0.5;
       const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12);
       const wheelMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1f });
       for (const [x, z] of [
@@ -191,13 +194,14 @@ export class KartRace {
         group.add(w);
       }
       const driver = makeCharacter(c);
-      driver.scale.setScalar(0.75);
-      driver.position.set(-0.2, 0.55, 0);
+      // Seated high enough that head and shoulders clear the deck (its top is at 0.7).
+      driver.scale.setScalar(0.8);
+      driver.position.set(-0.2, 0.62, 0);
       driver.rotation.y = Math.PI / 2;
       const tag = labelSprite(racer.human ? `▼ ${c.name}` : c.name, '#ffffff', racer.human ? 'rgba(20,110,60,0.85)' : 'rgba(0,0,0,0.45)');
       tag.scale.multiplyScalar(racer.human ? 0.6 : 0.42);
       tag.position.y = racer.human ? 2.4 : 1.9;
-      group.add(body, driver, tag);
+      group.add(body, stripe, driver, tag);
       this.scene.add(group);
       this.karts.push({ group, driver, racer });
     }

@@ -11,13 +11,13 @@ export interface PlanColors {
   /** A walking speech bubble with a cowlick. */
   chatBubble: { curl: number; legs: number; sneakers: number; tongue: number; lines: number };
   /** A tall soft block with an ink face page and a long scarf. */
-  scarfBlock: { page: number; stripe: number; legs: number; blush: number; vane: number; spine: number; nib: number };
+  scarfBlock: { page: number; stripe: number; legs: number; blush: number; vane: number; spine: number };
   /** Twin domes, one per twin, over a body blended from one twin's colour to the other's. */
   twinDomes: { twin: number; twinIris: number; bow: number; feet: number; blush: number; freckles: number };
   /** An upright llama: wool below, a long cream neck and banana ears above. */
   openLlama: { cream: number; snout: number; collar: number; charm: number; innerEar: number; hooves: number };
-  /** An upright whale calf with a spout. */
-  whaleCalf: { fins: number; belly: number; pleats: number; dark: number; spout: number; droplets: number; blush: number };
+  /** An upright whale calf with a spout, a pale striped belly and flukes by its foot. */
+  whaleCalf: { fins: number; belly: number; pleats: number; dark: number; droplets: number };
   /** A cat in a smooth gradient (body colour at the feet, `mid`, then `crown`) with a gust-curl tail. */
   galeCat: { mid: number; crown: number; tail: number; tailTip: number; cream: number; scarf: number; nose: number };
   /** A bobble-headed space cadet: helmet, visor, suit and a towel. */
@@ -69,7 +69,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'OpenAI',
     color: 0x10a37f,
     accent: 0xf4f4f4,
-    look: { plan: 'chatBubble', iris: 0x0b3d2e, colors: { curl: 0x0b7a5f, legs: 0x0b3d2e, sneakers: 0xf4f4f4, tongue: 0xff8a8a, lines: 0xc4f1df } },
+    look: { plan: 'chatBubble', iris: 0x13966f, colors: { curl: 0x0b7a5f, legs: 0x0b3d2e, sneakers: 0xf4f4f4, tongue: 0xff8a8a, lines: 0xc4f1df } },
     walkSpeed: 8.5,
     runSpeed: 13,
     jumpVelocity: 23,
@@ -85,7 +85,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'Anthropic',
     color: 0xd97757,
     accent: 0xf5ecd7,
-    look: { plan: 'scarfBlock', iris: 0x5a3322, colors: { page: 0xf5ecd7, stripe: 0x3d3929, legs: 0xb85f42, blush: 0xf2a48a, vane: 0xfffaf0, spine: 0xa4513a, nib: 0x3b2a22 } },
+    look: { plan: 'scarfBlock', iris: 0x9a5234, colors: { page: 0xf5ecd7, stripe: 0x3d3929, legs: 0xb85f42, blush: 0xf2a48a, vane: 0xfffaf0, spine: 0xa4513a } },
     walkSpeed: 8,
     runSpeed: 12.5,
     jumpVelocity: 24,
@@ -101,7 +101,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'Google',
     color: 0x4c8df6,
     accent: 0xffffff,
-    look: { plan: 'twinDomes', iris: 0x2446a8, colors: { twin: 0x9b72cb, twinIris: 0x6a3fb0, bow: 0xd96570, feet: 0x2f3a6b, blush: 0xffb3c7, freckles: 0xfff6c8 } },
+    look: { plan: 'twinDomes', iris: 0x2f6be0, colors: { twin: 0x9b72cb, twinIris: 0x6a3fb0, bow: 0xd96570, feet: 0x2f3a6b, blush: 0xffb3c7, freckles: 0xfff6c8 } },
     walkSpeed: 8.5,
     runSpeed: 12.5,
     jumpVelocity: 23,
@@ -118,7 +118,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'Meta',
     color: 0x7b61ff,
     accent: 0xffffff,
-    look: { plan: 'openLlama', iris: 0x2a1a6e, colors: { cream: 0xf3eefe, snout: 0xffffff, collar: 0x0866ff, charm: 0xffd166, innerEar: 0xd9ccff, hooves: 0x2a1a4e } },
+    look: { plan: 'openLlama', iris: 0x5b3fd0, colors: { cream: 0xf3eefe, snout: 0xffffff, collar: 0x0866ff, charm: 0xffd166, innerEar: 0xd9ccff, hooves: 0x2a1a4e } },
     walkSpeed: 8.5,
     runSpeed: 12.5,
     jumpVelocity: 23,
@@ -135,7 +135,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'DeepSeek',
     color: 0x4d6bfe,
     accent: 0xffffff,
-    look: { plan: 'whaleCalf', iris: 0x13235e, colors: { fins: 0x3a54d6, belly: 0xf2f6ff, pleats: 0xb9c6ff, dark: 0x2b3fb3, spout: 0xbfe6ff, droplets: 0xd9f3ff, blush: 0xffa8c8 } },
+    look: { plan: 'whaleCalf', iris: 0x2f58e8, colors: { fins: 0x3a54d6, belly: 0xe1e9ff, pleats: 0xa3b4ff, dark: 0x2b3fb3, droplets: 0xd9f3ff } },
     walkSpeed: 9,
     runSpeed: 14,
     jumpVelocity: 22.5,
@@ -170,7 +170,7 @@ export const CHARACTERS: Record<CharacterId, CharacterSpec> = {
     lab: 'xAI',
     color: 0x9a9a9a,
     accent: 0xffffff,
-    look: { plan: 'spaceCadet', iris: 0x1d1424, colors: { visor: 0x16181d, suit: 0x3a3d44, trim: 0xf4f4f4, mitts: 0xd6d8dc, light: 0x9ff7ff, towel: 0xf2eee3, bands: 0x7d8088, patch: 0xc1440e } },
+    look: { plan: 'spaceCadet', iris: 0x1d1424, colors: { visor: 0x16181d, suit: 0x565b66, trim: 0xf4f4f4, mitts: 0xd6d8dc, light: 0x9ff7ff, towel: 0xf2eee3, bands: 0x7d8088, patch: 0xc1440e } },
     walkSpeed: 8.5,
     runSpeed: 13,
     jumpVelocity: 23,

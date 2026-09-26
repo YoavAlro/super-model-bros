@@ -16,6 +16,15 @@ const BIG_H = 1.75;
 /** Frontier size: the giant finale form. */
 const MEGA_W = 1.4;
 const MEGA_H = 3;
+/**
+ * Emissive strength of the held-power glows: a tint over the body, not a recolour. Think's violet
+ * is weaker because warm bodies (clay, orange) have so little blue that it would turn them pink.
+ */
+const TOOL_GLOW = 0.35;
+const THINK_GLOW = 0.11;
+
+/** A material the star, tool and think glows tint. */
+type GlowMat = THREE.Material & { emissive: THREE.Color; emissiveIntensity: number };
 
 /** A power you keep until you get hit. */
 export type HeldPower = 'tool' | 'cape' | null;
@@ -60,7 +69,7 @@ export class PlayerActor {
   private tag: THREE.Sprite;
   private readonly cape: THREE.Object3D;
   /** The body's material plus any big second-colour mass (`userData.glow`): the star, tool and think glows. */
-  private readonly glowMats: (THREE.Material & { emissive: THREE.Color })[];
+  private readonly glowMats: GlowMat[];
   /** Seconds left of an air-dash's streaming look. */
   private dashTime = 0;
   /** Reused every frame for the mascot's idle life. */
@@ -83,10 +92,10 @@ export class PlayerActor {
   ) {
     this.mover = newMover(x, y, 0.8, SMALL_H);
     this.mesh = makeCharacter(spec);
-    const glow = new Set<THREE.Material & { emissive: THREE.Color }>();
+    const glow = new Set<GlowMat>();
     this.mesh.traverse((o) => {
       const m = (o as THREE.Mesh).material as (THREE.Material & { emissive?: THREE.Color }) | undefined;
-      if (m?.emissive && (o.name === 'body' || m.userData.glow)) glow.add(m as THREE.Material & { emissive: THREE.Color });
+      if (m?.emissive && (o.name === 'body' || m.userData.glow)) glow.add(m as GlowMat);
     });
     this.glowMats = [...glow];
     this.cape = makeCape(spec.accent);
@@ -309,12 +318,18 @@ export class PlayerActor {
       this.ghosted = ghosted;
       this.mesh.traverse((o) => {
         const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (m) m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
+        if (!m) return;
+        m.setValues({ transparent: ghosted, opacity: ghosted ? 0.5 : 1 });
+        // Opaque materials compile with alpha forced to 1: recompile, or the hit never shows.
+        m.needsUpdate = true;
       });
       showOutlines(this.mesh, !ghosted);
     }
     this.cape.visible = this.power === 'cape';
-    (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(0.9, Math.abs(b.vy) * 0.06);
+    (this.cape.userData.pivot as THREE.Object3D).rotation.x = b.onGround ? 0.15 : 0.15 + Math.min(1.1, Math.abs(b.vy) * 0.07);
+    // Held powers (tool, think) glow as a sheen that keeps the lab's colour; a star glows at full strength.
+    const glowStrength = this.star > 0 ? 1 : this.power === 'tool' ? TOOL_GLOW : THINK_GLOW;
+    for (const mat of this.glowMats) mat.emissiveIntensity = glowStrength;
     for (const mat of this.glowMats) {
       if (this.star > 0) {
         const hue = this.starKind === 'viral' ? (t * 1.5) % 1 : this.starKind === 'mega' ? 0.12 + Math.sin(t * 3) * 0.04 : 0.13;

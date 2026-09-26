@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, ROSTER } from '../config/characters';
-import { IDLE, animateCharacter, makeCharacter, makeHelper, type CharacterMotion } from './characterMeshes';
-import { blinkScale, flick, idleMoment, landingSquint, nextBlink, phaseOf, springWobble, strideRate } from './mascotMotion';
+import { CAPE, IDLE, animateCharacter, makeCharacter, makeHelper, type CharacterMotion } from './characterMeshes';
+import { blinkScale, flick, hold, idleMoment, landingSquint, nextBlink, phaseOf, popIn, springWobble, strideRate } from './mascotMotion';
 import { prefs } from './prefs';
 
 const meshesOf = (root: THREE.Object3D) => {
@@ -32,20 +32,24 @@ function vertices(root: THREE.Object3D, visibleOnly = false, skipEyes = false): 
 }
 
 /**
- * The reasoning cape's cloth hangs from (0, 0.72, -0.3), is 0.5 × 0.55 and 0.04 thick, and swings
- * back from 0.15 rad (standing) to 1.05 rad (airborne). A vertex collides if it is inside the fan
- * the cloth sweeps (padded by its half thickness plus a hair).
+ * The reasoning cape's cloth hangs from (0, 0.72, -0.3), flares from CAPE.top to CAPE.hem half-width
+ * over CAPE.length (its hem curves 0.025 lower in the middle), is 0.04 thick, and swings back from
+ * 0.15 rad (standing) to 1.25 rad (airborne: Player caps it there). A vertex collides if it is
+ * inside the fan the cloth sweeps between the `swing` angles, padded by its half thickness plus
+ * `hair` (a safety margin for the rest pose; moving parts are checked against the cloth itself).
  */
-function hitsCape(v: THREE.Vector3): boolean {
-  if (Math.abs(v.x) > 0.27 || v.y > 0.74) return false;
+function hitsCape(v: THREE.Vector3, hair = 0.005, swing: readonly [number, number] = [0.15, 1.25]): boolean {
+  if (v.y > 0.74) return false;
+  const pad = 0.02 + hair;
   const dy = v.y - 0.72;
   const dz = v.z + 0.3;
   const len = Math.hypot(dy, dz);
-  if (len > 0.55 + 0.025) return false;
+  if (len > CAPE.length + 0.025 + pad) return false;
+  if (Math.abs(v.x) > CAPE.top + (CAPE.hem - CAPE.top) * Math.min(1, len / CAPE.length) + 0.01) return false;
   // Angle of the vertex from straight down, swinging back toward -z.
   const angle = Math.atan2(-dz, -dy);
-  const pad = 0.025 / Math.max(len, 0.05);
-  return angle > 0.15 - pad && angle < 1.05 + pad;
+  const turn = pad / Math.max(len, 0.05);
+  return angle > swing[0] - turn && angle < swing[1] + turn;
 }
 
 describe('mascot meshes', () => {
@@ -85,7 +89,7 @@ describe('mascot meshes', () => {
       });
 
       it('stays within the draw budget', () => {
-        expect(meshesOf(a).length).toBeLessThanOrEqual(40);
+        expect(meshesOf(a).length).toBeLessThanOrEqual(36);
         const tris = meshesOf(a).reduce((n, m) => n + (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute('position').count) / 3, 0);
         expect(tris).toBeLessThan(7000);
       });
@@ -97,7 +101,27 @@ describe('mascot meshes', () => {
       });
 
       it('keeps clear of the reasoning cape, standing and airborne', () => {
-        const hits = vertices(a).filter(hitsCape);
+        const hits = vertices(a).filter((v) => hitsCape(v));
+        expect(hits.slice(0, 3).map((v) => v.toArray().map((n) => +n.toFixed(3)))).toEqual([]);
+      });
+
+      it('keeps clear of the reasoning cape while it idles, runs and jumps (moving parts too)', () => {
+        const m = makeCharacter(c);
+        let t = 0;
+        const hits: number[][] = [];
+        // On the ground Player holds the cape at 0.15 rad; in the air it swings back as far as 1.25.
+        const states: [CharacterMotion, [number, number]][] = [
+          [IDLE, [0.15, 0.15]],
+          [{ speed: 12, airborne: false, vy: 0 }, [0.15, 0.15]],
+          [{ speed: 8, airborne: true, vy: 10 }, [0.15, 1.25]],
+          [{ speed: 10, airborne: true, vy: -5, dashing: true }, [0.15, 1.25]],
+        ];
+        for (const [s, swing] of states) {
+          for (let i = 0; i < 360 && !hits.length; i++) {
+            animateCharacter(m, (t += 1 / 30), s);
+            if (i % 9 === 0) for (const v of vertices(m, true)) if (hitsCape(v, 0, swing)) hits.push(v.toArray().map((n) => +n.toFixed(3)));
+          }
+        }
         expect(hits.slice(0, 3)).toEqual([]);
       });
 
@@ -111,6 +135,12 @@ describe('mascot meshes', () => {
       it('animates without throwing and returns to its rest pose under reduced motion', () => {
         const m = makeCharacter(c);
         const rest = vertices(m, false, true);
+        const shown = (r: THREE.Object3D) => {
+          const out: boolean[] = [];
+          r.traverse((o) => out.push(o.visible));
+          return out;
+        };
+        const restShown = shown(m);
         const states: CharacterMotion[] = [
           { speed: 12, airborne: false, vy: 0 },
           { speed: 6, airborne: true, vy: 12 },
@@ -127,12 +157,22 @@ describe('mascot meshes', () => {
         prefs.reduceMotion = true;
         try {
           for (let i = 0; i < 90; i++) animateCharacter(m, (t += 1 / 30), { speed: 12, airborne: false, vy: 0 });
+          // An air-dash is secondary motion too: no streaming tail or wind under reduced motion.
+          for (let i = 0; i < 90; i++) animateCharacter(m, (t += 1 / 30), { speed: 0, airborne: false, vy: 0, dashing: true });
         } finally {
           prefs.reduceMotion = false;
         }
         const now = vertices(m, false, true);
         const worst = Math.max(...now.map((v, i) => v.distanceTo(rest[i])));
         expect(worst).toBeLessThan(1e-4);
+        expect(shown(m)).toEqual(restShown);
+      });
+
+      it('does not idle (typing, pondering, chatting) while driving a kart', () => {
+        const m = makeCharacter(c);
+        let t = 0;
+        for (let i = 0; i < 150; i++) animateCharacter(m, (t += 1 / 30), { speed: 20, airborne: false, vy: 0, seated: true });
+        expect(m.userData.idle).toBe(0);
       });
     });
   }
@@ -203,6 +243,21 @@ describe('mascot timing', () => {
     expect(idleMoment(6.5, 6, 1)).toBeCloseTo(0.5);
     expect(idleMoment(7.5, 6, 1)).toBe(-1);
     expect(idleMoment(12.25, 6, 1)).toBeCloseTo(0.25);
+  });
+
+  it('pops in with an overshoot and settles at full size', () => {
+    expect(popIn(0)).toBe(0);
+    expect(popIn(0.7)).toBeGreaterThan(1);
+    expect(popIn(1)).toBe(1);
+    expect(popIn(2)).toBe(1);
+  });
+
+  it('holds an idle moment smoothly between its fades', () => {
+    expect(hold(-1)).toBe(0);
+    expect(hold(0)).toBe(0);
+    expect(hold(0.5)).toBe(1);
+    expect(hold(0.1)).toBeCloseTo(0.5);
+    expect(hold(1)).toBe(0);
   });
 
   it('strides faster with speed, up to a cap', () => {

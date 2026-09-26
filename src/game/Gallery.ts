@@ -88,7 +88,7 @@ export function showGallery(root: HTMLElement, which: 'characters' | 'enemies'):
       else if (m.position.y > -4) m.rotation.y = Math.sin(t * 0.8) * 0.5;
       animateCharacter(m, t, IDLE);
     }
-    for (const p of capes) p.rotation.x = 0.6 + 0.45 * Math.sin(t * 1.5);
+    for (const p of capes) p.rotation.x = 0.7 + 0.55 * Math.sin(t * 1.5);
     renderer.render(scene, camera);
   });
   (window as unknown as { __smbGallery: () => number }).__smbGallery = () => items.length;
